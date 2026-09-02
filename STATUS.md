@@ -5,7 +5,7 @@ Every PR must update it. If you are a fresh session, read this before touching a
 
 - **⏰ PRESENTATION: Thu 3 Sep 2026, 09:30.** Everything below is now read against that, not
   against the 27 Sep code freeze. See **§Tomorrow 09:30** for what is in and what is cut.
-- **Last updated:** 2026-09-02 (session 4)
+- **Last updated:** 2026-09-02 (session 4 close — 11 PRs merged: #23-#33)
 - **Phase:** Phase 3 — money engine. **Exit criterion met**; its six audits are still owed.
 - **Local path:** `C:\MoMo-Hack`
 - **Repo:** <https://github.com/TUMO-MOGAME/MoMo-Hack> — **public**, `main` **protected**, and as of
@@ -693,8 +693,8 @@ straight out of the `[ ]`/`[~]`/`[x]` column. Recomputed whenever the board chan
 | Measure | | What it counts |
 |---|---|---|
 | **Done to the required test level** | **26%** | 18 items. The honest floor: `docs/04` says a feature is Done only at its named test level. |
-| **Weighted** (`[~]` counts half) | **31%** | The fairest single number. |
-| **Started or better** | **36%** | 25 items have real code. |
+| **Weighted** (`[~]` counts half) | **34%** | The fairest single number. |
+| **Started or better** | **42%** | 29 items have real code. |
 
 **Read these with three caveats, or they will mislead you.**
 
