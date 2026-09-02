@@ -275,14 +275,39 @@ beat. Confirm on the portal before committing to it. Currently **[U]** and not i
 
 Used for: escrow release to workers, the 60/25/10/5 revenue split payouts, bulk payroll.
 
+> ### ✅ DISBURSEMENTS ARE LIVE ON PRODUCTION — **[V] MEASURED 2026-09-03**
+>
+> Verified against `https://proxy.momoapi.mtn.com`, `X-Target-Environment: mtnsouthafrica`, using
+> `MTN_DISBURSEMENT_SUBSCRIPTION_KEY` with the same API user as collections:
+>
+> ```
+> POST /disbursement/token/                              → 200
+> GET  /disbursement/v1_0/account/balance                → 200 {"availableBalance":"35.83","currency":"ZAR"}
+> GET  /disbursement/v1_0/accountholder/msisdn/{n}/active → 200 {"result":true}
+> ```
+>
+> **There is R35.83 of real money in the disbursement account, and the intended payee is
+> reachable.** So paying OUT is not blocked by provisioning, credentials or the payee — the only
+> thing missing is the code (M3a).
+>
+> **The subscription key differs from collections.** One API user, one API key, but a separate
+> `Ocp-Apim-Subscription-Key` per product. `readMomoConfig` already models this correctly as
+> `subscriptionKeys.disbursement`.
+>
+> **`transfer` itself is still `[P]` and must not be coded from memory** (CLAUDE.md #9). Verify
+> the request body and response codes before the first send — and unlike a collection, **a
+> disbursement moves money with no second human in the loop.** A `requesttopay` that goes wrong
+> annoys someone; a `transfer` that goes wrong is gone.
+
 | Operation | Path | Rating |
 |---|---|---|
 | Transfer | `POST /disbursement/v1_0/transfer` | **[P]** |
 | Transfer status | `GET /disbursement/v1_0/transfer/{referenceId}` | **[P]** |
 | Deposit | `POST /disbursement/v1_0/deposit`, `v2_0` | **[P]** |
 | Refund | `POST /disbursement/v1_0/refund`, `v2_0` | **[P]** |
-| Account balance | `GET /disbursement/v1_0/account/balance` | **[P]** |
-| Account holder active | `GET /disbursement/v1_0/accountholder/{idType}/{id}/active` | **[P]** |
+| Account balance | `GET /disbursement/v1_0/account/balance` | **[V]** 200, R35.83 ZAR |
+| Account holder active | `GET /disbursement/v1_0/accountholder/{idType}/{id}/active` | **[V]** 200, `{"result":true}` |
+| Token | `POST /disbursement/token/` | **[V]** 200 |
 
 Transfer body mirrors `requesttopay`, with `payee` instead of `payer`:
 
