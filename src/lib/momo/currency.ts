@@ -16,6 +16,7 @@
  */
 
 import { posting, toDecimalString } from '@/domain/money';
+import { assertWithinLiveBudget } from './budget';
 
 const SANDBOX_CURRENCY = 'EUR';
 const HOME_CURRENCY = 'ZAR';
@@ -39,6 +40,14 @@ export function toMomoAmount(
   if (zarMinor <= 0n) {
     throw new RangeError(`amount must be positive, got ${zarMinor}`);
   }
+
+  // THE LIVE SPEND GUARD. This is the single chokepoint every outbound amount
+  // passes through, which is exactly why the cap lives here rather than in each
+  // caller: there is no second way to build a MoMo request. Sandbox is
+  // unaffected — sandbox money is not real. See budget.ts for why R10 makes
+  // this a guard rather than a note.
+  assertWithinLiveBudget(zarMinor, targetEnvironment);
+
   return {
     amount: toDecimalString(posting(zarMinor)),
     currency: momoCurrency(targetEnvironment),

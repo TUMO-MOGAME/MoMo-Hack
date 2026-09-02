@@ -47,6 +47,12 @@ Target submission: **28 Sep 2026**. Code freeze: **27 Sep 2026**. Solo developer
     to `STATUS.md`: an audit not written there did not happen. See `PLANNING.md` §11.
 14. **Never put a number in an artifact that did not come from a tool call.** Every monetary value
     carries a `sourceTxnId` or `sourceAccountId`. The model does not get to invent amounts.
+15. **The live MoMo testing budget is about R10, total.** Anything other than the exact string
+    `sandbox` in `MOMO_TARGET_ENVIRONMENT` spends real money. Outbound amounts to a live
+    environment are capped per transaction by `src/lib/momo/budget.ts` — R1.00 by default, so ten
+    transactions spend the lot. Sandbox is uncapped; sandbox money is not real. Never raise
+    `MOMO_LIVE_MAX_MINOR` casually, and never point a script that sends multiple payments at a
+    live environment without `MOMO_ALLOW_LIVE=1`. `scripts/momo-smoke.mjs` alone sends eight.
 
 ## Where things live
 
