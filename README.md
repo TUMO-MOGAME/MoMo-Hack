@@ -79,6 +79,8 @@ Then:
 | [09 Risk Register](docs/09-RISK-REGISTER.md) | Scored, owned, dated |
 | [10 Free Tier Budget](docs/10-FREE-TIER-BUDGET.md) | Every limit, and what breaks first |
 | [11 API Usage Map](docs/11-API-USAGE-MAP.md) | Every external call, its trigger, its ledger effect |
+| [12 Voice & Conversational AI](docs/12-VOICE-AND-CONVERSATIONAL-AI.md) | Language strategy, the phrase bank, the agent persona |
+| [13 Chat, Artifacts & Generative UI](docs/13-CHAT-ARTIFACTS-UI.md) | A conversation that grows a dashboard |
 | [ADRs](docs/adr/) | Ten decisions, with the options we rejected |
 
 ## Getting started

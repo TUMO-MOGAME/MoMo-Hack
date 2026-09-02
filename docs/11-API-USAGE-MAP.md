@@ -22,11 +22,20 @@ Every external API call this system makes or receives, what triggers it, and wha
 | A7 | **Africa's Talking USSD** | AT | **inbound** | shared secret + IP allowlist | Free (sandbox) | Feature-phone input |
 | A8 | **Supabase** (Postgres, Auth, Storage, Realtime) | Supabase | outbound | anon key / service-role key | Free tier | Everything persistent |
 | A9 | **GitHub Actions → our cron routes** | us | **inbound** | `CRON_SECRET` bearer | Free | Scheduling |
+| A10 | **Groq** (agent LLM) | Groq | outbound | API key | Free, no card | The conversational agent |
+| A11 | **Google Gemini Flash** (fallback LLM) | Google | outbound | API key | Free, no card | Used only when Groq rate-limits |
+| A12 | **ElevenLabs TTS** | ElevenLabs | outbound | API key | Free tier | Phrase-bank generation (build time) + capped live TTS |
+| A13 | **Web Speech API** | browser | on-device | none | Free | Speech input; TTS fallback |
 
 Not used, and why — so nobody adds them later without a decision:
 
 | Rejected | Why |
 |---|---|
+| Claude / OpenAI APIs | Paid from the first call, card required. Groq and Gemini Flash are free with no card (ADR-0012). |
+| Lelapa AI Vulavula | The right provider for South African language speech, but no free tier ($9.99/mo). Documented paid exit (ADR-0011). |
+| ElevenLabs Scribe (STT) | Metered against the same 10k credits the phrase bank needs. Web Speech API is free and on-device. |
+| CopilotKit Cloud | The runtime is self-hosted inside our Next.js app; the cloud tier adds nothing we need. |
+| A2A / multi-agent orchestration | Each agent hop consumes part of Vercel's 10s budget, and it violates ADR-0001. |
 | Google Cloud Vision / AWS Rekognition (OCR) | Requires a billing account with a card. Replaced by `tesseract.js`, client-side, zero cost, zero account (C2). |
 | WhatsApp Business Cloud API | Meta approval and a business verification we cannot complete in 25 days. Replaced by Telegram (ADR-0007). |
 | Any SMS gateway | All cost money per message. Telegram + USSD cover the channel need. |
@@ -205,6 +214,36 @@ that gets written to `system_check`, so "is the scheduler alive?" is a database 
 
 Every one of these is **idempotent and safe to run twice**, because GitHub's scheduler is
 best-effort and may fire late, early, or twice.
+
+---
+
+## 9a. Agent, voice and artifacts (A10-A13)
+
+**Groq (A10)** — `POST https://api.groq.com/openai/v1/chat/completions`, streaming, called from
+`app/api/agent/route.ts` on the **Edge** runtime.
+
+| Trigger | Detail |
+|---|---|
+| A user sends a chat message (typed or transcribed) | One streamed completion per turn |
+| Tools available | `get_balance`, `get_transactions`, `explain_split`, `get_stokvel_status`, `get_jobs`, `get_trust_score`, `propose_payment`, `propose_stokvel_join`, `propose_job_accept`, `render_artifact`, `patch_artifact` |
+| Rate limit handling | On 429, retry once against Gemini Flash (A11); on second failure, a plain apology plus a menu |
+
+> **`propose_*` tools have no database write access** (ADR-0014). They return a server-signed
+> proposal that renders a confirmation card. The agent cannot move money.
+
+**ElevenLabs (A12)** — two distinct, deliberately separated usages:
+
+| Usage | When | Volume | Notes |
+|---|---|---|---|
+| **Phrase-bank generation** | Build time, `npm run voice:build`, run manually | ~180 clips ≈ 7,200 chars, **once** | Output cached in Supabase Storage forever. **Never runs in CI or at runtime.** |
+| **Live TTS** | A genuinely novel agent reply | Capped at **500 chars/day** | On exhaustion: fall back to the phrase bank, then to text. Never fails, never bills. |
+
+Languages: English, Swahili, Hausa, Lingala, Somali only. isiZulu, isiXhosa, Sesotho and Afrikaans
+use human recordings; the rest use A13 or text (ADR-0011).
+
+**Web Speech API (A13)** — on-device, no network. `SpeechRecognition` for input,
+`speechSynthesis` as the Tier 3 voice fallback. **Raw audio never leaves the device**
+(`docs/12` §6).
 
 ---
 

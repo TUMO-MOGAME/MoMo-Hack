@@ -4,19 +4,23 @@
 Every PR must update it. If you are a fresh session, read this before touching anything.
 
 - **Last updated:** 2026-09-02 (planning session)
-- **Phase:** Day 0 — planning complete, build not started
+- **Phase:** Day 1 — planning complete, repo live, build not started
 - **Days to code freeze (27 Sep 2026):** 25
-- **Tree state:** no application code yet
-- **Blocked on:** GitHub repo URL from Tumo (Q2), deadline confirmation (Q1)
+- **Local path:** `C:\MoMo-Hack`
+- **Repo:** <https://github.com/TUMO-MOGAME/MoMo-Hack> — **public**, `main` **protected** (verified)
+- **Tree state:** documentation only, no application code yet
+- **Blocked on:** deadline confirmation (Q1), the frontend template Tumo is providing
 
 ---
 
 ## Right now — the next three actions
 
-1. Tumo creates the **public** GitHub repo and shares the URL (ADR-0005 explains why public).
-2. Register MoMo sandbox account, subscribe to Collections + Disbursements + Remittances,
-   capture the three `Ocp-Apim-Subscription-Key` values into GitHub Secrets.
-3. Scaffold Next.js + Supabase + CI, land the first PR through a protected `main`.
+1. **MoMo portal verification pass** — sign in at <https://momodeveloper.mtn.com/API-collections>
+   and work through the `momoAPIs.md` §14 checklist. Promote the `[P]` ratings to `[V]`.
+   Highest-value first task: Disbursements and Remittances are both unverified (R6).
+2. Subscribe to Collections + Disbursements + Remittances; put the three
+   `Ocp-Apim-Subscription-Key` values, `MOMO_API_USER` and `MOMO_API_KEY` into GitHub Secrets.
+3. Scaffold Next.js + Supabase + CI and land it through a PR. Then the walking skeleton (M1).
 
 ---
 
@@ -40,8 +44,8 @@ Test column: `none` / `unit` / `+prop` (property-based) / `+int` (integration in
 
 | ID | Item | State | Tests | Required tests | PR | Notes |
 |---|---|---|---|---|---|---|
-| F1 | Public GitHub repo created | `[!]` | n/a | n/a | — | Blocked: awaiting URL (Q2) |
-| F2 | Ruleset protecting `main` | `[ ]` | n/a | n/a | — | See `docs/06` §2 |
+| F1 | Public GitHub repo created | `[x]` | n/a | n/a | — | `TUMO-MOGAME/MoMo-Hack`, made public 2026-09-02 |
+| F2 | Ruleset protecting `main` | `[x]` | verified | n/a | — | Ruleset 22084424. Direct push **tested and rejected**. Squash-only, linear history, no bypass actors. |
 | F3 | Next.js + TS + Tailwind scaffold | `[ ]` | none | unit | — | |
 | F4 | Supabase staging + prod projects | `[ ]` | none | +int | — | Free tier allows exactly 2 |
 | F5 | Migration pipeline (local, CI, deploy) | `[ ]` | none | +int | — | |
@@ -103,6 +107,21 @@ Test column: `none` / `unit` / `+prop` (property-based) / `+int` (integration in
 | S5 | Live webhook console | `[ ]` | none | +e2e | — | Supabase Realtime |
 | S6 | Split-a-bill via Telegram group | `[ ]` | none | +e2e | — | |
 
+## 4b. Conversational layer (SHOULD) — `docs/12`, `docs/13`
+
+| ID | Item | State | Tests | Required tests | PR | Notes |
+|---|---|---|---|---|---|---|
+| S7a | Agent route (Edge, streaming, Groq) | `[ ]` | none | +int | — | Gemini Flash fallback on 429 |
+| S7b | Agent tools — read-only set | `[ ]` | none | +int | — | Numbers come from the ledger, always |
+| S7c | Artifact schema (zod discriminated union) | `[ ]` | none | +prop | — | ADR-0013 |
+| S7d | Artifact registry + panel + bottom sheet | `[ ]` | none | +e2e | — | Phone-first; **template pending from Tumo** |
+| S7e | In-chat chips + re-open from history | `[ ]` | none | +e2e | — | Pattern from Social-Assembly |
+| S7f | `propose_*` + signed confirmation card | `[ ]` | none | **+int +sec** | — | **ADR-0014 — the safety-critical one** |
+| S8a | Phrase bank build script | `[ ]` | none | unit | — | Run manually, never in CI |
+| S8b | ElevenLabs live TTS with a daily cap | `[ ]` | none | +int | — | Degrades to phrase bank, then text |
+| S8c | Speech input (Web Speech API) | `[ ]` | none | +e2e | — | On-device; audio never leaves the phone |
+| S8d | isiZulu/isiXhosa/Sesotho/Afrikaans recordings | `[ ]` | n/a | n/a | — | Needs a native speaker and a microphone |
+
 ## 5. Quality and demo
 
 | ID | Item | State | Tests | Required tests | PR | Notes |
@@ -161,6 +180,23 @@ Full register in `docs/09-RISK-REGISTER.md`. The ones actually biting right now:
 ## Session log
 
 Newest first. One short entry per working session so a fresh thread can catch up fast.
+
+### 2026-09-02 (later) — Voice, agent and generative UI added to scope
+- Repo created, made **public**, pushed, `main` protected. Protection **verified empirically**:
+  a direct push was rejected by GitHub with `GH013`.
+- Project moved to `C:\MoMo-Hack`.
+- **Key finding: ElevenLabs supports no South African language** — not isiZulu, isiXhosa,
+  Afrikaans, Sesotho or any other. Its African coverage is Swahili, Hausa, Lingala and Somali
+  (Eleven v3 only). Lelapa AI's Vulavula does cover SA languages but has no free tier ($9.99/mo).
+  Resolved with ADR-0011: provider-per-language voice plus a pre-generated phrase bank, which also
+  brings ongoing voice cost to R0 and makes cached replies faster than live TTS.
+- Studied `C:\Social-Assembly-Main` for the chat/artifact pattern. Adopted: CopilotKit generative
+  UI, doc-chip-in-chat plus artifact panel, `ArtifactContext` with patch helpers, auto-open on
+  stream completion, generated design tokens with a CI diff gate. Rejected: A2A multi-agent
+  (violates ADR-0001) and `maxDuration = 120` (impossible on Vercel Hobby's 10s cap).
+  Noted: that project has **no automated E2E tests**, so we take the flow and add the suite.
+- ADRs 0011-0014 written. 0014 is the important one: **the agent cannot move money.**
+- Still needed from Tumo: the frontend template, and the confirmed submission deadline.
 
 ### 2026-09-02 — Planning session
 - Confirmed: 3-4 week timeline, solo + agents, daily-use wallet with gigs as the earn engine,
