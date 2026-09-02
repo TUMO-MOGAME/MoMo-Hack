@@ -87,6 +87,43 @@ Everything here is live, public and measured — not a mock:
 | A bot | `@momokasi_demo_bot`, webhook registered against the custom domain, secret-verified (401 on a bad secret) |
 | Engineering credibility | 390 tests over 25 files, 0 vulnerabilities, 8 required CI checks, and a `MISTAKES.md` with nine entries that each carry a guard |
 
+### `npm run demo` — the presentation, in one command
+
+Built for tomorrow. It prints the whole story in order, and **every number on
+screen has an `expect` behind it** — the demo is a test, so it cannot print a
+balanced ledger unless the ledger actually balanced. A script that merely prints
+is a script that can lie on stage.
+
+```
+1  THE SPLIT ENGINE     R12.50 → owner R7.50 · driver R3.13 · fuel R1.25 · insurance R0.62   EXACT
+2  A REAL PAYMENT       → requesttopay … ← MTN accepted, status CREATED
+3  RESOLUTION           ← resolved, examined 1, resolved 1
+4  THE LEDGER           MOMO_SETTLEMENT +R1.00 / SUSPENSE −R1.00 → sum R0.00  BALANCED
+5  THE INVARIANT        14 postings in the database, summing to 0
+```
+
+**It adapts to its environment and says so in the header.** Standing in front of
+judges saying "this is live" while an emulator answers is the one unrecoverable
+mistake, so the run announces whether it is the emulator or the real API before
+it does anything.
+
+**It refuses to spend real money by accident.** `npm run demo -- --check` is a
+pre-flight that sends nothing. A live `MOMO_TARGET_ENVIRONMENT` *plus* a real
+client is the one combination it will not run without `--live` — because a demo
+command is exactly the thing that gets run twice while the projector is being
+set up, and the whole budget is about R10.
+
+Two things to know before the room:
+
+- **Every run writes two permanent postings.** `journal` and `ledger_entry` are
+  append-only by trigger. Rehearse as often as you like — the ledger still
+  balances, which is the point — but the row count grows and cannot be reset.
+- **The payment is `AIRTIME`, not `FARE`, and the demo says so.** The split is
+  shown *beside* the payment rather than through it, for the reason below. If a
+  judge asks whether the split is wired into the live path, the honest answer is
+  "not yet — here is exactly what is missing", and that answer is better than a
+  vague yes.
+
 ### The split: show it, do not wire it (read this before touching M6b)
 
 **The fare split, on the real path (M6b).** Change the walking skeleton's purpose from `AIRTIME`

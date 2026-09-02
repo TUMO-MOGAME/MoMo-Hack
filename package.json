@@ -29,6 +29,7 @@
     "db:migrate": "node scripts/migrate.mjs",
     "db:check": "node scripts/migrate.mjs --dry",
     "test:int": "vitest run tests/integration",
+    "demo": "node scripts/demo.mjs",
     "telegram:setup": "node scripts/telegram-setup.mjs",
     "dev:telegram": "node scripts/telegram-dev-bridge.mjs"
   },
