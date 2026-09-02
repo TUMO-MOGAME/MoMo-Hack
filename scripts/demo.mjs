@@ -2,8 +2,10 @@
 /**
  * `npm run demo` — the presentation, in one command.
  *
- *   npm run demo              # run it
- *   npm run demo -- --check   # pre-flight only, spends nothing
+ *   npm run demo                 # run it
+ *   npm run demo -- --check      # pre-flight only, spends nothing
+ *   npm run demo -- --emulator   # force the offline emulator (the fallback)
+ *   npm run demo -- --api        # force the real MTN API
  *
  * This is a thin launcher around `tests/demo/walkthrough.test.ts`. The
  * demonstration itself is a test because a test is the only thing that ASSERTS
@@ -13,9 +15,10 @@
  *
  * ── WHY THERE IS A PRE-FLIGHT ────────────────────────────────────────────────
  *
- * `MOMO_TARGET_ENVIRONMENT` is currently a live MTN environment on this
- * machine, and the whole live testing budget is about R10 (CLAUDE.md #15). A
- * demo command is exactly the thing somebody runs twice while setting up the
+ * `MOMO_TARGET_ENVIRONMENT` can be a LIVE MTN environment — production
+ * credentials for `mtnsouthafrica` exist for this project and authenticate —
+ * and the whole live testing budget is about R10 (CLAUDE.md #15). A demo
+ * command is exactly the thing somebody runs twice while setting up the
  * projector. So: if the run would send REAL money, this refuses unless
  * `--live` is passed, and prints what it would have cost first.
  *
@@ -30,10 +33,31 @@ import { loadEnv, colour as c } from './_env.mjs';
 const argv = process.argv.slice(2);
 const checkOnly = argv.includes('--check');
 const allowLive = argv.includes('--live');
+const forceEmulator = argv.includes('--emulator');
+const forceApi = argv.includes('--api');
 
 const { env, path } = loadEnv();
 
-const mode = env.MOMO_MODE === 'emulator' ? 'emulator' : 'sandbox';
+// ── THE DEMO-DAY SWITCH ──────────────────────────────────────────────────────
+//
+// ADR-0009 promises the MoMo client can be swapped "ninety seconds before we
+// present". That promise is worthless if honouring it means opening a dotfile
+// in front of an audience and editing it correctly under pressure.
+//
+//   npm run demo -- --emulator    recorded responses, offline, deterministic
+//   npm run demo -- --api         the real MTN API
+//
+// So when the venue wifi is hostile or MTN is having an afternoon, the fallback
+// is one word on a command line. Neither flag can spend more than the other:
+// the budget guard sits below both.
+const mode = forceEmulator
+  ? 'emulator'
+  : forceApi
+    ? 'sandbox'
+    : env.MOMO_MODE === 'emulator'
+      ? 'emulator'
+      : 'sandbox';
+env.MOMO_MODE = mode === 'emulator' ? 'emulator' : 'sandbox';
 const target = env.MOMO_TARGET_ENVIRONMENT ?? 'sandbox';
 const live = target !== 'sandbox';
 const cap = env.MOMO_LIVE_MAX_MINOR || '100';

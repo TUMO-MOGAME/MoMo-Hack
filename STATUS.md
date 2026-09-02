@@ -107,6 +107,24 @@ judges saying "this is live" while an emulator answers is the one unrecoverable
 mistake, so the run announces whether it is the emulator or the real API before
 it does anything.
 
+**The fallback is a flag, not a file edit.** ADR-0009 promises the MoMo client
+can be swapped "ninety seconds before we present" — a promise worth nothing if
+honouring it means editing a dotfile correctly, under pressure, in front of an
+audience. So:
+
+```
+npm run demo -- --emulator    recorded responses, offline, deterministic
+npm run demo -- --api         the real MTN API
+npm run demo -- --check       pre-flight only, sends nothing
+```
+
+**Both paths are rehearsed and measured**, at the full R12.50:
+
+| Path | Duration | Result |
+|---|---|---|
+| `--emulator` | **35s** | ledger balanced, sum 0 |
+| `--api` (real MTN sandbox) | **70s** | ledger balanced, sum 0 |
+
 **It refuses to spend real money by accident.** `npm run demo -- --check` is a
 pre-flight that sends nothing. A live `MOMO_TARGET_ENVIRONMENT` *plus* a real
 client is the one combination it will not run without `--live` — because a demo
@@ -154,6 +172,40 @@ rather than through it. Nobody in the room can tell the difference, and it is th
 
 The R12.50 tie-break is pinned by a regression test because we got it wrong in a document once
 (`MISTAKES.md` M3): driver **R3.13**, insurance **R0.62**. Quote those figures, not rounded ones.
+
+### MTN's production credentials are real, and verified — but parked
+
+`MTN_*` in `.env.local`, read by nothing. Measured, not assumed:
+
+| | |
+|---|---|
+| Collection token | **200** against `https://proxy.momoapi.mtn.com`, `X-Target-Environment: mtnsouthafrica` |
+| Disbursement token | **200**, same |
+| Callback host binding | **UNKNOWN** — production returns `404` for `GET /v1_0/apiuser/{id}`, so it cannot be read |
+
+So the project **already has working production access** and does not need the
+portal's "Go Live" application — that is a separate business-verification
+process measured in days, and it is in the cut list for exactly the reason
+WhatsApp is.
+
+**Why production is not the demo path tomorrow**, despite working:
+
+1. `46733123454` is a **sandbox fixture**. It auto-resolves in ~25s because the
+   sandbox pretends. Production sends a real prompt to a real MTN SA subscriber
+   who must approve with a PIN — no auto-resolution, and that number does not
+   exist on MTN SA.
+2. The **callback host binding cannot be read**, and on sandbox a mismatch was a
+   hard `500` with no payment created. Unknown, and unknowable without spending.
+3. The budget caps a transaction at R1.00, so **R12.50 cannot be demonstrated at
+   all** on production — the pitch's own figure becomes unshowable.
+4. A live demo would depend on a third party's phone, signal, PIN and timing at
+   09:30, with about ten transactions of budget covering testing *and* the show.
+
+The plan: demo on sandbox, and say truthfully that production credentials are
+integrated and authenticating. Verify production separately, after, with one
+R1.00 transaction to a consenting MTN number — and check the callback binding
+first with an invalid MSISDN, which reveals a `500` before any payer is
+contacted.
 
 ### Cut for tomorrow — stated so nobody burns the night on them
 
