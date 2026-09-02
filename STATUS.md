@@ -20,36 +20,53 @@ Every PR must update it. If you are a fresh session, read this before touching a
 | **Current phase** | Phase 3 — Money engine |
 | **Phase state** | Phases 0-1 substantially done. Money engine reviewed and merged (#10). |
 | **Audits owed at close** | Phase 3: A1 A2 A3 A4 A5 A6 — **none run yet** |
-| **Blocking findings** | **CI is not a quality gate** — see below. A8 red on every branch since #2. |
+| **Blocking findings** | none — the CI gate landed in #13 and all eight checks are green |
 | **Days to code freeze** | 25 (27 Sep 2026) |
-| **Open PRs** | #11 frontend shell + sidebar (this one). #10 merged as `a75ea52`. |
+| **Open PRs** | #11 frontend shell + sidebar (this one). #10 and #13 merged. |
 
-### The CI finding, recorded because it changes how every merge before this was judged
+### The CI finding, kept because it changes how every merge before it was judged
 
-`STATUS.md` said both PRs were "green". **Neither was, and CI could not have told us either way.**
+`STATUS.md` said #10 and #11 were both "green". **Neither was, and CI could not have told us
+either way.** All four causes are now fixed in #13, but the record matters more than the fix:
 
-1. **`Audits / A8` has failed on every push since PR #2** — `npm ci` rejects a
-   `package-lock.json` out of sync with `package.json`. Pre-existing on `main`, inherited by both
-   PRs, caused by neither.
-2. **CI runs no tests.** `.github/workflows/audits.yml` is the only workflow: `npm audit` plus a
-   plan/gate step that self-skips without `AUDIT_SUITE_TOKEN`. No typecheck, no test, no build, no
-   lint has ever run on a pull request. F6 is `[ ]` and this is what that costs.
-3. **`npm run lint` is unconfigured.** No `eslint.config.*` anywhere, so `next lint` drops into an
-   interactive prompt — which also means `npm run verify`, session-checklist step 4, cannot pass.
-4. **`npm audit` reports 9 vulnerabilities, 3 critical** (`next` 15.1.6, `vitest` 2.1.9). The A8
-   gate blocks at `--audit-level=high`, so the lockfile fix alone does not turn it green.
+1. **`Audits / A8` failed on every push since PR #2** — `npm ci` rejected a `package-lock.json`
+   out of sync with `package.json`. The real cause was the *platform*: npm resolves optional
+   dependencies for the OS it runs on, so a lockfile written on Windows omits the `@emnapi/*`
+   subtree Linux needs for the wasm bindings behind `sharp` and `@tailwindcss/oxide`.
+   Regenerating on Windows could never have fixed it. A `Lockfile` CI job now regenerates on
+   Linux and hands back the corrected file as an artifact.
+2. **CI ran no tests.** `audits.yml` was the only workflow. No typecheck, no test, no build and
+   no lint had ever run on a pull request, so "231 tests green" was an agent's local vitest run.
+3. **`npm run lint` could never have passed.** There was no ESLint config at all, so `next lint`
+   dropped into an interactive prompt — which also meant `npm run verify` could not complete.
+4. **9 vulnerabilities, 3 critical.** Now **0**.
 
-Fixes land in the follow-up PR. Recorded here because "green" was asserted in this file and was
-not true, and the reason it went unnoticed is that nothing was checking.
+Two of our own guards were also wrong: `safe-merge.mjs` reported #10's successful merge as a
+failure, and the no-floating-point guard fired on its own prose in any Windows checkout. Both
+fixed, both written up in `MISTAKES.md` terms in #13.
+
+**And the toolchain bump hid 84 tests.** vitest 4 ships Vite 8, which honours `tsconfig.json`'s
+`jsx: "preserve"` — the setting Next.js requires — and so stopped transforming `.tsx` at all.
+All five component test files failed at import, and the summary still read **`Tests 231 passed`**
+because tests that never load cannot fail. The only tell was `Test Files 5 failed` on the line
+above. Fixed with an `oxc.jsx` override in `vitest.config.ts` (the key is `oxc`, not `esbuild` —
+an `esbuild` block is silently ignored under Vite 8). Two lessons worth keeping:
+
+- **A passing test count is not evidence.** Read the file count too. "231 passed" was true and
+  meaningless.
+- **This is the argument for the CI gate in one example.** A toolchain bump quietly disabled a
+  third of the suite, including the provenance guard that stops the agent inventing a balance
+  (CLAUDE.md #14). Nothing but running the whole suite would have found it.
 
 ### The next three actions
 
-1. **Make CI a real quality gate (F6).** Typecheck, lint, test and build as separate named
-   stages, so a failure says which one. Plus the lockfile, an ESLint config, a `.gitattributes`,
-   and the dependency bumps A8 needs. Until this lands, every "green" in this file is an
-   assertion, not a measurement.
-2. **Supabase.** The last required credential. Two projects, three values. Until it exists,
-   the ledger runs against the in-memory adapter and there are no integration or RLS tests.
+1. **Require the new checks on `main`.** The ruleset has **no required status checks**, so the
+   gate exists but nothing stops a merge past a red one. This is a five-minute settings change
+   and it is what makes everything above load-bearing.
+2. **Supabase — apply the migrations (F5).** The project is live and verified, but the two
+   migrations have never touched a real database, so the money engine still runs on the in-memory
+   adapter and there are still no integration or RLS tests. Settle Q6 (region) first: the project
+   is in `eu-west-2`, London, and it is free to recreate today and expensive later.
 3. **Wire the walking skeleton**: a real `requesttopay` from a deployed function writing
    balanced ledger rows. Every piece now exists; nothing has been joined end to end.
 
@@ -62,10 +79,10 @@ written up. Only the audits listed are run at that phase — see `PLANNING.md` �
 
 | # | Phase | State | Days | Audits |
 |---|---|---|---|---|
-| 0 | Foundation and walking skeleton | mostly done — skeleton not joined | 1-3 | A1 A8 ⚪ |
+| 0 | Foundation and walking skeleton | CI gate done (#13); skeleton not joined; Supabase not migrated | 1-3 | A1 A8 ⚪ |
 | 1 | Design system and app shell | built, in PR #11 | 4-5 | A1 A2 A3 ⚪ |
 | 2 | Narrative and content surfaces | landing page built, in PR #11 | 6 | A1 A6 ⚪ |
-| 3 | Money engine | **in progress** — ledger/client/state machine in PR #10 | 7-13 | A1 A2 A3 A4 A5 A6 ⚪ |
+| 3 | Money engine | **in progress** — ledger/client/state machine merged (#10); no integration tests yet | 7-13 | A1 A2 A3 A4 A5 A6 ⚪ |
 | 4 | Channels and products | not started | 14-19 | A1 A2 A3 A4 A5 A8 ⚪ |
 | 5 | Reach — offline, USSD, voice | not started | 20-23 | A1 A2 A3 A4 A7 ⚪ |
 | 6 | Hardening, demo and submission | not started | 24-28 | A1 A3 A4 A5 A6 A7 A8 S1 ⚪ |
@@ -99,12 +116,12 @@ Test column: `none` / `unit` / `+prop` (property-based) / `+int` (integration in
 | F3b | Design tokens (`src/design/tokens.ts` + `@theme`) | `[x]` | none | unit | — | Architecture from Social-Assembly; brand retuned to MTN gold |
 | F3c | Frozen contracts: `money`, `split`, `errors`, `artifacts/types` | `[x]` | **manual** | +prop | — | Split verified exact across 200,000 amounts. Needs the real fast-check suite (M1d). |
 | F3d | Starter chat + artifact UI (mock agent) | `[x]` | manual | +e2e | — | 7 artifact renderers, chip + panel + bottom sheet, zero keys needed |
-| F4 | Supabase staging + prod projects | `[ ]` | none | +int | — | Free tier allows exactly 2 |
-| F5 | Migration pipeline (local, CI, deploy) | `[ ]` | none | +int | — | |
-| F6 | CI quality gate workflow | `[ ]` | none | n/a | — | |
+| F4 | Supabase staging + prod projects | `[~]` | none | +int | — | **Project 1 of 2 live and verified** — URL, anon and service_role all resolve to ref `edtduvwbejdfahkmfort`, service_role authenticates 200. **Region is `eu-west-2` (London)**, measured from the DB host's IPv6 against AWS's published ranges — not an African region. See Q6. |
+| F5 | Migration pipeline (local, CI, deploy) | `[ ]` | none | +int | — | Two migrations exist and have never been applied to a real database |
+| F6 | CI quality gate workflow | `[x]` | **verified** | n/a | #13 | Typecheck · Lint · Tests · Build · Money guards, each a separate named job. Guards tested against synthetic violations to prove they fire. |
 | F7 | Vercel project + preview deploys | `[ ]` | none | +e2e | — | |
 | F8 | GitHub Actions scheduler + keep-alive | `[ ]` | none | +int | — | ADR-0006 |
-| F9 | Secrets wired (MoMo, Supabase, Telegram) | `[ ]` | n/a | n/a | — | |
+| F9 | Secrets wired (MoMo, Supabase, Telegram) | `[~]` | n/a | n/a | — | All present in `.env.local` and verified live. **None are in GitHub Secrets yet**, so nothing deployed can use them. |
 
 ## 1. Money engine (MUST)
 
@@ -211,6 +228,12 @@ Format: one line per merged workstream, with the evidence.
 | 2026-09-02 | Money engine (PR #10) | unit + property + contract | **231 tests, 15 files.** Ledger balance, state transitions, MoMo response matrix, webhook/cron auth. Typecheck clean. |
 | 2026-09-02 | Frontend (PR #11) | unit | **90 tests, 6 files.** Every artifact renders from a fixture; the provenance guard is locked in. Typecheck clean. |
 | 2026-09-02 | **#10 + #11 combined** | unit + property + contract | **315 tests, 20 files** (321 less the 6 shared split tests counted once), typecheck clean, production build clean. The combination is what found the CRLF guard bug — neither PR failed alone. |
+| 2026-09-02 | Money engine reviewed and merged (#10) | read, not just run | Diff read in full. Verified by hand: the overdraft trigger follows each account's normal balance; `claimTransition` takes `for update` so concurrent resolvers serialise; the callback body can only trigger a lookup and never sets a status; cron uses a constant-time compare; ledger tables carry no RLS policies at all. |
+| 2026-09-02 | Supabase project 1 | **integration** | URL, anon and service_role keys all carry ref `edtduvwbejdfahkmfort`; GoTrue health 200; service_role authenticates against PostgREST 200. Region measured as `eu-west-2` (London) from the DB host's IPv6 against AWS's published ranges. |
+| 2026-09-02 | `npm run check:momo` | **integration** | Dead on main (`ReferenceError: resolve is not defined`). Fixed and re-run live: token issued, all six MSISDN cases match the `[V]` table in `momoAPIs.md` §10, idempotency `202` then `409`. |
+| 2026-09-02 | CI quality gate (#13) | **verified** | Typecheck, lint, full 231-test suite and production build all green locally on the bumped toolchain. Both content guards tested against a synthetic violation to prove they fire, and against this tree to prove they do not fire on prose. |
+| 2026-09-02 | Dependency health | **verified** | `npm audit` 9 vulnerabilities (3 critical) → **0**. `npm ci` restored — it had been failing since PR #2. |
+| 2026-09-02 | **#11 on the merged toolchain** | unit + property + contract | **315 tests, 20 files**, typecheck, lint and production build all clean. Caught vitest 4 silently not running the 84 component tests — see below. |
 
 ---
 
@@ -278,6 +301,36 @@ Deferring is legitimate; deferring silently is not.
 ---
 
 ## Session log
+
+### 2026-09-02 (session 2) — money engine merged, and CI made real
+
+**Merged:** #10, the money engine, after reading the diff rather than trusting the test count.
+The design holds up: the overdraft trigger correctly follows each account's normal balance
+instead of the version printed in `docs/02`, which would have rejected the first collection ever
+taken; `claimTransition` takes `for update`, so two resolvers racing the same transaction
+serialise; the callback body can only ever trigger a lookup, never set a status.
+
+**The session's real finding is that we could not have known any of that from CI.** `STATUS.md`
+called both PRs green. Neither was — `Audits / A8` had been red on every branch since PR #2 —
+and more importantly CI ran no tests, no typecheck, no lint and no build, so it was never in a
+position to agree or disagree. Four more defects were sitting behind that: 9 vulnerabilities
+including 3 critical, an ESLint setup that could not run non-interactively (so `npm run verify`
+could not complete either), and `npm run check:momo` dead on `main` with a `ReferenceError`
+since #9. Each was found by writing the gate, not by using the code.
+
+**Two guards were themselves wrong, and both are now fixed.** `safe-merge.mjs` reported #10's
+successful merge as a failure, because `--delete-branch` could not remove a local branch a
+worktree was holding and the script concluded from the exit code instead of asking GitHub —
+which is M2, committed by the script written to prevent M2. And the no-floating-point guard
+fired on its own prose in any Windows checkout, because `core.autocrlf` gave it CRLF and its
+comment-stripping regex cannot cross a `\r`; it passed in the tree that authored the file and on
+Linux CI, which is the worst possible combination. `.gitattributes` fixes the cause.
+
+**Supabase project 1 is live and verified** — all three values belong to ref
+`edtduvwbejdfahkmfort`. It is in `eu-west-2`, London, measured from the database host's IPv6
+against AWS's published ranges. That is a decision for Tumo (Q6), cheapest to reverse today.
+
+**Still blocked:** Q1, the submission deadline. Asked a third time.
 
 ### 2026-09-02 (session 1 close) — credentials verified, money engine built, agents stopped
 
