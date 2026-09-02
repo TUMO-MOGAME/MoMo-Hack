@@ -274,31 +274,42 @@ Used for: diaspora funding of a purpose-locked family sub-wallet (S3).
 
 ---
 
-## 10. Sandbox test MSISDNs — **[P]**
+## 10. Sandbox test MSISDNs — **[V] VERIFIED 2026-09-02, and the docs were wrong**
 
-These control the simulated outcome. Reported consistently by multiple developers; **confirm on the
-portal Day 1** because our entire test matrix depends on them.
+Measured against the live sandbox with `node scripts/momo-smoke.mjs`, then polled for 40 seconds
+per number. **Four of six documented outcomes were wrong.** This is exactly why they were rated
+`[P]` and never coded against.
 
-| MSISDN | Resulting status |
-|---|---|
-| `46733123450` | `FAILED` |
-| `46733123451` | `REJECTED` |
-| `46733123452` | `TIMEOUT` |
-| `46733123453` | `SUCCESSFUL` |
-| `46733123454` | `PENDING` |
-| any other number | **always `SUCCESSFUL`** |
+| MSISDN | Secondary sources claimed | **Actually observed** | Use it for |
+|---|---|---|---|
+| `46733123450` | FAILED | **`FAILED`** immediately | The failure path |
+| `46733123451` | REJECTED | **`FAILED`** immediately | (duplicate of the above) |
+| `46733123452` | TIMEOUT | **`FAILED`** immediately | (duplicate of the above) |
+| `46733123453` | SUCCESSFUL | **`PENDING`**, still pending after 40s | **The stuck-transaction path** — reconciler, timeout handling |
+| `46733123454` | PENDING | **`CREATED` → `SUCCESSFUL` after ~25s** | **The async happy path.** This is the demo number. |
+| anything else | always SUCCESSFUL | **`SUCCESSFUL`** immediately | Nothing — a test using one cannot fail |
 
-**Two consequences we must design around:**
+### Three consequences, all load-bearing
 
-1. **A passing test that uses a random number proves nothing.** Every negative-path test must use an
-   explicit failure MSISDN. We lint for this: test files may only use MSISDNs from a named constant.
-2. **No USSD push happens in sandbox.** Nothing appears on a real phone, no balance moves. The demo
-   must therefore *show* the state change on our own console — which is exactly what `app/console` is for.
+**1. `CREATED` is a real status and was missing from our state machine.**
+The documented vocabulary (`PENDING`/`SUCCESSFUL`/`FAILED`/`REJECTED`/`TIMEOUT`) is incomplete.
+A transaction can sit in `CREATED` before it reaches `PENDING`. Any state machine that does not
+accept `CREATED` will crash or silently mis-handle the one number that actually demonstrates
+asynchronous resolution. See §12.
 
-> One source rendered the success number as `56733123453` (leading 5). Treat that as a typo, but
-> verify. If `46733123453` does not return `SUCCESSFUL`, try the `5` variant and update this file.
+**2. `REJECTED` and `TIMEOUT` appear to be unreachable in sandbox.**
+Both numbers documented for them return `FAILED`. We still model those states — production may
+emit them — but we cannot integration-test them against the sandbox. The emulator (ADR-0009) is
+therefore the **only** way to exercise those branches, which moves it from "demo insurance" to a
+test-coverage requirement.
 
----
+**3. `46733123454` is the demo number.**
+It is the only one that exercises the real flow: request accepted → `CREATED` → poll → `SUCCESSFUL`
+about 25 seconds later. That 25-second window is exactly what the live console was built to show
+(`docs/08` §3). Do not demo with a random number — it resolves instantly and proves nothing.
+
+> **Idempotency verified at the same time:** posting the identical `X-Reference-Id` twice returns
+> `202` then `409`. Our retry-safety guarantee (`docs/03` §2) holds against the real API.
 
 ## 11. The ZAR / EUR problem — **[V]** that it exists, our shim is our own design
 
@@ -338,6 +349,11 @@ in the codebase: this shim, and its test.
                     |  INITIATED  |   row written, nothing sent yet
                     +------+------+
                            | POST succeeds (202)
+                           v
+                    +-------------+
+                    |   CREATED   |   [V] observed 2026-09-02 — MTN emits this
+                    +------+------+   before PENDING. NOT in the documented
+                           |          vocabulary. Treat as non-terminal.
                            v
                     +-------------+
         +---------->|   PENDING   |<----------+
@@ -413,3 +429,4 @@ Tick these off with a signed-in browser session and update the ratings above.
 | Date | Change | By |
 |---|---|---|
 | 2026-09-02 | Created. Provisioning, auth, collections and the EUR shim established from public sources. Disbursements, remittances and test MSISDNs recorded as **[P]**, pending portal confirmation. | Planning session |
+| 2026-09-02 | **§10 rewritten from live measurement.** Credentials provisioned and verified; tokens issue for all three products. Ran `scripts/momo-smoke.mjs` + a 40s poll. Four of six documented MSISDN outcomes were wrong. Discovered an undocumented `CREATED` status and added it to §12. `REJECTED`/`TIMEOUT` appear unreachable in sandbox. Idempotency (202 then 409) confirmed against the real API. Promoted §10 to **[V]**. | Live sandbox |
