@@ -18,16 +18,36 @@ Every PR must update it. If you are a fresh session, read this before touching a
 | | |
 |---|---|
 | **Current phase** | Phase 3 — Money engine |
-| **Phase state** | Phases 0-1 substantially done. Money engine built and green, awaiting review. |
+| **Phase state** | Phases 0-1 substantially done. Money engine reviewed and merged (#10). |
 | **Audits owed at close** | Phase 3: A1 A2 A3 A4 A5 A6 — **none run yet** |
-| **Blocking findings** | none |
+| **Blocking findings** | **CI is not a quality gate** — see below. A8 red on every branch since #2. |
 | **Days to code freeze** | 25 (27 Sep 2026) |
-| **Open PRs** | **#10 backend money engine**, **#11 frontend shell + sidebar** — both green, both need review |
+| **Open PRs** | #11 frontend shell + sidebar (this one). #10 merged as `a75ea52`. |
+
+### The CI finding, recorded because it changes how every merge before this was judged
+
+`STATUS.md` said both PRs were "green". **Neither was, and CI could not have told us either way.**
+
+1. **`Audits / A8` has failed on every push since PR #2** — `npm ci` rejects a
+   `package-lock.json` out of sync with `package.json`. Pre-existing on `main`, inherited by both
+   PRs, caused by neither.
+2. **CI runs no tests.** `.github/workflows/audits.yml` is the only workflow: `npm audit` plus a
+   plan/gate step that self-skips without `AUDIT_SUITE_TOKEN`. No typecheck, no test, no build, no
+   lint has ever run on a pull request. F6 is `[ ]` and this is what that costs.
+3. **`npm run lint` is unconfigured.** No `eslint.config.*` anywhere, so `next lint` drops into an
+   interactive prompt — which also means `npm run verify`, session-checklist step 4, cannot pass.
+4. **`npm audit` reports 9 vulnerabilities, 3 critical** (`next` 15.1.6, `vitest` 2.1.9). The A8
+   gate blocks at `--audit-level=high`, so the lockfile fix alone does not turn it green.
+
+Fixes land in the follow-up PR. Recorded here because "green" was asserted in this file and was
+not true, and the reason it went unnoticed is that nothing was checking.
 
 ### The next three actions
 
-1. **Review and merge #10 and #11.** Both are green (231 and 90 tests). Read the diffs —
-   with 0 required approvals, CI is the only other reviewer (`docs/06` §2).
+1. **Make CI a real quality gate (F6).** Typecheck, lint, test and build as separate named
+   stages, so a failure says which one. Plus the lockfile, an ESLint config, a `.gitattributes`,
+   and the dependency bumps A8 needs. Until this lands, every "green" in this file is an
+   assertion, not a measurement.
 2. **Supabase.** The last required credential. Two projects, three values. Until it exists,
    the ledger runs against the in-memory adapter and there are no integration or RLS tests.
 3. **Wire the walking skeleton**: a real `requesttopay` from a deployed function writing
@@ -190,6 +210,7 @@ Format: one line per merged workstream, with the evidence.
 | 2026-09-02 | Telegram bot | **integration** | `getMe` + `getWebhookInfo` on `@momokasi_demo_bot`. Live. |
 | 2026-09-02 | Money engine (PR #10) | unit + property + contract | **231 tests, 15 files.** Ledger balance, state transitions, MoMo response matrix, webhook/cron auth. Typecheck clean. |
 | 2026-09-02 | Frontend (PR #11) | unit | **90 tests, 6 files.** Every artifact renders from a fixture; the provenance guard is locked in. Typecheck clean. |
+| 2026-09-02 | **#10 + #11 combined** | unit + property + contract | **315 tests, 20 files** (321 less the 6 shared split tests counted once), typecheck clean, production build clean. The combination is what found the CRLF guard bug — neither PR failed alone. |
 
 ---
 
