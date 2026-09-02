@@ -207,6 +207,63 @@ R1.00 transaction to a consenting MTN number — and check the callback binding
 first with an invalid MSISDN, which reveals a `500` before any payer is
 contacted.
 
+### `/ledger` — the first screen in this product that is not making it up
+
+**The problem it fixes.** Every surface on the site is driven by `mockAgent`
+— honest starter scope, clearly labelled, and entirely invented. The pitch is
+"money moved, and the books cannot be wrong". A page of plausible fiction argues
+the opposite of that, to precisely the audience least likely to take it on
+trust. The terminal had the real numbers; the product had the pretty ones. That
+is backwards for judges who score design.
+
+`/ledger` reads Postgres and renders what it finds, through the **same artifact
+components** the agent will use, with the **same provenance guard** pointed at
+it. Verified against a production build:
+
+```
+The invariant     0 — 18 postings across 12 accounts, summed
+Recent activity   real momo_transaction rows, newest first
+The journal       MOMO_SETTLEMENT +R12.50 / SUSPENSE −R12.50 → R0.00
+If that had been a taxi fare
+                  R7.50 · R3.13 · R1.25 · R0.62
+```
+
+**The split is not decorative.** It is the amount of the most recent settled
+transaction put through the real `split()`, carrying that transaction's id as
+provenance. If no money has moved, no split renders — there would be nothing
+true to show.
+
+Checked on the rendered HTML, not assumed: **zero "unverified" markers** (every
+amount carries a source), the MSISDN renders as `•••• 3454` and the full number
+**does not appear in the response** (POPIA s105/106).
+
+**Two boundary problems worth keeping.**
+
+`bigint` cannot cross a Server → Client component boundary — React has no
+serialisation for it — and narrowing to `number` to get it across would
+reintroduce the exact floating-point bug ADR-0004 exists to prevent, at the last
+possible moment. So the boundary carries lossless decimal **strings**, revived
+with `BigInt()` on arrival. Types for that shape live in `src/lib/ledger/` so
+both sides can hold them.
+
+And **the ADR-0010 guard fired on its own prose.** It asked
+`body.includes("'use client'")`, which is true of any file that *mentions* the
+directive — so it flagged a server-only module whose docstring warns that client
+components must not import it. Same failure as the CRLF one. The directive is
+only meaningful as a module's first statement, so the guard now matches a real
+directive line, which is strictly **more** accurate. Re-proved to fire against a
+synthetic violation before being trusted.
+
+### What the frontend still owes, in honest order
+
+| | |
+|---|---|
+| **Auth (M9a)** | none at all. Blocks the RLS policy from ever being exercised, and blocks S7f's signed proposals from having an identity to sign for. |
+| **A real agent (S7a/S7b)** | `/chat` is still `mockAgent`. Every number there is invented, and it is the surface a judge will click first. |
+| **Zod artifact schema (S7c)** | a TypeScript union with a `TODO`; no runtime validation. Harmless while no agent produces artifacts — a hard blocker the moment one does. |
+| **Commuter / worker / rank views (M9b-d)** | not started; all three need auth and data models that do not exist. |
+| **axe accessibility pass (Q7)** | owed. Judges score design, and this is the cheapest credibility in the list. |
+
 ### Cut for tomorrow — stated so nobody burns the night on them
 
 WhatsApp was already rejected on Day 1 (ADR-0007) — Meta approval cannot be completed in the
@@ -679,7 +736,7 @@ is the honest one, and it is why the percentage in §Progress counts both ways.
 | M5a | Telegram webhook + secret verification | `[~]` | **contract (27)** | +int | #24 | Built and verified against the live bot. Constant-time secret compare, `update_id` de-duplication, `200` on every path except a bad secret (`401`). `[~]` not `[x]` because the required level is `+int` and de-duplication is in-memory, not a table. |
 | M5b | Bot conversation state machine | `[~]` | contract | +prop | #24 | Short per-chat history (8 turns, 30 min), reset by `/start`. **In-memory, so it survives a warm function and not a cold start.** Not a state machine yet — there are no flows to hold state for until M5c. |
 | M5c | Bot flows: pay, earn, stokvel, balance | `[ ]` | none | +e2e | — | The agent explains all four; it cannot execute any of them. Needs the read tools (S7a) and the outbox. |
-| M9a | Web shell + auth | `[~]` | unit | +e2e | #11 | Shell, landing page, chat surface and context sidebar shipped and serving 200. **There is no auth of any kind** — no sign-in, no session, no `auth.uid()`, so the one RLS policy we wrote cannot yet be exercised. |
+| M9a | Web shell + auth | `[~]` | unit | +e2e | #11, #31 | Shell, landing page, chat surface and context sidebar shipped and serving 200, plus **`/ledger` — the first surface in the product whose numbers are real**. **There is still no auth of any kind** — no sign-in, no session, no `auth.uid()`, so the one RLS policy we wrote cannot yet be exercised. |
 | M9b | Commuter view | `[ ]` | none | +e2e | — | |
 | M9c | Worker view | `[ ]` | none | +e2e | — | |
 | M9d | Rank-admin view | `[ ]` | none | +e2e | — | |

@@ -122,8 +122,30 @@ describe('module boundaries (docs/01 §5)', () => {
 
   test('no client component can reach the service-role client (ADR-0010)', () => {
     // In a PUBLIC repository this is the single most damaging possible mistake.
-    const offenders = sourceFiles()
-      .filter(({ body }) => body.includes("'use client'"))
+    //
+    // ⚠️ MATCH THE DIRECTIVE, NOT THE WORDS. This used to ask
+    // `body.includes("'use client'")`, which is true of any file that MENTIONS
+    // the directive — including a server-only module whose docstring warns that
+    // client components must not import it. It flagged `server/ledger/read.ts`,
+    // a file that could not be a client component if it tried, for describing
+    // the very rule this test enforces.
+    //
+    // That is the same failure as the CRLF one below: a guard firing on its own
+    // prose. The cost is worse than noise, because the obvious way to silence
+    // it is to stop writing the explanation.
+    //
+    // `'use client'` is only meaningful as the FIRST statement of a module —
+    // anywhere else Next.js ignores it and the file is server code. So
+    // anchoring to a real directive line is strictly MORE accurate, not looser:
+    // a file that declares it mid-body is not a client component, and one that
+    // declares it properly still matches.
+    const CLIENT_DIRECTIVE = /^\s*['"]use client['"]\s*;?\s*$/m;
+
+    const clientFiles = sourceFiles().filter(({ body }) => CLIENT_DIRECTIVE.test(body));
+    // If this hits zero the guard has silently stopped guarding.
+    expect(clientFiles.length).toBeGreaterThan(0);
+
+    const offenders = clientFiles
       .filter(({ body }) => /@\/server|SERVICE_ROLE/.test(body))
       .map(({ path }) => path);
 
