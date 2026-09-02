@@ -16,6 +16,20 @@ import { appendTurn, readHistory, resetThread } from './memory';
 export interface HandleDeps {
   readonly telegram: TelegramClient;
   readonly agent: AgentClient;
+  /**
+   * The money commands, INJECTED — which is the point, not a convenience.
+   *
+   * `handleUpdate` is pure decision-making and every test in
+   * `tests/contract/telegram-webhook.test.ts` runs it with no network and no
+   * database. Importing the payment path directly would put a live MoMo call
+   * one careless test away, and would make the module graph say the Telegram
+   * handler *can* move money even in tests that never intend to.
+   *
+   * Absent (the default) means `/pay` politely says it is unavailable, so the
+   * bot degrades to a read-only assistant rather than erroring.
+   */
+  readonly pay?: (text: string) => Promise<string>;
+  readonly status?: () => Promise<string>;
 }
 
 export type HandleOutcome =
@@ -83,6 +97,41 @@ export async function handleUpdate(
       await deps.telegram.sendMessage({ chatId, text: canned });
       return { kind: 'replied', source: 'command' };
     }
+
+    // ── THE ONLY PATH IN THIS FILE THAT CAN TOUCH MONEY ─────────────────────
+    //
+    // A COMMAND, matched by `parseCommand`'s regex. Not a model decision, not
+    // an intent classifier, not free text that happened to look like a payment
+    // request — those still reach the agent below, which has no write tools and
+    // refuses to claim it can send anything (MISTAKES.md M10).
+    //
+    // This is what keeps CLAUDE.md #11 true while the bot can still take a
+    // payment: the human types the verb and the amount, the server chooses the
+    // payee from configuration, and MTN asks the payer for their own PIN on
+    // their own handset. No model is anywhere in that sentence.
+    if (command === 'pay') {
+      if (!deps.pay) {
+        await deps.telegram.sendMessage({
+          chatId,
+          text: 'Payments are not switched on for this bot right now.',
+        });
+        return { kind: 'replied', source: 'command' };
+      }
+      await deps.telegram.sendChatAction(chatId, 'typing').catch(() => undefined);
+      await deps.telegram.sendMessage({ chatId, text: await deps.pay(text) });
+      return { kind: 'replied', source: 'command' };
+    }
+
+    if (command === 'status') {
+      if (!deps.status) {
+        await deps.telegram.sendMessage({ chatId, text: 'No ledger connected right now.' });
+        return { kind: 'replied', source: 'command' };
+      }
+      await deps.telegram.sendChatAction(chatId, 'typing').catch(() => undefined);
+      await deps.telegram.sendMessage({ chatId, text: await deps.status() });
+      return { kind: 'replied', source: 'command' };
+    }
+
     // An unknown command still reaches the agent — "/stokvel" should get a
     // useful answer about stokvels rather than "unknown command".
   }
