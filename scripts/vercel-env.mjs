@@ -228,6 +228,14 @@ async function main() {
     ['MOMO_MODE', momoMode, 'NOT emulator — the deployed function hits the real sandbox'],
     ['MOMO_CALLBACK_HOST', host, 'host only, no scheme (momoAPIs.md §4.1)'],
     ['MOMO_LIVE_MAX_MINOR', env.MOMO_LIVE_MAX_MINOR || '100', 'R1.00 per txn, off sandbox'],
+    // The ONE number `/pay` may request money from. Falls back to the sandbox
+    // fixture rather than to nothing: an unset value makes `/pay` refuse
+    // outright, which is safe but looks broken in a demo.
+    [
+      'MOMO_DEMO_MSISDN',
+      env.MOMO_DEMO_MSISDN || '46733123454',
+      'the only payer /pay can ever charge',
+    ],
   ];
 
   // ── refuse before writing anything ─────────────────────────────────────────
