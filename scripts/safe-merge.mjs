@@ -108,7 +108,31 @@ console.log(`\n  ${d('merging (squash)…')}`);
 try {
   execFileSync('gh', ['pr', 'merge', pr, '--squash', '--delete-branch'], { stdio: 'inherit' });
 } catch {
-  die('The merge itself failed. Nothing was pruned; the branch is untouched.');
+  // A non-zero exit here does NOT mean the merge failed.
+  //
+  // `--delete-branch` deletes the remote branch AND the local one. When a
+  // worktree holds the local branch git refuses ("cannot delete branch ... used
+  // by worktree"), gh exits non-zero, and the old code reported
+  // "The merge itself failed. Nothing was pruned; the branch is untouched."
+  // — wrong on all three counts. PR #10 merged cleanly and was reported as a
+  // failure, which invites exactly the retry that M1 and M2 are about.
+  //
+  // This is the M2 lesson turned on the guard itself: never conclude an outcome
+  // from an exit code when you can go and look. So we ask GitHub.
+  const state = probe('gh', ['pr', 'view', pr, '--json', 'state', '--jq', '.state']);
+
+  if (state === 'MERGED') {
+    console.log(
+      `\n  ${y('!')} gh exited non-zero, but PR #${pr} is MERGED.\n` +
+        `    Almost always the local branch delete failing because a worktree\n` +
+        `    holds it. Continuing to the M2 checks, which verify the real state.`,
+    );
+  } else {
+    die(
+      `The merge itself failed — PR #${pr} is ${state || 'in an unknown state'}.\n` +
+        '    Nothing was pruned; the branch is untouched.',
+    );
+  }
 }
 
 // ── 5. M2 guard — the branch must actually be gone ───────────────────────────

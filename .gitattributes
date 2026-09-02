@@ -1,0 +1,28 @@
+# Line endings, settled once, for everybody.
+#
+# Without this file the repository inherits whatever `core.autocrlf` each
+# machine happens to have. Ours is `true`, so a Windows checkout rewrote every
+# file to CRLF while the trees that *authored* files kept LF. That is not
+# cosmetic: `tests/unit/ledger/single-writer.test.ts` strips SQL comments before
+# scanning the schema for banned floating-point types, and a trailing CR defeats
+# the strip — so the guard fired on its own prose in a fresh clone, and passed
+# in the tree that wrote the file and on Linux CI. A guard whose result depends
+# on who checked it out is not a guard.
+#
+# `eol=lf` normalises in the repository AND in the working tree, so every
+# machine sees the same bytes as CI does.
+
+* text=auto eol=lf
+
+# Binaries must never be touched.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.pdf  binary
+*.woff  binary
+*.woff2 binary
+*.ttf   binary
+*.otf   binary

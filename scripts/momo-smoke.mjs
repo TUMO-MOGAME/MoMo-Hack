@@ -5,10 +5,11 @@
  * Two jobs:
  *   1. "Is the sandbox up, and do our credentials work right now?" — the check
  *      to run before a demo (docs/08 §2).
- *   2. Confirm the sandbox test MSISDN table, which momoAPIs.md §10 rates [P]
- *      (probable, from secondary sources). Every negative-path test we write
- *      depends on these numbers behaving as documented, so this promotes them
- *      to [V] or tells us they are wrong.
+ *   2. Re-confirm the sandbox test MSISDN table. It is now [V] — measured, and
+ *      four of MTN's six documented outcomes were wrong (momoAPIs.md §10). So a
+ *      mismatch here no longer means "update the doc"; it means the SANDBOX has
+ *      changed under us, and the negative-path tests that depend on these
+ *      numbers need re-checking.
  *
  *   node scripts/momo-smoke.mjs
  *
@@ -18,29 +19,31 @@
 import { randomUUID } from 'node:crypto';
 import { loadEnv } from './_env.mjs';
 // Mirrored from src/lib/momo/test-msisdns.ts — plain node cannot import a .ts
-// module. If that file changes, change this. The whole point of this script is
-// to check whether these numbers behave as documented.
+// module. If that file changes, change this.
+//
+// These names and expectations are the MEASURED ones (momoAPIs.md §10, [V]
+// 2026-09-02), not MTN's documented ones — four of which are wrong. The mirror
+// was not updated when #5 corrected the table, so this script reported "4
+// outcomes differed" on every run while the doc and the code were both right.
+// A smoke test that always warns is a smoke test nobody reads.
 const TEST_MSISDN = {
-  FAILED: '46733123450',
-  REJECTED: '46733123451',
-  TIMEOUT: '46733123452',
-  SUCCESS: '46733123453',
-  PENDING: '46733123454',
+  FAILS_FAST: '46733123450',
+  ALSO_FAILS: '46733123451',
+  ALSO_FAILS_2: '46733123452',
+  STAYS_PENDING: '46733123453',
+  ASYNC_SUCCESS: '46733123454',
 };
 
-const root = resolve(fileURLToPath(import.meta.url), '..', '..');
-const envPath = join(root, '.env.local');
-if (!existsSync(envPath)) {
-  console.error('\n  .env.local not found.\n');
-  process.exit(1);
-}
-
-const env = Object.fromEntries(
-  readFileSync(envPath, 'utf8')
-    .split('\n')
-    .filter((l) => /^[A-Z_]+=/.test(l))
-    .map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1).trim()]),
-);
+// This is what the `loadEnv` import was always for. #9 added the import and the
+// worktree-aware loader but left the old inline copy in place, and the inline
+// copy referenced `resolve`, `join`, `existsSync` and `readFileSync` whose
+// imports had gone with it — so this script died with `ReferenceError: resolve
+// is not defined` before it read a single credential. Nothing ran it again
+// after the refactor, and nothing could have told us: it is not in CI.
+//
+// `loadEnv` also searches every git worktree, so `npm run check:momo` now works
+// from the chore tree, where `.env.local` does not live.
+const { env } = loadEnv();
 
 const BASE = env.MOMO_BASE_URL;
 const TARGET = env.MOMO_TARGET_ENVIRONMENT || 'sandbox';
@@ -72,23 +75,29 @@ if (!tokRes.ok) {
 const { access_token, expires_in } = await tokRes.json();
 console.log(`  ${g('✓')} access token  ${d(`expires in ${expires_in}s`)}\n`);
 
-// ── the documented outcomes we are checking ─────────────────────────────────
+// ── the MEASURED outcomes we are checking (momoAPIs.md §10, [V]) ────────────
+//
+// Each case lists every status we accept. Only ASYNC_SUCCESS has more than one:
+// it resolves CREATED -> SUCCESSFUL in about 25 seconds, so which of the two we
+// land on depends on where the poll window closes. Both are correct; treating
+// either as a mismatch is what made this script noise.
 const CASES = [
-  ['SUCCESS', TEST_MSISDN.SUCCESS, 'SUCCESSFUL'],
-  ['FAILED', TEST_MSISDN.FAILED, 'FAILED'],
-  ['REJECTED', TEST_MSISDN.REJECTED, 'REJECTED'],
-  ['TIMEOUT', TEST_MSISDN.TIMEOUT, 'TIMEOUT'],
-  ['PENDING', TEST_MSISDN.PENDING, 'PENDING'],
-  ['random (undocumented)', '260970000001', 'SUCCESSFUL'],
+  ['STAYS_PENDING', TEST_MSISDN.STAYS_PENDING, ['PENDING']],
+  ['FAILS_FAST', TEST_MSISDN.FAILS_FAST, ['FAILED']],
+  ['ALSO_FAILS (doc: REJECTED)', TEST_MSISDN.ALSO_FAILS, ['FAILED']],
+  ['ALSO_FAILS_2 (doc: TIMEOUT)', TEST_MSISDN.ALSO_FAILS_2, ['FAILED']],
+  ['ASYNC_SUCCESS — the demo', TEST_MSISDN.ASYNC_SUCCESS, ['CREATED', 'SUCCESSFUL']],
+  ['random (undocumented)', '260970000001', ['SUCCESSFUL']],
 ];
 
-console.log(`  ${'label'.padEnd(22)} ${'msisdn'.padEnd(14)} ${'expected'.padEnd(12)} actual`);
+console.log(`  ${'label'.padEnd(28)} ${'msisdn'.padEnd(14)} ${'accepted'.padEnd(22)} actual`);
 console.log(`  ${d('─'.repeat(66))}`);
 
 let mismatches = 0;
 let hardFail = false;
 
 for (const [label, msisdn, expected] of CASES) {
+  const show = expected.join('/');
   const ref = randomUUID();
 
   const pay = await fetch(`${BASE}/collection/v1_0/requesttopay`, {
@@ -113,7 +122,7 @@ for (const [label, msisdn, expected] of CASES) {
   if (pay.status !== 202) {
     const body = await pay.text().catch(() => '');
     console.log(
-      `  ${label.padEnd(22)} ${msisdn.padEnd(14)} ${expected.padEnd(12)} ${r(`POST ${pay.status}`)} ${d(body.slice(0, 60))}`,
+      `  ${label.padEnd(28)} ${msisdn.padEnd(14)} ${show.padEnd(22)} ${r(`POST ${pay.status}`)} ${d(body.slice(0, 60))}`,
     );
     hardFail = true;
     continue;
@@ -130,18 +139,18 @@ for (const [label, msisdn, expected] of CASES) {
   });
 
   if (!st.ok) {
-    console.log(`  ${label.padEnd(22)} ${msisdn.padEnd(14)} ${expected.padEnd(12)} ${r(`GET ${st.status}`)}`);
+    console.log(`  ${label.padEnd(28)} ${msisdn.padEnd(14)} ${show.padEnd(22)} ${r(`GET ${st.status}`)}`);
     hardFail = true;
     continue;
   }
 
   const body = await st.json();
   const actual = body.status || '(none)';
-  const match = actual === expected;
+  const match = expected.includes(actual);
   if (!match) mismatches++;
 
   console.log(
-    `  ${label.padEnd(22)} ${msisdn.padEnd(14)} ${expected.padEnd(12)} ${match ? g(actual) : y(actual)}`,
+    `  ${label.padEnd(28)} ${msisdn.padEnd(14)} ${show.padEnd(22)} ${match ? g(actual) : y(actual)}`,
   );
 }
 
@@ -152,7 +161,7 @@ const body = JSON.stringify({
   amount: '5.00',
   currency: 'EUR',
   externalId: `dupe-${Date.now()}`,
-  payer: { partyIdType: 'MSISDN', partyId: TEST_MSISDN.SUCCESS },
+  payer: { partyIdType: 'MSISDN', partyId: TEST_MSISDN.ASYNC_SUCCESS },
   payerMessage: 'idempotency check',
   payeeNote: 'dupe',
 });
@@ -180,7 +189,9 @@ if (hardFail) {
 if (mismatches) {
   console.log(
     `  ${y('!')} ${mismatches} MSISDN outcome(s) differed from momoAPIs.md §10.\n` +
-      `    Update that table with what you actually observed — the negative-path tests depend on it.\n`,
+      `    That table is [V] — measured, not assumed — so this means the SANDBOX\n` +
+      `    changed. Re-measure, then update §10 AND src/lib/momo/test-msisdns.ts\n` +
+      `    AND the mirror at the top of this file, in the same PR.\n`,
   );
   process.exit(0);
 }
