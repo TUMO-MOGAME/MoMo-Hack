@@ -13,9 +13,12 @@ Every PR must update it. If you are a fresh session, read this before touching a
   `mo-mo-hack.vercel.app` alias still serves the same deployment. Production deploys on every
   merge, previews on every PR.
 - **Database:** live. 3 migrations applied to Supabase `edtduvwbejdfahkmfort` (`eu-west-2`).
-- **Tree state:** 361 tests green (23 files), 0 vulnerabilities, CI enforcing all of it.
-- **Blocked on:** nothing external. **F9 is done** — the deployed function has credentials, and
-  `/api/health` reports `database: configured`.
+- **Tree state:** 363 green + 2 skipped over 24 files, 0 vulnerabilities, CI enforcing all of it.
+  Both skips are opt-in and announce themselves: the walking skeleton (`MOMO_SKELETON=1`) and the
+  write-skew case (`allowWrites`). Both commit permanent rows, so neither runs by accident.
+- **Blocked on:** nothing external. **F9 is done** and **the walking skeleton is closed** — a real
+  `requesttopay` against MTN's sandbox has been resolved through the deployed function into a
+  balanced double-entry journal. Money has moved end to end.
 
 ---
 
@@ -24,11 +27,11 @@ Every PR must update it. If you are a fresh session, read this before touching a
 | | |
 |---|---|
 | **Current phase** | Phase 3 — Money engine |
-| **Phase state** | Phases 0-1 substantially done. Money engine reviewed and merged (#10). |
+| **Phase state** | **Phase 0 closed** — walking skeleton proved end to end. Phase 3 exit criterion met; its six audits still owed. |
 | **Audits owed at close** | Phase 3: A1 A2 A3 A4 A5 A6 — **none run yet** |
 | **Blocking findings** | none — the CI gate landed in #13 and all eight checks are green |
 | **Days to code freeze** | 25 (27 Sep 2026) |
-| **Open PRs** | none. #10, #11, #13-#21 all merged. |
+| **Open PRs** | **#24** (Telegram, M5a — a second agent's). #10, #11, #13-#21, #23 merged. |
 
 ### The CI finding, kept because it changes how every merge before it was judged
 
@@ -66,15 +69,110 @@ an `esbuild` block is silently ignored under Vite 8). Two lessons worth keeping:
 
 ### The next three actions
 
-1. **Close the walking skeleton (Phase 0).** F9 is done, so this is now the front of the queue:
-   a real `requesttopay` from the deployed function, resolved by the reconciler, writing balanced
-   ledger rows. Demo MSISDN `46733123454` — the only number that exercises a real ~25s async
-   resolution. Every part exists and is tested; nothing has been joined.
-2. **Phase 3's six audits (A1 A2 A3 A4 A5 A6).** `npm run audit:plan`. None have been run, and
-   the phase cannot close without them (CLAUDE.md #13).
-3. **Telegram handler (M5a).** Owned by a second agent, in its own worktree. This session did not
-   touch it and deliberately left `TELEGRAM_BOT_TOKEN` / `TELEGRAM_WEBHOOK_SECRET` alone — see
-   the note on split ownership below.
+1. **Phase 3's six audits (A1 A2 A3 A4 A5 A6).** `npm run audit:plan`. None have been run, and
+   the phase cannot close without them (CLAUDE.md #13). This is now the front of the queue.
+2. **The scheduler (F8).** The reconciler works in production but **nothing calls it on a
+   timer** — every tick so far has been a human with `curl`. Until the GitHub Actions cron exists,
+   a transaction resolves only when someone pokes it. ADR-0006.
+3. **Disbursements (M3a).** Nothing pays anybody out yet. Money can come in and stop; it cannot
+   leave. That is the other half of every product surface.
+
+### ✅ THE WALKING SKELETON IS CLOSED (Phase 0)
+
+*"A real `requesttopay` from the deployed function, resolved by the reconciler, writing balanced
+ledger rows."* Done, and measured rather than asserted:
+
+```
+momo_transaction  SUCCESSFUL  100  SKELETON-1788365755412  AIRTIME  attempts=1
+journal d6df990b    MOMO_SETTLEMENT   +100
+                    SUSPENSE          -100
+                    sum:                 0
+initiate → resolved: 66.4s
+GLOBAL ledger sum:   0 over 8 rows
+```
+
+A second collection was then resolved through the same path (`journal a7cc179a`), which matters
+more than the first — see the Critical finding below.
+
+Driven by `tests/integration/walking-skeleton.test.ts`, opt-in behind `MOMO_SKELETON=1` because it
+is the one integration test here that **cannot roll back**: `journal` and `ledger_entry` are
+append-only by trigger, so a successful run leaves rows in the production project permanently. That
+is what it is proving. It refuses to run against any `MOMO_TARGET_ENVIRONMENT` but `sandbox`.
+
+```
+MOMO_SKELETON=1 npx vitest run tests/integration/walking-skeleton.test.ts
+```
+
+**No seed data was needed.** `ensureAccount` upserts by natural key, so `AIRTIME` — which posts
+`MOMO_SETTLEMENT` → `SUSPENSE` with no owner, driver, rank or split rule — creates both accounts
+on demand. D2 is still worth having for the demo, but it was not a blocker.
+
+**A deliberate limitation, stated because it would otherwise read as proven:** the test pokes the
+deployed reconciler every 5s while waiting, and MTN's callback fires at the same time. Both paths
+are live and both are safe to run concurrently (that is the single-resolver guarantee), but **which
+of the two actually won the race was not instrumented**. "Resolved by the deployed function" is
+proved; "the callback specifically works" is not. M2d stays `[~]` for that reason.
+
+### CRITICAL — the ledger worked exactly once
+
+Found on the **second** collection ever made, in production. `ensureAccount` falls back to a
+`SELECT` when `on conflict do nothing` fires, and that SELECT was passed six parameters while
+referencing five. Postgres refused it outright:
+
+```
+error: could not determine data type of parameter $5
+  at ensureAccount           (src/server/db/postgres.ts)
+  at writeJournal            (src/server/ledger/journal.ts)
+  at postSuccessfulJournal   (src/server/momo/resolve.ts)
+```
+
+The failing branch runs **only when the account already exists**. So the first journal against any
+account succeeded and every subsequent one threw — the first fare works, the second does not, and
+the ledger is stuck forever.
+
+**Why 361 tests missed it.** Every integration test rolls back. `inRollback` is the right default
+and it is why the suite can run against the production project with no seeding and no cleanup — but
+it means **no test had ever seen a committed account**, so the entire `on conflict` branch was dead
+code as far as the suite was concerned. The unit suite could not help either: the in-memory adapter
+has no SQL to get wrong. Written up as **M9** in `MISTAKES.md` — *a rolled-back suite proves the
+first use of everything and the second use of nothing.*
+
+Fixed, and guarded by two tests that call `ensureAccount` **twice** for the same natural key (one
+subject-scoped, one for the null/null system key). Proved to fire: reintroducing the sixth parameter
+fails both with the original error.
+
+### HIGH — the MoMo callback host is fixed at provisioning, and a mismatch is a 500
+
+`momoAPIs.md` §4.1 rated this `[P]` and guessed that a mismatched `X-Callback-Url` means
+"callbacks are silently dropped". **Measured, it is worse than that: the whole payment fails.**
+
+```
+500 {"message":"Callback URL does not match the configured value.",
+     "code":"INVALID_CALLBACK_URL_HOST"}
+```
+
+Proved as a controlled experiment, because a single 500 could have been the sandbox having a bad
+afternoon:
+
+| `X-Callback-Url` | API user bound to `momo-kasi` | rebound to `momo.tumoolo.tech` |
+|---|---|---|
+| none | 202 | 202 |
+| `momo.tumoolo.tech` | **500** | **202** |
+| `momo-kasi.vercel.app` | 202 | **500** |
+
+The results invert exactly. `GET /v1_0/apiuser/{id}` confirmed both bindings directly.
+
+**The consequence is operational, and it bites at the worst moment.** The callback host is fixed
+when the API user is created and there is no documented way to change it. Moving to a new domain
+is **not** an environment-variable change — it needs a **new API user and key**. So the API user
+was re-provisioned against `momo.tumoolo.tech` (`MOMO_API_USER` is now `28b81c8c…`), and the new
+credentials pushed to Vercel.
+
+Note what this means about the state before today: the project was provisioned against
+`momo-kasi.vercel.app`, **a host that 404s**. Requests only ever succeeded because we happened to
+name that dead host, and every callback MTN sent went nowhere. The callback path had never worked
+and could not have. `momoAPIs.md` §4.1 is promoted `[P]` → `[V]`, §4.3 `[P]` → `[V]`, and §7.1
+gained two bullets.
 
 ### F9 is done, and the reason it looked undone was not the reason anyone assumed
 
@@ -250,8 +348,8 @@ straight out of the `[ ]`/`[~]`/`[x]` column. Recomputed whenever the board chan
 
 | Measure | | What it counts |
 |---|---|---|
-| **Done to the required test level** | **23%** | 16 items. The honest floor: `docs/04` says a feature is Done only at its named test level. |
-| **Weighted** (`[~]` counts half) | **30%** | The fairest single number. |
+| **Done to the required test level** | **26%** | 18 items. The honest floor: `docs/04` says a feature is Done only at its named test level. |
+| **Weighted** (`[~]` counts half) | **31%** | The fairest single number. |
 | **Started or better** | **36%** | 25 items have real code. |
 
 **Read these with three caveats, or they will mislead you.**
@@ -281,7 +379,7 @@ written up. Only the audits listed are run at that phase — see `PLANNING.md` �
 
 | # | Phase | State | Days | Audits |
 |---|---|---|---|---|
-| 0 | Foundation and walking skeleton | CI gate done (#13); skeleton not joined; Supabase not migrated | 1-3 | A1 A8 ⚪ |
+| 0 | Foundation and walking skeleton | **DONE.** Skeleton closed — real requesttopay → deployed function → balanced journal, measured | 1-3 | A1 A8 ⚪ |
 | 1 | Design system and app shell | built, in PR #11 | 4-5 | A1 A2 A3 ⚪ |
 | 2 | Narrative and content surfaces | landing page built, in PR #11 | 6 | A1 A6 ⚪ |
 | 3 | Money engine | **in progress** — ledger/client/state machine merged (#10); no integration tests yet | 7-13 | A1 A2 A3 A4 A5 A6 ⚪ |
@@ -341,11 +439,11 @@ is the honest one, and it is why the percentage in §Progress counts both ways.
 | M1b | Journal writer (atomic, balanced) | `[x]` | unit **+prop** | +prop | #10 | Single writer, guarded by `single-writer.test.ts`. Required level met. |
 | M1c | Balance projection + hold logic | `[~]` | unit +prop | +prop | #10 | Projection done (`accountBalance`, no cached balance anywhere). **Hold logic exists only as posting builders** — the escrow service is M4a. |
 | M1d | Split engine (basis points, remainder) | `[x]` | **+prop** | +prop | #3 | 6 properties, 5,000+ cases. R12.50 tie-break pinned (M3 in `MISTAKES.md`). |
-| M2a | MoMo client (auth, token cache, retry) | `[~]` | unit + contract | +int | #10 | Contract tests across the response matrix, **plus live sandbox verification**. Not `+int` in the CI sense. |
-| M2b | Collections `requesttopay` + status | `[~]` | contract | +int | #10 | Live-verified: `202` then `409` on a repeated `X-Reference-Id`. |
+| M2a | MoMo client (auth, token cache, retry) | `[x]` | **+int** | +int | #10, #25 | Contract tests across the response matrix, and now a real end-to-end collection through the deployed function. Token issue, `requesttopay`, `getStatus` and the callback-host binding all exercised against the live sandbox. |
+| M2b | Collections `requesttopay` + status | `[x]` | **+int** | +int | #10, #25 | Live-verified: `202` then `409` on a repeated `X-Reference-Id`, and **two real collections resolved to `SUCCESSFUL` with balanced journals**. Also found `500 INVALID_CALLBACK_URL_HOST` — see the HIGH finding above. |
 | M2c | Transaction state machine | `[x]` | **+prop** | +prop | #10 | Terminal states absorbing, machine total and closed. Accepts the undocumented `CREATED`. |
-| M2d | Callback webhook handler | `[~]` | contract | +int | #10 | Replay-safe by construction — the body can only trigger a lookup, never set a status. |
-| M2e | Reconciliation poller | `[~]` | unit + contract | +int | #10 | Route and poller built. **The GitHub Actions cron that calls it does not exist** (F8). |
+| M2d | Callback webhook handler | `[~]` | contract | +int | #10, #25 | Replay-safe by construction — the body can only trigger a lookup, never set a status. **Now reachable for the first time**: the API user is bound to `momo.tumoolo.tech`, so MTN's callback finally arrives somewhere real. Stays `[~]` because the skeleton polls the reconciler concurrently and **which path won the race was not instrumented**. |
+| M2e | Reconciliation poller | `[~]` | **+int** | +int | #10, #23, #25 | Proved in production: `{"ok":true,"examined":1,...}` from the deployed route, including the resend path moving an `INITIATED` row to `CREATED`. Stays `[~]` because **nothing calls it on a timer** — every tick so far has been a human with `curl` (F8). |
 | M3a | Disbursements `transfer` | `[ ]` | none | +int | — | Not started. Nothing pays anybody out yet. |
 | M3b | Payout orchestration + outbox | `[ ]` | none | +int | — | The `outbox` table and writes exist; **nothing drains it**. |
 | M4a | Escrow hold / release / refund | `[ ]` | none | +prop | — | Posting builders exist; the service and state machine do not. |
@@ -414,7 +512,7 @@ is the honest one, and it is why the percentage in §Progress counts both ways.
 | Q7 | Accessibility pass (axe) | `[ ]` | — | — | — | Judges score design |
 | Q8 | Security review (secrets, authz matrix) | `[ ]` | — | — | — | |
 | D1 | MoMo emulator for demo resilience | `[ ]` | none | +int | — | ADR-0009 |
-| D2 | Seed data + demo reset script | `[ ]` | none | — | — | One command |
+| D2 | Seed data + demo reset script | `[ ]` | none | — | — | One command. **Not a blocker after all** — `ensureAccount` upserts by natural key, so the skeleton needed no seed data. Still wanted for a demo with plausible balances. |
 | D3 | Demo rehearsed end to end 3x | `[ ]` | — | — | — | `docs/08` |
 | D4 | Pitch deck | `[ ]` | — | — | — | |
 | D5 | Demo video recorded | `[ ]` | — | — | — | Fallback if live fails |
@@ -461,6 +559,9 @@ Format: one line per merged workstream, with the evidence.
 | 2026-09-02 | **F9 — env vars on Vercel** | **integration** | 15 variables written to the `production` target and **read back from the API**, not trusted to a 200. Root cause of the apparent gap: they were already set on **preview** only. Verified by behaviour after a redeploy of the same commit (`11569c6`): `/api/health` `database: unconfigured` → **`configured`** on both aliases. |
 | 2026-09-02 | **Cron auth, live** | **integration** | Three-way probe against the deployed function: no bearer → **401**, wrong bearer → **401**, correct `CRON_SECRET` → **through to the handler**. Proves the secret landed correctly and the constant-time compare behaves. |
 | 2026-09-02 | **HIGH — money routes never bound the database** | **integration + static guard** | The same correct-bearer call returned **500**. Cause: `ensureMoneyDb()` had one caller in the codebase (`/api/health`), and `setMoneyDb` is a module-scoped singleton that serverless isolation does not share. `/api/cron/reconcile` 500'd on every tick; `/api/momo/callback/[kind]` returned **200 while never reaching the database**, because its catch swallows exactly that error. Fixed in both. Guarded by a static test over `src/app/api/**/route.ts`, and **the guard was proved to fire** against a synthetic violation. |
+| 2026-09-02 | **✅ WALKING SKELETON — Phase 0 closed** | **integration, live** | A real `requesttopay` to MTN's sandbox (R1.00, MSISDN `46733123454`), resolved through the **deployed** function, writing a balanced journal. Measured: `SUCCESSFUL`, `journal d6df990b`, `MOMO_SETTLEMENT +100` / `SUSPENSE -100`, sum `0`, **initiate → resolved 66.4s**. Global ledger sum `0` over 8 rows. Driven by `tests/integration/walking-skeleton.test.ts`, opt-in behind `MOMO_SKELETON=1` because it cannot roll back. |
+| 2026-09-02 | **CRITICAL — the ledger worked exactly once** | **integration + regression** | `ensureAccount`'s `on conflict` fallback passed 6 params to SQL referencing 5 → `could not determine data type of parameter $5`. That branch runs only when the account already **exists**, so the first journal against any account succeeded and every later one threw. Found on the second real collection. Missed by 361 tests because every integration test rolls back and so had never seen a committed account. Fixed; two idempotency tests added and **proved to fire** against the reintroduced bug. Second collection then resolved: `journal a7cc179a`. M9 in `MISTAKES.md`. |
+| 2026-09-02 | **HIGH — MoMo callback host is bound at provisioning** | **integration, controlled experiment** | A mismatched `X-Callback-Url` returns **`500 INVALID_CALLBACK_URL_HOST`** and creates no payment — `momoAPIs.md` §4.1 had guessed "silently dropped". Proved by inversion: bound to host A, sending B is 500 and A is 202; after re-provisioning against B the results flip exactly; no callback URL is 202 either way. `GET /v1_0/apiuser/{id}` confirmed both bindings. The project had been provisioned against `momo-kasi.vercel.app`, **which 404s**, so the callback path had never worked. API user re-provisioned as `28b81c8c…` against `momo.tumoolo.tech`. §4.1 and §4.3 promoted `[P]` → `[V]`. |
 
 ---
 
