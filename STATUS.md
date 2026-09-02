@@ -89,6 +89,59 @@ of the product has not been written yet. It is Phase 4, and it is gated on F7.
 One thing to change while it is queued: `/setprivacy` → **Disable** in @BotFather. Split-a-bill
 needs to see who replied in a group, and the bot currently cannot read group messages.
 
+### CRITICAL, found and fixed the first time the tests met a real database
+
+**`anon` could `TRUNCATE` the entire ledger.** Measured, not theorised:
+
+```
+set local role anon;
+truncate ledger_entry cascade;   -- SUCCEEDED
+```
+
+`0001_ledger.sql` enables RLS and deliberately gives the ledger tables **no policies**, on the
+stated reasoning that "RLS with zero policies denies every role except service_role" (ADR-0010).
+That is true for SELECT, INSERT, UPDATE and DELETE. **It is not true for TRUNCATE.** TRUNCATE is
+not a row operation, so RLS never sees it — it is governed only by the table privilege, and
+Supabase's default privileges grant **ALL** privileges on every new table in `public` to `anon`
+and `authenticated`. The append-only triggers do not help either: they fire on UPDATE and DELETE,
+and TRUNCATE is neither.
+
+Not remotely exploitable today — PostgREST does not expose TRUNCATE, so the anon API key alone
+cannot reach it. But ADR-0010's guarantee is meant to be **structural**, and "unreachable through
+the API we happen to use" is not structural.
+
+Fixed in `0002_lockdown_and_bigint_balances.sql`: revoke everything from `anon` and
+`authenticated`, then grant back only what is deliberately public. **Verified closed** — TRUNCATE
+now returns `42501` for both roles.
+
+**Also fixed: `wallet_balance` exposed money as `numeric`, not `bigint`**, because `sum(bigint)`
+returns `numeric` in Postgres. No value was ever rounded — `numeric` is exact — but it breaks the
+contract rule 1 promises and that `toBigInt` is built around. Now `::bigint`, and **zero
+numeric/float columns remain** in `public`.
+
+**The lesson worth keeping: the CI "Money guards" job could not have caught either.** It greps
+*migrations* for banned type names, and `sum(e.amount)` contains none of them. A static grep over
+source cannot see a type the database infers, nor a privilege the platform grants behind your
+back. Only a check against the live schema can, and it did on its first run.
+
+### Phase 3's exit criterion is now met
+
+*"The ledger always balances, under concurrency, with property tests to prove it."*
+
+Measured against real Postgres with two connections racing the same account: **one spend
+committed, one was refused, the global ledger sum is exactly `0`, and the credit-normal wallet
+never went positive.** The write-skew risk flagged in #17 does not materialise here — the deferred
+trigger runs its `SELECT` as a fresh statement at COMMIT, so under READ COMMITTED it sees the
+other transaction's committed rows. That is a measurement of one interleaving, not a formal proof,
+so it stays worth re-checking when M3a and M4a add paths that debit a wallet.
+
+### A cost worth stating: test runs left permanent rows
+
+The opt-in concurrency test commits, and **journals are append-only by trigger, so its rows cannot
+be deleted** — 7 journals and 4 postings are in the production project for good. The ledger still
+balances exactly, and nothing is wrong; but it argues for the **second Supabase project (F4)** to
+exist and to be where writing tests point. The free tier allows two and we have made one.
+
 ### Decisions taken 2026-09-02
 
 - **Q6 — Supabase region: keep `eu-west-2` (London).** Decided by Tumo. POPIA s72 is satisfied
@@ -114,8 +167,8 @@ straight out of the `[ ]`/`[~]`/`[x]` column. Recomputed whenever the board chan
 
 | Measure | | What it counts |
 |---|---|---|
-| **Done to the required test level** | **17%** | 12 items. The honest floor: `docs/04` says a feature is Done only at its named test level. |
-| **Weighted** (`[~]` counts half) | **27%** | The fairest single number. |
+| **Done to the required test level** | **22%** | 15 items. The honest floor: `docs/04` says a feature is Done only at its named test level. |
+| **Weighted** (`[~]` counts half) | **29%** | The fairest single number. |
 | **Started or better** | **36%** | 25 items have real code. |
 
 **Read these with three caveats, or they will mislead you.**
@@ -123,19 +176,18 @@ straight out of the `[ ]`/`[~]`/`[x]` column. Recomputed whenever the board chan
 1. **Items are not equal.** The money engine is one row per concept but 7,500 lines and 231
    tests; "Pitch deck" is one row and an afternoon. By item count the ledger is worth the same
    as a checkbox.
-2. **The gap between 16% and 32% is almost entirely one missing thing.** Eight items sit at
-   `[~]` purely because their required level is `+int` and **there is no database to integrate
-   against**. The code is written and green. Applying the migrations (F5) moves more of this
-   board than any other single action available.
+2. **The database gap is closed.** That caveat used to read "eight items sit at `[~]` because
+   there is no database to integrate against". There is now: three migrations applied, 29
+   integration tests green, and the four ledger invariants verified *firing* rather than assumed.
+   Strict completion moved 17% → 22% on that alone, and it is the reason the remaining `[~]`
+   items are now blocked on real work rather than on a credential.
 3. **The hard part is disproportionately done.** The double-entry ledger, the integer split
    engine, the state machine and the idempotency model are the parts that are expensive to get
    right and unforgiving when wrong, and they are built and property-tested. What remains is
    mostly breadth — more surfaces over the same engine — not depth.
 
-**Phase 3 exit criterion is not met.** It reads "the ledger always balances, under concurrency,
-with property tests to prove it". Property tests: yes. **Under concurrency against a real
-Postgres: not demonstrated**, because that needs F5. The in-memory adapter cannot prove the
-`DEFERRABLE` triggers fire, and those triggers are the whole safety argument.
+**Phase 3's exit criterion is now met** — see the measurement above. What Phase 3 still owes is
+its six audits (A1 A2 A3 A4 A5 A6), none of which have been run.
 
 ---
 
@@ -184,7 +236,7 @@ Test column: `none` / `unit` / `+prop` (property-based) / `+int` (integration in
 | F3c | Frozen contracts: `money`, `split`, `errors`, `artifacts/types` | `[x]` | **manual** | +prop | — | Split verified exact across 200,000 amounts. Needs the real fast-check suite (M1d). |
 | F3d | Starter chat + artifact UI (mock agent) | `[x]` | manual | +e2e | — | 7 artifact renderers, chip + panel + bottom sheet, zero keys needed |
 | F4 | Supabase staging + prod projects | `[~]` | none | +int | — | **Project 1 of 2 live and verified** — URL, anon and service_role all resolve to ref `edtduvwbejdfahkmfort`, service_role authenticates 200. **Region is `eu-west-2` (London)**, measured from the DB host's IPv6 against AWS's published ranges — not an African region. See Q6. |
-| F5 | Migration pipeline (local, CI, deploy) | `[~]` | unit | +int | #17 | **Pipeline built, not yet run against a database.** `npm run db:migrate` applies `supabase/migrations/*.sql` in order, once, and **refuses to continue if an applied file's checksum changed** (CLAUDE.md #4). `pg` is bound via `connection.ts`, and `bootstrap.ts` finally calls `setMoneyDb` — the link that did not exist. Blocked only on `DATABASE_URL`. |
+| F5 | Migration pipeline (local, CI, deploy) | `[x]` | **+int** | +int | #20 | `npm run db:migrate` — ordered, once, each file in a transaction, and it **refuses if an applied file's checksum changed** (CLAUDE.md #4). **Three migrations applied to the live Supabase project.** |
 | F6 | CI quality gate workflow | `[x]` | **verified** | n/a | #13, #14 | Lockfile · Typecheck · Lint · Format · Tests · Build · Money guards, each a separate named job. Guards tested against synthetic violations to prove they fire. |
 | F7 | Vercel project + preview deploys | `[x]` | **verified live** | +e2e | — | **<https://mo-mo-hack.vercel.app> is public and serving.** Production deploys on every merge to `main`, previews on every PR. Verified 2026-09-02: `/` and `/chat` **200**, `/api/health` `ok:true`, and **`POST /api/momo/callback/collection` returns 200 from the public internet** — so MTN can reach our callback. Note the per-deployment URLs (`…-tumo-mogames-projects.vercel.app`) 302 to SSO; only the stable alias is public, and that is the one to give MTN and Telegram. |
 | F8 | GitHub Actions scheduler + keep-alive | `[ ]` | none | +int | — | ADR-0006 |
@@ -202,7 +254,7 @@ is the honest one, and it is why the percentage in §Progress counts both ways.
 
 | ID | Item | State | Tests | Required tests | PR | Notes |
 |---|---|---|---|---|---|---|
-| M1a | Chart of accounts + ledger schema | `[~]` | unit +prop | +int | #10 | Written and enforced by DB triggers (I1-I4). **Never applied to a real database** — blocked on F5. |
+| M1a | Chart of accounts + ledger schema | `[x]` | **+int** | +int | #10, #20 | Applied to real Postgres and **all four invariants verified firing** — I1 balance, I2 append-only, I3 overdraft in each account's own direction, I4 terminal immutability. These could never be proven against the in-memory adapter, which has no triggers. |
 | M1b | Journal writer (atomic, balanced) | `[x]` | unit **+prop** | +prop | #10 | Single writer, guarded by `single-writer.test.ts`. Required level met. |
 | M1c | Balance projection + hold logic | `[~]` | unit +prop | +prop | #10 | Projection done (`accountBalance`, no cached balance anywhere). **Hold logic exists only as posting builders** — the escrow service is M4a. |
 | M1d | Split engine (basis points, remainder) | `[x]` | **+prop** | +prop | #3 | 6 properties, 5,000+ cases. R12.50 tie-break pinned (M3 in `MISTAKES.md`). |
@@ -271,7 +323,7 @@ is the honest one, and it is why the percentage in §Progress counts both ways.
 | ID | Item | State | Tests | Required tests | PR | Notes |
 |---|---|---|---|---|---|---|
 | Q1 | Property-test suite for money invariants | `[ ]` | — | — | — | `docs/04` §3 |
-| Q2 | RLS policy test suite | `[~]` | written, not yet run | — | #17 | 6 RLS tests written, using `set local role` + `request.jwt.claims` — the only way to test a policy, since the connection we hold is the owner and bypasses RLS entirely. Covers: ledger tables unreachable by `anon` **and** `authenticated`, no client INSERT, split rules publicly readable on purpose, a user sees only their own transactions, and a user **cannot mark their own transaction SUCCESSFUL** — the most valuable forgery in the system. |
+| Q2 | RLS policy test suite | `[x]` | **+int** | — | #20 | 6 RLS tests, green against the live database. They found a **Critical** hole — see below. |
 | Q3 | MoMo contract tests (2xx/4xx/5xx/timeout) | `[ ]` | — | — | — | |
 | Q4 | E2E critical path (Playwright) | `[ ]` | — | — | — | |
 | Q5 | Load test: 500 concurrent fares | `[ ]` | — | — | — | k6, asserts balance |
@@ -316,6 +368,10 @@ Format: one line per merged workstream, with the evidence.
 | 2026-09-02 | Telegram bot | **integration** | Re-checked live. Bot healthy; **no webhook set and 1 update queued**; `/api/telegram/webhook` does not exist (M5a). A sent message has nowhere to go. Not a fault — unbuilt, and gated on F7. |
 | 2026-09-02 | DB wiring (#17) | unit + skip-verified | `pg` bound, bootstrap calls `setMoneyDb`, migration runner with checksum enforcement. **35 integration + RLS tests written**; they skip cleanly and visibly without `DATABASE_URL` (315 passed, 29 skipped). Typecheck, lint, format and build all green. |
 | 2026-09-02 | **Deployed app is live** | **integration** | <https://mo-mo-hack.vercel.app> from the public internet: `/` and `/chat` 200, `/api/health` `ok:true`, and `POST /api/momo/callback/collection` **200** — MTN can reach our callback. Health also proves no env vars are set there yet. |
+| 2026-09-02 | **Migrations applied to live Supabase** | **integration** | 3 migrations applied to `edtduvwbejdfahkmfort`. Connection reached via the **Session pooler** — the direct `db.<ref>.supabase.co` host is IPv6-only and does not resolve from this machine at all (`ENOTFOUND`). |
+| 2026-09-02 | **Ledger invariants, real Postgres** | **integration** | **29 tests green.** All four DB invariants verified *firing*: unbalanced journal refused, ledger append-only, overdraft blocked in each account's own direction, terminal status immutable, `journal_id` write-once, split rules must sum to 10000bps. |
+| 2026-09-02 | **RLS, real Postgres** | **integration** | 6 tests via `set local role` + `request.jwt.claims`. Found the **Critical** TRUNCATE hole (above), fixed in `0002`, re-verified closed. |
+| 2026-09-02 | **Concurrency — Phase 3 exit criterion** | **integration** | Two connections racing one account: one spend committed, one refused, **global ledger sum exactly 0**, wallet never positive. |
 | 2026-09-02 | Live spend guard (#18) | unit + **empirical** | 15 tests on the cap. Verified by pointing `.env.local` at `production` and running `npm run check:momo`: it **refused and exited before issuing a token**, then the env was restored. 331 tests pass overall. |
 | 2026-09-02 | Footer rebuild + attribution | manual + build | Footer replaced: nav columns, the MTN MoMo mark and the TUMO OLO wordmark. Both logos are the owners' own assets, not traced — MoMo is MTN's `mtnmomoLogo.svg` payload (**`#FFCB05` / `#003A58`** sampled from the file), TUMO OLO is the outline served at tumoolo.tech, checked side by side against their own nav render. Screenshotted from the **production** build at 1280px and 390px. Caught a real overflow at 390px: the old small-print row pushed the copyright past the viewport edge, now stacked. Re-verified after merging `main`: **331 passed, 29 skipped**, typecheck, lint, format and build green. `/` still prerendered **static** at 6.3 kB / 112 kB First Load JS — the footer is a server component and ships no client JavaScript, though no pre-change baseline was measured to quote a delta. |
 

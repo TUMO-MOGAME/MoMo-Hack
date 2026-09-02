@@ -27,10 +27,20 @@
  * projects and no third.
  */
 
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import type { Client } from 'pg';
 import { randomUUID } from 'node:crypto';
 import { connect, hasDb, inRollback, makeAccount, makeJournal, post } from './_db';
+
+/**
+ * Every statement here is a round trip to eu-west-2 and back — roughly 200ms.
+ * A test that opens several transactions blows the 5s default long before it
+ * has done anything wrong, and a timed-out test leaves its queries running on
+ * the shared connection, which then breaks the NEXT test with an error that
+ * points at innocent code. Raised per FILE rather than globally, so the unit
+ * suite keeps its fast default and a genuinely slow unit test still stands out.
+ */
+vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
 
 const allowWrites = process.env.INTEGRATION_ALLOW_WRITES === '1';
 
@@ -142,9 +152,16 @@ describe.skipIf(!hasDb)('concurrency, against real Postgres', () => {
       const settlement = await makeAccount(a, 'MOMO_SETTLEMENT');
       const wallet = await makeAccount(a, 'USER_WALLET');
 
+      // The funding journal must be ONE transaction. Without an explicit BEGIN
+      // each insert autocommits alone, and the deferred balance trigger fires
+      // at the end of that single-statement transaction on a journal holding
+      // one posting — "does not balance: 1000". Which is the trigger working
+      // exactly as designed; it was the test that was wrong.
+      await a.query('BEGIN');
       const fund = await makeJournal(a, 'CONC_FUND');
       await post(a, fund, settlement, 1000n);
       await post(a, fund, wallet, -1000n);
+      await a.query('COMMIT');
 
       const spend = async (client: Client, amount: bigint) => {
         await client.query('BEGIN');
