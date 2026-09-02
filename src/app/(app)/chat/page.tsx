@@ -8,8 +8,9 @@
  * (desktop) or in a modal bottom sheet (phone) and can be reopened from history
  * without re-prompting. Pattern taken from the Social-Assembly reference.
  *
- * STARTER SCOPE: driven by `mockAgent` — no keys, no network, no database.
- * `src/app/api/agent/route.ts` (S7a) replaces the mock; nothing else changes.
+ * It talks to `POST /api/agent`, which reads the live ledger and assembles the
+ * artifact server-side (S7a). The only thing left of `mockAgent` here is
+ * `SUGGESTIONS` — the starter chips — and the `KasiContext` type.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -58,11 +59,31 @@ export default function ChatPage() {
   // same database is the contradiction a judge notices first. Null until it
   // arrives; the rail renders its own empty state rather than inventing one.
   const [context, setContext] = useState<KasiContext | null>(null);
-  const endRef = useRef<HTMLDivElement>(null);
+  const logRef = useRef<HTMLElement>(null);
   const composerRef = useRef<HTMLInputElement>(null);
 
+  // ── Keep the conversation pinned WITHOUT moving the page ────────────────────
+  //
+  // This used to be `endRef.current.scrollIntoView(...)` on a sentinel div, and
+  // it walked the whole app up the screen: after a few messages the header left
+  // the top of the window and a band of blank page appeared under the composer.
+  //
+  // `scrollIntoView` is not a request to scroll one box. It scrolls EVERY
+  // scrollable ancestor until the element is in view — the message log first,
+  // and then the document. And the document here is scrollable by a small
+  // amount almost everywhere: `globals.css` sets `html, body { height: 100% }`
+  // (the *small* viewport, which excludes retractable browser chrome) while this
+  // shell is `h-dvh` (the *dynamic* viewport, which includes it). On any browser
+  // that hides its toolbar on scroll those two differ, and the difference is
+  // exactly the height of the blank band.
+  //
+  // So: scroll the log element itself and nothing else. `scrollTop` cannot touch
+  // an ancestor, which makes the leak structurally impossible rather than merely
+  // absent. The shell also gets `overflow-hidden` for the same reason.
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: scrollBehaviour() });
+    const log = logRef.current;
+    if (!log) return;
+    log.scrollTo({ top: log.scrollHeight, behavior: scrollBehaviour() });
   }, [messages, thinking]);
 
   // The send handler reads history without depending on it, so a new message
@@ -143,7 +164,7 @@ export default function ChatPage() {
   }, []);
 
   return (
-    <div className="flex h-dvh flex-col lg:flex-row">
+    <div className="flex h-dvh flex-col overflow-hidden lg:flex-row">
       <a href="#composer" className="skip-link">
         Skip to the message box
       </a>
@@ -179,7 +200,8 @@ export default function ChatPage() {
         </header>
 
         <main
-          className="min-h-0 flex-1 space-y-5 overflow-y-auto px-5 py-6"
+          ref={logRef}
+          className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 py-6"
           role="log"
           aria-live="polite"
           aria-label="Messages"
@@ -222,8 +244,6 @@ export default function ChatPage() {
               </div>
             </div>
           ) : null}
-
-          <div ref={endRef} />
         </main>
 
         <div className="space-y-3 border-t border-border px-5 py-4">

@@ -54,14 +54,58 @@ export interface RespondOptions {
   readonly env?: Record<string, string | undefined>;
 }
 
-type Intent = 'wallet' | 'transactions' | 'split' | 'none';
+type Intent = 'wallet' | 'transactions' | 'split' | 'unbuilt' | 'none';
 
 /**
  * Deterministic routing. Order matters — the first match wins, so the more
  * specific patterns come first.
+ *
+ * ── WHY `unbuilt` IS FIRST, AND WHY IT EXISTS AT ALL ─────────────────────────
+ *
+ * *"lets send money to this person send 0.01 the number is 0761346606"* used to
+ * reach `wallet`, because the word **money** is in the wallet pattern. So the
+ * server dutifully read the ledger, built a "Where the money is" card, handed it
+ * to the model — and the model, asked to write prose for a payment request while
+ * looking at a balance, replied:
+ *
+ *   *"I've prepared a transfer of R0.01 to 0761346606 … please confirm the
+ *   payment on your phone screen to send it."*
+ *
+ * Nothing was prepared. There is no transfer, no proposal, no confirmation, no
+ * phone screen — disbursements (M3a) are not built and `propose_*` (S7f) is not
+ * built. The card beside that sentence said "Where the money is", which is not
+ * what the sentence claimed to be showing.
+ *
+ * Two lessons, and the second is the general one:
+ *
+ * 1. **A request to DO something must never route to a tool that READS
+ *    something.** The wrong card is not a cosmetic problem; it is the premise
+ *    the model writes its prose against, and it will write prose that fits the
+ *    card rather than the truth.
+ * 2. **The deterministic answer is the safety mechanism, not the fallback.**
+ *    For anything unbuilt there is nothing true for a model to add, so this
+ *    intent does not call the model at all. A refusal that cannot be
+ *    reworded cannot be talked out of.
+ *
+ * This costs one regex and closes the whole class: every unbuilt verb lands on a
+ * fixed sentence with no artifact. When M3a lands, `send` moves out of here into
+ * a real `propose_transfer` — and not one hour before.
  */
 const ROUTES: readonly { intent: Intent; test: RegExp }[] = [
-  { intent: 'split', test: /\b(split|fare|taxi|divide|60|breakdown|where did.*(go|money))\b/i },
+  {
+    intent: 'unbuilt',
+    // `\d+`, not `\d`: the trailing `\b` cannot follow a single digit inside a
+    // longer number, so `save R2|00` failed to match "save R200 a month" and
+    // that request fell through to the generic fallback. Caught by the test.
+    test: /\b(send|sending|transfer|pay|paying|payout|withdraw|cash ?out|eft|deposit|top ?up|buy|purchase|schedule|automate|remind|save (?:me |up )?r?\d+)\b/i,
+  },
+  {
+    intent: 'split',
+    // `60` was here as shorthand for the 60/25/10/5 ratio, and it matched any
+    // bare "R60" — so "did I get my R60" asked for a fare breakdown. It now
+    // only matches as part of a written ratio.
+    test: /\b(split|fare|taxi|divide|breakdown|60\s*[/:]\s*25|where did.*(go|money))\b/i,
+  },
   {
     intent: 'transactions',
     test: /\b(transaction|spent|spend|history|activity|statement|last month|three months|3 months|recent)\b/i,
@@ -71,6 +115,30 @@ const ROUTES: readonly { intent: Intent; test: RegExp }[] = [
 
 function classify(message: string): Intent {
   return ROUTES.find((r) => r.test.test(message))?.intent ?? 'none';
+}
+
+/**
+ * The answer for something this build cannot do.
+ *
+ * Fixed strings, chosen deterministically, and **the model is never called** —
+ * see the ROUTES docstring. Each one names the limit, says it is not built, and
+ * offers the nearest real thing, because "no" on its own is a dead end in a chat
+ * whose whole job is to be useful.
+ *
+ * None of them acknowledges an amount or a payee. Repeating *"your R0.01 to
+ * 0761346606"* back at someone reads as a receipt even when the sentence around
+ * it is a refusal, and that is the exact confusion this route exists to end.
+ */
+function unbuiltProse(message: string): string {
+  if (
+    /\b(schedule|automate|remind|every (month|week|day)|save (?:me |up )?r?\d)\b/i.test(message)
+  ) {
+    return "I can't set up anything that runs on its own yet — scheduled and recurring payments aren't built. What I can do right now is show you your balance, your recent transactions, or how a taxi fare splits.";
+  }
+  if (/\b(buy|purchase|top ?up|airtime|electricity|data)\b/i.test(message)) {
+    return "I can't buy airtime or electricity yet — that part isn't built. Money can come into this ledger, but nothing can go out of it yet. I can show you your balance, your recent transactions, or how a taxi fare splits.";
+  }
+  return "I can't send money to anyone yet, so nothing has been set up and nothing is waiting for you to confirm. Payouts aren't built — money can come into this ledger and cannot yet leave it. What I can do is show you your balance, your recent transactions, or how a taxi fare splits.";
 }
 
 /** Total of a wallet artifact's spendable rows. Bigint arithmetic, never float. */
@@ -160,6 +228,16 @@ async function fetchArtifact(intent: Intent): Promise<Artifact | null> {
 
 export async function respond(message: string, options: RespondOptions = {}): Promise<AgentTurn> {
   const intent = classify(message);
+
+  // Asked to DO something that does not exist. Answer and stop — no ledger read,
+  // so there is no card to write misleading prose against, and no model call, so
+  // there is nothing to talk into rewording the refusal. This return is the only
+  // thing standing between a payment request and an invented receipt, so it is
+  // deliberately the shortest path in the function.
+  if (intent === 'unbuilt') {
+    log('info', 'agent.intent.unbuilt', {});
+    return { reply: unbuiltProse(message), tool: 'none', modelled: false };
+  }
 
   let artifact: Artifact | null = null;
   try {

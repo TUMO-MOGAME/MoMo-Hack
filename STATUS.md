@@ -5,7 +5,8 @@ Every PR must update it. If you are a fresh session, read this before touching a
 
 - **⏰ PRESENTATION: Thu 3 Sep 2026, 09:30.** Everything below is now read against that, not
   against the 27 Sep code freeze. See **§Tomorrow 09:30** for what is in and what is cut.
-- **Last updated:** 2026-09-02 (session 4 close — 11 PRs merged: #23-#33)
+- **Last updated:** 2026-09-02 (session 5 — the agent claimed a payment it had not made; see
+  **§The agent invented an action** and `MISTAKES.md` M10)
 - **Phase:** Phase 3 — money engine. **Exit criterion met**; its six audits are still owed.
 - **Local path:** `C:\MoMo-Hack`
 - **Repo:** <https://github.com/TUMO-MOGAME/MoMo-Hack> — **public**, `main` **protected**, and as of
@@ -15,7 +16,7 @@ Every PR must update it. If you are a fresh session, read this before touching a
   `mo-mo-hack.vercel.app` alias still serves the same deployment. Production deploys on every
   merge, previews on every PR.
 - **Database:** live. 3 migrations applied to Supabase `edtduvwbejdfahkmfort` (`eu-west-2`).
-- **Tree state:** 390 green + 2 skipped over 25 files, 0 vulnerabilities, CI enforcing all of it.
+- **Tree state:** 420 green + 3 skipped over 27 files, 0 vulnerabilities, CI enforcing all of it.
   Both skips are opt-in and announce themselves: the walking skeleton (`MOMO_SKELETON=1`) and the
   write-skew case (`allowWrites`). Both commit permanent rows, so neither runs by accident.
 - **Blocked on:** nothing external. **F9 is done** and **the walking skeleton is closed** — a real
@@ -74,6 +75,65 @@ an `esbuild` block is silently ignored under Vite 8). Two lessons worth keeping:
 
 **The plan below (§Phase board, `docs/05`) is a 28-day plan. The presentation is tomorrow
 morning.** These are different problems and this section governs until the presentation is over.
+
+### 🔴 The agent invented an action — found in the live chat, fixed, guarded
+
+**Read this before the demo. It is the failure most likely to have been triggered on stage**, and
+it was found by using the product rather than by any test we had.
+
+Typed into the deployed chat: *"lets send money to this person send 0.01 the number is
+0761346606"*. The agent answered:
+
+> *"I've prepared a transfer of R0.01 to 0761346606 from your spendable balance. Since I cannot
+> move money myself, please confirm the payment on your phone screen to send it."*
+
+**Nothing was prepared.** No transfer, no proposal, no confirmation, no phone screen — M3a and S7f
+are both unbuilt. The card rendered beside it was the wallet, *"Where the money is"*. A judge
+asking the single most obvious question of a payments app would have been told money was one tap
+from moving, and no tap would ever have come.
+
+**Why every existing guard missed it.** They all watch the **numbers** — the server builds the
+artifact, `grounding()` pins the figures, the provenance guard strikes through any amount with no
+`sourceTxnId`. All three held: R0.01 was the user's own figure and no balance was invented. **The
+lie was in the verb.** CLAUDE.md #14 covers invented amounts; nothing covered invented *actions*,
+and an invented action is worse because the user acts on it.
+
+Three causes, all fixed:
+
+| | |
+|---|---|
+| Routing sent a DO request to a READ tool | the wallet pattern contains `money`, so *"send **money**"* matched it. The model was handed a balance card as the premise for a payment request, and wrote prose that fit the card instead of the truth. There is now an `unbuilt` intent, matched **first** |
+| The system prompt had expired | `persona.ts` GROUNDING still said *"You have NO tools connected yet… NO balances, NO transactions"* — true when written, false since #32. So the prompt **contradicted itself**, swearing the agent was blind while `grounding()` handed it real balances in the same message. That is why one turn quoted a true R2.00 and the next said *"my live tools aren't connected"*. Replaced by CAPABILITY, which states both halves: reads work, payouts do not |
+| `HELP_TEXT` and `ABOUT_TEXT` said the same | `/about` told anyone who asked *"I have no tools wired up, so I can't read a balance. If I ever quote you an amount, I've made it up."* On a Telegram bot, to judges, about the one thing the product does well |
+
+**The shape of the fix, and it is the part worth defending on stage.** The `unbuilt` route reads
+no ledger and **never calls the model at all** — so there is no card to write misleading prose
+against and no sentence to talk out of its refusal. Deterministic refusal is the safety mechanism,
+not the fallback.
+
+Verified against a running server, not asserted:
+
+| Asked | Result |
+|---|---|
+| the verbatim transcript line | *"I can't send money to anyone yet, so nothing has been set up and nothing is waiting for you to confirm…"* · no artifact · `tool: none` · `modelled: false` |
+| *"who can i send money to?"* | same refusal, no artifact |
+| *"how much do i have"* | still `modelled: true`, real wallet card, R2.00 spendable |
+| *"what can you do"* | now claims the read tools instead of denying them |
+
+**The agent core also had no tests at all** — a debt STATUS has carried since #32, and the reason
+this reached production. `tests/unit/agent/refusal.test.ts` is its first: 30 tests, including the
+nine phrasings above, five ordinary money questions asserted *not* to be swallowed by the new
+route, and a diff of the VOICE block against docs/12 §4.2 so the prompt and its spec cannot drift
+again. Proved to fire — disabling the route fails 9 by name. `MISTAKES.md` M10.
+
+**Also fixed: the chat walked the page up the screen.** Reported from real use — after a few
+messages the header left the top of the window and a blank band opened under the composer.
+`scrollIntoView` does not scroll one box, it scrolls **every** scrollable ancestor, and this
+document is scrollable by a small amount almost everywhere: `globals.css` sets `html, body {
+height: 100% }` (the *small* viewport) while the chat shell is `h-dvh` (the *dynamic* one). On any
+browser that retracts its toolbar those differ, and the difference is exactly the blank band. Now
+the message log's own `scrollTop` is set — which cannot touch an ancestor — and the shell carries
+`overflow-hidden`.
 
 ### What we can already show, and it is more than it looks
 
@@ -925,6 +985,8 @@ Nothing yet. Anything merged at a lower test level than
 | RLS policies | none | ~~write the tests~~ **run them** | Day 9 | Written in #17 (6 tests). They skip until `DATABASE_URL` exists — a skip that announces itself, never a fake pass. |
 | Context sidebar | unit | drawer focus trap verified at 320px | Day 5 | Agent stopped mid-verification |
 | `src/lib/agent/mock.ts` | manual | becomes the UI test fixture source | Day 18 | Replaced by the real agent route (S7a) |
+| `src/server/agent/respond.ts` | **none — shipped untested** | routing + refusal tests | **PART-PAID 2026-09-02** | 30 tests in `tests/unit/agent/refusal.test.ts`. It shipped with none, and that is why M10 reached production. Still owed: the *modelled* path (needs a stubbed client) and `grounding()`. |
+| `src/server/agent/tools.ts` | none | integration tests against real Postgres | Day 9 | The three read tools are exercised only through `/api/agent` by hand |
 
 ---
 
