@@ -29,6 +29,14 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['tests/**/*.{test,spec}.ts'],
+    /**
+     * Vitest does not read `.env.local` — Next.js does, and so do the CLI
+     * scripts, which makes it easy to assume everything does. The integration
+     * suite skipped itself for want of `DATABASE_URL` while the database was
+     * migrated and reachable. A skip is only honest if the condition it claims
+     * is actually true.
+     */
+    setupFiles: ['./tests/setup-env.ts'],
     coverage: {
       provider: 'v8',
       include: ['src/domain/**', 'src/server/**', 'src/lib/**'],

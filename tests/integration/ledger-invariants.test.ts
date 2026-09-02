@@ -11,10 +11,20 @@
  * Every test rolls back. Nothing here leaves a row behind.
  */
 
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import type { Client } from 'pg';
 import { randomUUID } from 'node:crypto';
 import { asRole, connect, failure, hasDb, inRollback, makeAccount, makeJournal, post } from './_db';
+
+/**
+ * Every statement here is a round trip to eu-west-2 and back — roughly 200ms.
+ * A test that opens several transactions blows the 5s default long before it
+ * has done anything wrong, and a timed-out test leaves its queries running on
+ * the shared connection, which then breaks the NEXT test with an error that
+ * points at innocent code. Raised per FILE rather than globally, so the unit
+ * suite keeps its fast default and a genuinely slow unit test still stands out.
+ */
+vi.setConfig({ testTimeout: 60_000, hookTimeout: 60_000 });
 
 describe.skipIf(!hasDb)('ledger invariants, against real Postgres', () => {
   let client: Client;

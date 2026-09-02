@@ -39,11 +39,32 @@ export async function connect(): Promise<Client> {
  * twice gives the same answer. Nothing here is destructive.
  */
 export async function inRollback<T>(client: Client, fn: (c: Client) => Promise<T>): Promise<T> {
+  // Clear anything a previous test left on this connection BEFORE starting.
+  //
+  // The suite deliberately provokes errors — half these tests assert that
+  // Postgres refuses something — and an error inside a transaction ABORTS it:
+  // every later statement returns 25P02 until a ROLLBACK. Combined with a
+  // shared connection, an escape leaks into the NEXT test, which then fails
+  // with "current transaction is aborted" pointing at code that is perfectly
+  // fine. The same applies to `SET LOCAL ROLE`, which made one test insert as
+  // `authenticated` and report "permission denied for table profile" while
+  // looking like a policy bug.
+  //
+  // Both symptoms appear one test away from their cause, so this resets at the
+  // START as well as the end. Belt and braces is cheap here; an afternoon lost
+  // to a phantom RLS failure is not.
+  // One round trip, not two. Every statement here crosses to eu-west-2 and back
+  // at roughly 200ms, and a test that opens eight transactions was spending
+  // most of its budget on latency alone — enough to blow the 5s default timeout
+  // and, worse, to have its queries still running on the shared connection
+  // afterwards, which corrupted the NEXT test.
+  await client.query('ROLLBACK; RESET ROLE').catch(() => {});
+
   await client.query('BEGIN');
   try {
     return await fn(client);
   } finally {
-    await client.query('ROLLBACK');
+    await client.query('ROLLBACK; RESET ROLE').catch(() => {});
   }
 }
 
@@ -121,6 +142,9 @@ export async function asRole(
   try {
     await fn();
   } finally {
-    await client.query('set local role none').catch(() => {});
+    // `RESET ROLE`, not `SET LOCAL ROLE NONE`. Both are swallowed on an aborted
+    // transaction, which is common here, so `inRollback` resets again either
+    // side of every test rather than trusting this line.
+    await client.query('RESET ROLE').catch(() => {});
   }
 }
