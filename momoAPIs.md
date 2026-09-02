@@ -301,20 +301,23 @@ Used for: escrow release to workers, the 60/25/10/5 revenue split payouts, bulk 
 
 | Operation | Path | Rating |
 |---|---|---|
-| Transfer | `POST /disbursement/v1_0/transfer` | **[P]** |
-| Transfer status | `GET /disbursement/v1_0/transfer/{referenceId}` | **[P]** |
-| Deposit | `POST /disbursement/v1_0/deposit`, `v2_0` | **[P]** |
-| Refund | `POST /disbursement/v1_0/refund`, `v2_0` | **[P]** |
+| Transfer | `POST /disbursement/v1_0/transfer` | **[V]** 202 sandbox · **403 on production** (§8a) |
+| Transfer status | `GET /disbursement/v1_0/transfer/{referenceId}` | **[V]** 200, body below |
+| Deposit | `POST /disbursement/v1_0/deposit` | **[V]** **403 on production** (§8a) |
+| Deposit / Refund | `v2_0` variants | **[P]**, not measured |
+| Refund | `POST /disbursement/v1_0/refund` | **[P]**, not measured |
 | Account balance | `GET /disbursement/v1_0/account/balance` | **[V]** 200, R35.83 ZAR |
 | Account holder active | `GET /disbursement/v1_0/accountholder/{idType}/{id}/active` | **[V]** 200, `{"result":true}` |
 | Token | `POST /disbursement/token/` | **[V]** 200 |
+| Transfer, `v2_0` | `POST /disbursement/v2_0/transfer` | **[V]** **404** — `v1_0` is the path |
 
-Transfer body mirrors `requesttopay`, with `payee` instead of `payer`:
+**The transfer body — [V] MEASURED 2026-09-03.** Exactly these fields returned `202 Accepted`
+against the sandbox. It mirrors `requesttopay` with `payee` in place of `payer`:
 
 ```json
 {
-  "amount": "7.50",
-  "currency": "EUR",
+  "amount": "12.50",
+  "currency": "<sandbox label | ZAR>",
   "externalId": "payout-8842-owner",
   "payee": { "partyIdType": "MSISDN", "partyId": "46733123453" },
   "payerMessage": "MoMo Kasi fare split",
@@ -322,8 +325,91 @@ Transfer body mirrors `requesttopay`, with `payee` instead of `payer`:
 }
 ```
 
-> **Day 1 task:** confirm the exact transfer body and response codes on the portal, then promote
-> these rows to **[V]**. The whole payout half of the product depends on this.
+Headers are the standard set (§6) plus `X-Reference-Id`. `X-Callback-Url` is accepted and optional.
+
+**The status response — [V] MEASURED 2026-09-03**, verbatim:
+
+```json
+{"amount":"12.5","currency":"<label>","externalId":"payout-1788389263802",
+ "payee":{"partyIdType":"MSISDN","partyId":"46733123453"},
+ "payerMessage":"MoMo Kasi gig payout","payeeNote":"Your gig payment","status":"PENDING"}
+```
+
+**Note `"12.5"`, not `"12.50"`.** MTN normalises the decimal it echoes back, so anything comparing
+this against what we sent must compare MONEY, not strings.
+
+### 8a. Disbursement WRITES are forbidden on production — **[V] MEASURED 2026-09-03**
+
+**Money can come in. It cannot go out.** This is MTN's authorization gate, not our code, and no
+change to the request can affect it.
+
+Measured against `https://proxy.momoapi.mtn.com`, `X-Target-Environment: mtnsouthafrica`, with the
+credentials that collect real money successfully in the same session:
+
+| Call | Result |
+|---|---|
+| `POST /disbursement/v1_0/transfer` — a well-formed body | **`403 { "statusCode": 403, "message": "Forbidden" }`** |
+| `POST /disbursement/v1_0/transfer` — **a deliberately malformed body** | **the same `403`** |
+| `POST /disbursement/v1_0/deposit` | **`403`** |
+| `POST /collection/v1_0/requesttopay` — **the control** | **`202 Accepted`** |
+| `GET /disbursement/v1_0/account/balance` | `200 {"availableBalance":"35.83","currency":"ZAR"}` |
+| `GET /disbursement/v1_0/accountholder/msisdn/27767223145/active` | `200 {"result":true}` |
+| disbursement balance after all of the above | **unchanged** |
+
+**Re-run it yourself: `npm run momo:preflight -- --production`.** It probes both products
+per-operation, sends only amounts that cannot clear (asserted against the balance it reads first,
+with no override flag), includes the malformed-body probe, and re-reads both balances at the end so
+"nothing moved" is evidence rather than a claim.
+
+**Collections and disbursements report the SAME balance** — `39.75` on both at 01:5x — so this is
+one wallet seen through two products, not a separate payout float. The earlier "R35.83 sitting in
+the disbursement account" was the same money the collection side was already showing.
+
+**The malformed-body row is the one that settles it.** A bad body returns the same `403` as a good
+one, so nothing ever read our body: the refusal happens above the MoMo service, at the API gateway.
+The `{"statusCode":…,"message":…}` shape is the gateway's; MoMo's own errors look like
+`{"message":"…","code":"NOT_ALLOWED_TARGET_ENVIRONMENT"}`.
+
+**What is therefore ruled out:** our body, our headers, our path (`v2_0` is a 404, so `v1_0` exists
+and is forbidden rather than missing), our credentials (the same token reads the disbursement
+balance), our API user (the disbursement product recognises it — an unrecognised user returns
+`NOT_ALLOWED`, as the sandbox did), and the payee (`active` is `true`).
+
+**What is left, and is stated as an inference rather than a finding:** the account is not authorised
+for disbursement *operations* on production. It is also possible MTN issues a separate production
+API user for Disbursements. Both are portal/support questions. `MISTAKES.md` M13 is the reason this
+paragraph is labelled — a confident story about a third party's provisioning was wrong once before.
+
+> **The lesson that generalises, and it was ours.** `PLANNING.md` said *"Nothing is blocked but the
+> code"*, from two read-only checks: the balance was there and the payee was reachable.
+> **Read-only checks only ever prove read-only things.** A `GET` that works says nothing about
+> whether a `POST` is permitted, and the difference between them is the entire product. See
+> `MISTAKES.md` M14.
+
+### 8b. The SANDBOX scopes an API user to its subscription key — **[V] MEASURED 2026-09-03**
+
+`scripts/momo-provision.mjs` creates the sandbox API user with the **collection** subscription key.
+Every disbursement call with that user returned:
+
+```
+500 {"message":"Access to target environment is forbidden.","code":"NOT_ALLOWED_TARGET_ENVIRONMENT"}
+```
+
+That message names the environment and the cause is the **credential scope** — the token succeeds,
+because the KEY is valid, and then the USER is unknown to the product. Provisioning a second API
+user under the disbursement key fixes it immediately:
+
+```
+POST /v1_0/apiuser              201    (with the DISBURSEMENT subscription key)
+POST /v1_0/apiuser/{id}/apikey  201
+POST /disbursement/token/       200
+POST /disbursement/v1_0/transfer 202   ← the contract above, verified
+```
+
+`MOMO_DISBURSEMENT_API_USER` / `MOMO_DISBURSEMENT_API_KEY` carry it; `credentialsFor()` in
+`src/lib/momo/config.ts` falls back to the shared pair when they are absent, which is what
+production wants. **On production there is one user for everything** — the 403 in §8a is not this
+problem.
 
 ---
 

@@ -144,8 +144,25 @@ GET  /disbursement/v1_0/account/balance                 → 200 {"availableBalan
 GET  /disbursement/v1_0/accountholder/msisdn/{n}/active  → 200 {"result":true}
 ```
 
-**R35.83 of real money is sitting in the disbursement account and the payee is reachable.** Nothing
-is blocked but the code. `transfer` itself is still `[P]` — verify the body before the first send,
+> ### ⛔ CORRECTION, 2026-09-03: "Nothing is blocked but the code" was WRONG
+>
+> **`POST /disbursement/v1_0/transfer` returns `403 Forbidden` on production, and always has.** So
+> does `deposit`. A **deliberately malformed body returns the same 403**, so MTN never reads the
+> request — it is an authorization gate above the MoMo service, not a defect in ours. Collections
+> POSTs return `202` on the same credentials in the same breath, and the disbursement *reads*
+> (balance, `active`) return `200`.
+>
+> The claim below came from exactly two read-only checks. **Read-only checks only ever prove
+> read-only things**, and this was promoted to a MUST and handed on as a build instruction. See
+> `MISTAKES.md` M14 and `momoAPIs.md` §8a. Verify with `npm run momo:preflight -- --production`.
+>
+> **M3a is BUILT and sandbox-verified** — the transfer contract is `[V]` (`202`, with the status
+> body pinned), `/send` works on both channels, and the ledger posts a payout in the correct
+> direction. It cannot run on production until MTN opens that gate, which is a portal/support
+> question rather than a code one.
+
+**R35.83 of real money is sitting in the disbursement account and the payee is reachable.**
+`transfer` itself is still `[P]` — verify the body before the first send,
 and treat it with more care than a collection: **a `requesttopay` that goes wrong annoys someone; a
 `transfer` that goes wrong is money gone, with no second human in the loop.**
 

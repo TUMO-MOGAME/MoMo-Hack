@@ -5,8 +5,8 @@ Every PR must update it. If you are a fresh session, read this before touching a
 
 - **⏰ PRESENTATION: Thu 3 Sep 2026, 09:30.** Everything below is now read against that, not
   against the 27 Sep code freeze. See **§Tomorrow 09:30** for what is in and what is cut.
-- **Last updated:** 2026-09-03 (session 6 — **M5d, the allowlist, is closed**, which unblocks the
-  production deploy. Previously: session 5, the agent claimed a payment it had not made
+- **Last updated:** 2026-09-03 (session 6 — **M5d closed** (deploy unblocked) and **M3a built**, which also
+  found that MTN forbids disbursement writes on production (M14). Previously: session 5, the agent claimed a payment it had not made
   (`MISTAKES.md` M10, fixed in #35), and **Phase 3's six audits ran** — 12 Highs opened, 9 fixed the same day)
 - **Phase:** Phase 3 — money engine. **Exit criterion met**; its six audits are still owed.
 - **Local path:** `C:\MoMo-Hack`
@@ -17,7 +17,7 @@ Every PR must update it. If you are a fresh session, read this before touching a
   `mo-mo-hack.vercel.app` alias still serves the same deployment. Production deploys on every
   merge, previews on every PR.
 - **Database:** live. 3 migrations applied to Supabase `edtduvwbejdfahkmfort` (`eu-west-2`).
-- **Tree state:** 470 green + 3 skipped over 29 files, 0 vulnerabilities, CI enforcing all of it.
+- **Tree state:** 517 green + 3 skipped over 30 files, 0 vulnerabilities, CI enforcing all of it.
   Both skips are opt-in and announce themselves: the walking skeleton (`MOMO_SKELETON=1`) and the
   write-skew case (`allowWrites`). Both commit permanent rows, so neither runs by accident.
 - **Blocked on:** nothing external. **F9 is done** and **the walking skeleton is closed** — a real
@@ -201,6 +201,84 @@ receipt number is the strongest possible evidence for it. Three payments already
 **Sandbox remains wired and one flag away** (`npm run demo -- --emulator`, or
 `MOMO_TARGET_ENVIRONMENT=sandbox`) as the fallback if MTN or the venue wifi misbehaves at 09:30.
 That is what a fallback is for; it is not the plan.
+
+### ⛔ M3a — DISBURSEMENTS ARE BUILT AND VERIFIED, AND MTN WILL NOT LET US PAY OUT
+
+**`POST /disbursement/v1_0/transfer` returns `403 Forbidden` on production, and always has.**
+So does `deposit`. Money can come in; it cannot go out. This is MTN's authorization gate, above the
+MoMo service, and **no change to our code can affect it.**
+
+Measured 2026-09-03, everything free, nothing moved:
+
+| Call | Result |
+|---|---|
+| `POST /disbursement/v1_0/transfer` — a well-formed body | **`403 { "statusCode": 403, "message": "Forbidden" }`** |
+| `POST /disbursement/v1_0/transfer` — **a deliberately malformed body** | **the same `403`** |
+| `POST /disbursement/v1_0/deposit` | **`403`** |
+| `POST /collection/v1_0/requesttopay` — **the control** | **`202 Accepted`** |
+| `GET /disbursement/v1_0/account/balance` | `200`, R39.75 ZAR |
+| `GET .../accountholder/msisdn/27767223145/active` | `200 {"result":true}` |
+| both balances afterwards | **unchanged** |
+
+**The malformed-body row settles it.** A bad body and a good body get the *same* 403, so nothing
+ever read our request — the refusal is authorization, not schema. `v2_0` is a 404, so `v1_0` exists
+and is forbidden rather than missing. Reproduce any time: **`npm run momo:preflight -- --production`**.
+
+**And the previous session's "nothing is blocked but the code" was ours to correct.** That came from
+two read-only checks — the balance was there, the payee was reachable — and was promoted into
+`PLANNING.md` as a **MUST**. **Read-only checks only ever prove read-only things.** A `GET` that
+works says nothing about whether a `POST` is permitted, and that difference is the entire payout
+half of the product. `MISTAKES.md` **M14**, with `momo-preflight.mjs` as its guard.
+
+*(Also learned: collections and disbursements report the **same** balance — R39.75 on both. It is
+one wallet seen through two products, not a separate payout float.)*
+
+#### What was built anyway, and why it was still worth the hours
+
+**The transfer contract is now `[V]`, measured on sandbox** — and the sandbox needed unblocking
+first: `momo-provision.mjs` creates the API user with the **collection** key, and in the sandbox a
+user belongs to the key it was made under, so every disbursement call returned
+`NOT_ALLOWED_TARGET_ENVIRONMENT` — a message that names the environment when the cause is credential
+scope (`momoAPIs.md` §8b). With a user provisioned under the disbursement key:
+
+```
+POST /disbursement/v1_0/transfer        → 202 Accepted
+GET  /disbursement/v1_0/transfer/{ref}  → 200 {"amount":"12.5", … ,"status":"PENDING"}
+```
+
+**The body we would have shipped was correct.** Note `"12.5"`, not `"12.50"` — MTN normalises the
+decimal it echoes back, so anything comparing it to what we sent must compare money, not strings.
+
+| Built | |
+|---|---|
+| `lib/momo/disbursements.ts` | `transfer` + `getTransferStatus`, mirroring collections; 409 is an OUTCOME, never an error |
+| `server/momo/payout.ts` | its own file, not `initiate.ts` with a flag — a flag has a default, and a default on "ask for money or send it" is a bug waiting for an omitted argument |
+| A **separate, tighter payout cap** | **R0.10** live, a tenth of the inbound cap. A collection that misfires asks a human who declines; a payout that misfires is money gone |
+| `/send` on both channels | shares `pay-replies.ts` with `/pay`, gated by the same M5d allowlist |
+| Per-product credentials | `credentialsFor()`, falling back to the shared pair — which is what production wants |
+| Emulator parity | payouts work under `MOMO_MODE=emulator`, sharing the collections store so a reused reference id still 409s |
+
+**Two real bugs found on the way, both invisible to every existing guard:**
+
+| | |
+|---|---|
+| **An unknown DISBURSEMENT purpose posted as money coming IN** | `journalDraftFor`'s `default:` branch parks unrecognised purposes in SUSPENSE — correct instinct, but "post to SUSPENSE" is not a direction, and every purpose that had ever reached it was a collection. A payout would have been recorded as a receipt. **The journal still balances**, so no database trigger and no invariant test could catch it; `MOMO_SETTLEMENT` would simply be wrong by twice the amount, in the one account that says how much money we hold at MTN. Fixed with `PostingInput.direction`, defaulted to `'IN'` so no collection changed |
+| **The reconciler asked the wrong endpoint** | it called `collections.getStatus` for every row. A payout would 404 forever, counting `errors: 1` each tick and never posting. `resend` was worse: re-sending a payout through `requestToPay` would have asked the payee to send US the money we owed them |
+
+**A test of mine was decoration until I broke the code to check.** Every payout-cap case I first
+wrote used an amount above *both* caps, so deleting the payout guard entirely broke nothing. The
+discriminating case is R0.50 — under the R1.00 live cap, over the R0.10 payout cap. Added, and
+proved to fail with the guard removed. **A test that cannot distinguish the thing it is named after
+is decoration**, and the only way to find out is to break the thing on purpose.
+
+**40 payout tests + 6 for `/send` routing. Proved to fire:** removing the direction fix fails
+*"direction OUT credits MOMO_SETTLEMENT"*; removing the payout cap fails *"toPayoutAmount enforces
+the PAYOUT cap, not merely the live one"*.
+
+**What to say on stage.** Real money moves IN on production, with MTN receipt numbers. The payout
+path is built, contract-verified and ledger-correct, and MTN's gate is the only thing between it and
+real rands — shown live in one command rather than described. That is a stronger story than a
+half-built payout, and it is true.
 
 ### 🔒 M5d — the Telegram allowlist. The blocking item for a production deploy is closed
 

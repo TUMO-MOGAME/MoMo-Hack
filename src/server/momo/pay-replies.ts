@@ -23,6 +23,7 @@
 import { formatZAR, type Minor } from '@/domain/money';
 import { log } from '@/server/log';
 import { demoStatus, hasExtraArguments, parsePayAmount, requestDemoPayment } from './demo-collect';
+import { hasExtraSendArguments, parseSendAmount, sendDemoPayout } from './demo-payout';
 
 /** `/pay 0.20` → the sentence to send back. Never throws; a chat must answer. */
 export async function payReply(text: string, channel: string): Promise<string> {
@@ -152,6 +153,81 @@ export async function statusReply(): Promise<string> {
     ].join('\n');
   } catch {
     return 'I could not reach the ledger just then. Nothing changed — /status only ever reads.';
+  }
+}
+
+/**
+ * `/send <amount>` → the sentence to send back (M3a). Never throws.
+ *
+ * ── THE RULE FOR EVERY STRING BELOW, AND IT IS STRICTER THAN `/pay`'S ────────
+ *
+ * `/pay` must never claim money HAS moved, because MTN has only accepted a
+ * request. `/send` must never claim money has moved EITHER — a `202` on a
+ * transfer means accepted for processing, not paid — but the failure modes are
+ * the opposite way round:
+ *
+ *   · a `/pay` that silently succeeded costs the payer money they can see;
+ *   · a `/send` that silently succeeded costs US money, twice, if a human
+ *     reads "it failed" and sends it again.
+ *
+ * So "I could not send that" is only ever said when we KNOW nothing left, and
+ * anything uncertain says so in those words and points at `/status`.
+ */
+export async function sendReply(text: string, channel: string): Promise<string> {
+  const args = text.replace(/^\/send(?:@\S+)?/i, '');
+
+  if (hasExtraSendArguments(args)) {
+    return [
+      'Just the amount, please — like /send 0.10.',
+      '',
+      "I can't pay a number you type. This pays the one phone that's set up for",
+      'this demo, and that number lives in the server config, not in the message.',
+    ].join('\n');
+  }
+
+  const amount = parseSendAmount(args);
+  if (amount === null) {
+    return 'Tell me how much to send — like /send 0.10.';
+  }
+
+  try {
+    const result = await sendDemoPayout(amount, channel);
+    if (!result.ok) return result.reason;
+
+    return [
+      `Payout of ${formatZAR(result.amountMinor)} accepted for ${result.masked}.`,
+      '',
+      'Nobody has to approve this one — a payout has no PIN prompt. MTN is',
+      'processing it now.',
+      '',
+      'Send /status when you want me to check with MTN and read the ledger.',
+    ].join('\n');
+  } catch (e) {
+    const message = e instanceof Error ? e.message : 'unknown';
+
+    log('error', 'demo.send.failed', { channel, error: message });
+
+    // ── THE 403 DESERVES ITS OWN SENTENCE ────────────────────────────────────
+    //
+    // Measured on production 2026-09-03: MTN refuses `POST .../transfer` with a
+    // bare 403 before reading the body. Collapsing that into "something went
+    // wrong" would send someone hunting a bug in our code that is not there.
+    if (/\b403\b|forbidden/i.test(message)) {
+      return [
+        'MTN will not let this account pay out yet, so nothing was sent and nothing left the wallet.',
+        '',
+        'This is an authorisation gate on their side, not a failure here — collections',
+        'work on the same credentials in the same breath. Money can come in; it cannot',
+        'go out until MTN enables disbursements for this account.',
+      ].join('\n');
+    }
+
+    // Anything else is genuinely uncertain, and says so rather than guessing.
+    return [
+      'I could not tell whether that payout went through, so please do NOT send it again yet.',
+      'Run /status first — if it did leave, it will be in the ledger, and sending twice',
+      'would pay it twice.',
+    ].join('\n');
   }
 }
 

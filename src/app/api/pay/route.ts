@@ -30,7 +30,7 @@
 
 import { createRateLimiter } from '@/server/momo/callback';
 import { log } from '@/server/log';
-import { payReply, statusReply } from '@/server/momo/pay-replies';
+import { payReply, sendReply, statusReply } from '@/server/momo/pay-replies';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -107,14 +107,16 @@ export async function POST(request: Request): Promise<Response> {
       ? (body as { message: string }).message.slice(0, 120).trim()
       : '';
 
-  if (!/^\/(pay|status)\b/i.test(message)) {
+  if (!/^\/(pay|status|send)\b/i.test(message)) {
     return Response.json({ error: 'not a payment command' }, { status: 400 });
   }
 
   try {
     const reply = /^\/status\b/i.test(message)
       ? await statusReply()
-      : await payReply(message, 'web');
+      : /^\/send\b/i.test(message)
+        ? await sendReply(message, 'web')
+        : await payReply(message, 'web');
     return Response.json({ reply }, { headers: { 'cache-control': 'no-store' } });
   } catch (e) {
     log('error', 'pay.failed', { error: e instanceof Error ? e.message : 'unknown' });

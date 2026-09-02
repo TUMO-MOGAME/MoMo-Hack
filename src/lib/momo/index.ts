@@ -13,13 +13,18 @@
 
 import { createTransport, type CreateClientOptions } from './client';
 import { createCollectionsApi } from './collections';
+import { createDisbursementsApi } from './disbursements';
 import { type EnvBag, readMomoMode } from './config';
 import { createEmulatorClient } from './emulator';
 import type { MomoClient } from './types';
 
 export function createSandboxClient(options: CreateClientOptions = {}): MomoClient {
   const transport = createTransport(options);
-  return { mode: 'sandbox', collections: createCollectionsApi(transport) };
+  return {
+    mode: 'sandbox',
+    collections: createCollectionsApi(transport),
+    disbursements: createDisbursementsApi(transport),
+  };
 }
 
 export interface GetClientOptions extends CreateClientOptions {
@@ -45,11 +50,18 @@ export function getMomoClient(options: GetClientOptions = {}): MomoClient {
 
 export * from './types';
 export { MomoRequestError, isMomoRequestError, eventForSendFailure } from './errors';
-export { toMomoAmount, fromMomoAmount, momoCurrency, isExpectedCurrency } from './currency';
-export { readMomoConfig, readMomoMode, callbackUrlFor } from './config';
+export {
+  toMomoAmount,
+  toPayoutAmount,
+  fromMomoAmount,
+  momoCurrency,
+  isExpectedCurrency,
+} from './currency';
+export { readMomoConfig, readMomoMode, callbackUrlFor, credentialsFor } from './config';
 export { createTokenCache, tokenCache, TOKEN_TTL_SAFETY } from './token';
 export { createTransport, isUuidV4, assertReferenceId, assertExternalId } from './client';
 export { createCollectionsApi } from './collections';
+export { createDisbursementsApi } from './disbursements';
 export {
   ASYNC_SETTLE_MS,
   createEmulatorClient,

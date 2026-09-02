@@ -20,7 +20,18 @@ const compat = new FlatCompat({
 const config = [
   {
     // Build output and vendored code are not ours to lint.
-    ignores: ['.next/**', 'out/**', 'build/**', 'coverage/**', 'node_modules/**', 'next-env.d.ts'],
+    ignores: [
+      '.next/**',
+      'out/**',
+      'build/**',
+      'coverage/**',
+      'node_modules/**',
+      'next-env.d.ts',
+      // Agent worktrees (MISTAKES.md M4). Each is a full checkout with its own
+      // `.next/`, so without this `eslint .` lints another agent's build output
+      // and reports thousands of problems in code that is not in this branch.
+      '.claude/**',
+    ],
   },
 
   ...compat.extends('next/core-web-vitals', 'next/typescript'),

@@ -94,7 +94,14 @@ export async function reconcile(
         continue;
       }
 
-      const status = await deps.client.collections.getStatus(row.id);
+      // ASK THE RIGHT ENDPOINT. A disbursement's status lives at
+      // `/disbursement/v1_0/transfer/{id}`, and asking collections for it
+      // returns 404 — which the catch below would log as a row failure forever,
+      // leaving every payout stuck in CREATED and never posted.
+      const status =
+        row.product === 'DISBURSEMENT'
+          ? await deps.client.disbursements.getTransferStatus(row.id)
+          : await deps.client.collections.getStatus(row.id);
       const result = await resolveTransaction(deps, {
         referenceId: row.id,
         observed: status.status,
@@ -139,13 +146,20 @@ async function resend(deps: ReconcileDeps, row: MomoTransactionRow): Promise<boo
 
   await deps.db.transaction((tx) => tx.bumpAttempt(row.id));
 
-  const result = await deps.client.collections.requestToPay(row.id, {
+  // Same reference id, and now also the same DIRECTION. Re-sending a payout
+  // through `requestToPay` would not merely fail — it would ask the payee to
+  // send US the money we owe them.
+  const payload = {
     amountMinor: row.amountMinor,
     msisdn: row.counterparty,
     externalId: row.externalId,
     payerMessage: 'MoMo Kasi',
     payeeNote: row.purpose,
-  });
+  };
+  const result =
+    row.product === 'DISBURSEMENT'
+      ? await deps.client.disbursements.transfer(row.id, payload)
+      : await deps.client.collections.requestToPay(row.id, payload);
 
   const target = transition('INITIATED', {
     type: result.outcome === 'ALREADY_ACCEPTED' ? 'ALREADY_ACCEPTED' : 'ACCEPTED',

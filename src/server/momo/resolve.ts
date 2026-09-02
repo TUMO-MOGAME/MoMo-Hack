@@ -145,6 +145,11 @@ async function postSuccessfulJournal(
     amountMinor: row.amountMinor,
     referenceId: row.id,
     context,
+    // The row already knows which way the money went; before M3a nothing asked
+    // it. Without this, a DISBURSEMENT with an unrecognised purpose posts
+    // through the SUSPENSE fallback as money coming IN — a journal that
+    // balances perfectly and leaves MOMO_SETTLEMENT wrong by twice the amount.
+    direction: row.product === 'DISBURSEMENT' ? 'OUT' : 'IN',
   });
 
   const written = await writeJournal(tx, draft);

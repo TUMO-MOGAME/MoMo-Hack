@@ -15,7 +15,7 @@
  * client is how systems double-charge people.
  */
 
-import { type EnvBag, type MomoConfig, readMomoConfig } from './config';
+import { type EnvBag, type MomoConfig, credentialsFor, readMomoConfig } from './config';
 import { MomoRequestError, upstream } from './errors';
 import { type TokenCache, basicAuthHeader, tokenCache as defaultTokenCache } from './token';
 import type { MomoProduct, TokenResponse } from './types';
@@ -134,10 +134,14 @@ export function createTransport(options: CreateClientOptions = {}): MomoTranspor
    */
   async function fetchToken(product: MomoProduct): Promise<string> {
     const cfg = config();
+    // Per-product credentials. The sandbox scopes an API user to the
+    // subscription key it was created under, so the disbursement product may
+    // need a different pair — see `credentialsFor`.
+    const credentials = credentialsFor(cfg, product);
     const response = await rawFetch(cfg, `${cfg.baseUrl}/${product}/token/`, {
       method: 'POST',
       headers: {
-        Authorization: basicAuthHeader(cfg.apiUser, cfg.apiKey),
+        Authorization: basicAuthHeader(credentials.apiUser, credentials.apiKey),
         'Ocp-Apim-Subscription-Key': subscriptionKey(cfg, product),
         'X-Target-Environment': cfg.targetEnvironment,
       },

@@ -17,7 +17,12 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import { TEST_MSISDN, maskMsisdn } from '@/lib/momo/test-msisdns';
 import { MomoRequestError, upstream } from '@/lib/momo/errors';
-import type { CollectionsApi, MomoClient, RequestToPayResult } from '@/lib/momo/types';
+import type {
+  CollectionsApi,
+  DisbursementsApi,
+  MomoClient,
+  RequestToPayResult,
+} from '@/lib/momo/types';
 import { initiateCollection } from '@/server/momo/initiate';
 import { reconcile } from '@/server/momo/reconcile';
 import type { MemoryDb } from '@/server/db/memory';
@@ -54,7 +59,20 @@ function fakeClient(
         throw new MomoRequestError('HTTP', upstream(404, false), 'not found');
       }),
   };
-  return { mode: 'emulator', collections, sent };
+  // This fake is about COLLECTIONS. Its disbursements throw rather than
+  // returning a benign stub: these tests assert that money comes in exactly
+  // once, and a silent no-op payout API would let a collection path that
+  // wrongly reached for a transfer pass unnoticed. If it is called here, that
+  // is the bug, and it should say so by name.
+  const disbursements: DisbursementsApi = {
+    async transfer() {
+      throw new Error('this fake client cannot pay out — a collection path called transfer()');
+    },
+    async getTransferStatus() {
+      throw new Error('this fake client cannot pay out — a collection path called transfer()');
+    },
+  };
+  return { mode: 'emulator', collections, disbursements, sent };
 }
 
 const INPUT = {

@@ -16,7 +16,7 @@
  */
 
 import { posting, toDecimalString } from '@/domain/money';
-import { assertWithinLiveBudget } from './budget';
+import { assertWithinLiveBudget, assertWithinPayoutBudget } from './budget';
 
 const SANDBOX_CURRENCY = 'EUR';
 const HOME_CURRENCY = 'ZAR';
@@ -47,6 +47,38 @@ export function toMomoAmount(
   // unaffected — sandbox money is not real. See budget.ts for why R10 makes
   // this a guard rather than a note.
   assertWithinLiveBudget(zarMinor, targetEnvironment);
+
+  return {
+    amount: toDecimalString(posting(zarMinor)),
+    currency: momoCurrency(targetEnvironment),
+  };
+}
+
+/**
+ * The same conversion, for money going OUT.
+ *
+ * A separate function rather than a flag on `toMomoAmount`, and the reason is
+ * the failure it prevents. A boolean parameter defaults, and a default that
+ * means "this is only a collection" is one a payout path can silently inherit
+ * by forgetting to pass it — which would enforce the R1.00 inbound cap on a
+ * transfer instead of the R0.10 payout one, quietly, with everything looking
+ * fine. A distinct name cannot be forgotten into the weaker check.
+ *
+ * BOTH caps apply. A payout must clear the general live ceiling and the tighter
+ * payout ceiling, in that order, because the general one is the statement about
+ * the whole R10 budget and the payout one is the statement about there being no
+ * human in the loop. See `budget.ts`.
+ */
+export function toPayoutAmount(
+  zarMinor: bigint,
+  targetEnvironment: string | undefined,
+): { amount: string; currency: string } {
+  if (zarMinor <= 0n) {
+    throw new RangeError(`payout amount must be positive, got ${zarMinor}`);
+  }
+
+  assertWithinLiveBudget(zarMinor, targetEnvironment);
+  assertWithinPayoutBudget(zarMinor, targetEnvironment);
 
   return {
     amount: toDecimalString(posting(zarMinor)),
