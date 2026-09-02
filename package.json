@@ -22,6 +22,7 @@
     "agent:worktree": "node scripts/agent-worktree.mjs",
     "check:momo": "node scripts/momo-smoke.mjs",
     "check:telegram": "node scripts/telegram-check.mjs",
+    "env:push": "node scripts/vercel-env.mjs",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "images": "node scripts/optimise-images.mjs",

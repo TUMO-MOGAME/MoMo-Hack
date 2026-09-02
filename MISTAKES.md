@@ -147,6 +147,75 @@ file that involves `sed` was caught by looking; the ones that hurt were the ones
 
 ---
 
+## M8 · Trusted a 200 from a route that returns 200 when it fails
+
+**What happened.** `POST /api/momo/callback/collection` returned **200** from the public internet,
+and `STATUS.md` recorded that as "MTN can reach our callback" — verified, twice, in two sessions.
+It was reachable. It had also **never once reached the database**. `ensureMoneyDb()` had exactly
+one caller in the whole codebase — `/api/health` — and `setMoneyDb` writes a module-scoped
+singleton that serverless isolation does not share between routes. So the callback route threw
+`no database adapter configured` on every request, and its own catch block, which returns 200
+unconditionally so that a probe learns nothing, swallowed it. The sibling route with no such catch
+(`/api/cron/reconcile`) was 500ing on every tick, and nobody had called it with a valid bearer.
+
+**Why.** Two causes, and the second is the general one.
+
+The specific cause: `next dev` is a single process. Hitting `/api/health` first binds the singleton
+for every other route in that process, so the bug is *unreproducible locally* — it exists only
+where each route is its own instance.
+
+The general cause: I accepted a status code as evidence of an outcome. A 200 from a route whose
+documented behaviour is "return 200 unconditionally" carries **no information about whether the
+work happened**. The stronger the route's "never leak anything" posture, the weaker its response
+is as evidence — and this one was designed, correctly, to tell an attacker nothing. It told us
+nothing either.
+
+**The rule.** **Verify an effect, not a response.** For any endpoint, ask what would be observably
+different if it had genuinely worked, and check *that*: a row written, a status transitioned, a
+balance moved. Where a route deliberately returns a constant, it can never be verified from its
+own response — reach for a sibling that does report, or read the effect directly. And treat any
+`catch` that swallows into a success as a place where evidence goes to die.
+
+**The guard.** `tests/unit/ledger/single-writer.test.ts` now reads every `src/app/api/**/route.ts`
+and fails when one calls `getMoneyDb` without `ensureMoneyDb`. Proved to fire against a synthetic
+violation before being trusted — it names the offending file. It runs in the `Tests` CI job, which
+is a required check.
+
+---
+
+## M9 · Every test rolled back, so nothing ever ran twice
+
+**What happened.** `ensureAccount` inserts with `on conflict do nothing` and falls back to a
+`SELECT` when the row already exists. The fallback passed **six** parameters to SQL that referenced
+**five** of them — `allow_negative` was carried over from the INSERT and used nowhere — so Postgres
+refused the statement outright: `could not determine data type of parameter $5`.
+
+That branch runs **only when the account already exists**. So the first journal against any account
+succeeded and every one after it threw. **The ledger worked exactly once.** The first real
+collection in the project's history passed; the second failed, and would have kept failing forever.
+
+**Why.** Not the typo — the typo is ordinary. The reason it survived a 361-test suite that includes
+property tests and real-Postgres integration tests is that **every integration test rolls back**.
+`inRollback` is the right default and it is why the suite can run against the production project
+without seeding or cleaning. But it means no test had ever seen a **committed** account, so the
+entire `on conflict` branch — half of `ensureAccount` — was dead code as far as the suite was
+concerned. Unit tests could not help either: the in-memory adapter has no SQL to get wrong.
+
+The general shape: **a rolled-back test suite proves the first use of everything and the second use
+of nothing.** Anything whose behaviour depends on state already existing — upserts, caches,
+idempotency keys, "create if missing" — is invisible to it.
+
+**The rule.** For any code path that behaves differently when a row already exists, write a test
+that **calls it twice in the same transaction** and asserts the second call agrees with the first.
+Rolling back afterwards is fine; what matters is that both calls happen on the same state.
+
+**The guard.** `tests/integration/ledger-invariants.test.ts` → *"ensureAccount is idempotent"*: two
+tests that call `ensureAccount` twice for the same natural key, one subject-scoped and one for the
+null/null system key, asserting the same id both times. Proved to fire — reintroducing the sixth
+parameter fails both with the original `could not determine data type of parameter $5`.
+
+---
+
 ## What has gone right, and why
 
 Worth recording, because these are the patterns to keep:

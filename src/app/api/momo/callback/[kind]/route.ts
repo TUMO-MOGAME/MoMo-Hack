@@ -24,6 +24,7 @@
  */
 
 import { getMoneyDb } from '@/server/db';
+import { ensureMoneyDb } from '@/server/db/bootstrap';
 import { log } from '@/server/log';
 import { createRateLimiter, extractReferenceId, isCallbackKind } from '@/server/momo/callback';
 import { resolveTransaction } from '@/server/momo/resolve';
@@ -61,6 +62,13 @@ export async function POST(
       log('info', 'momo.callback.unsupported_kind', { kind, correlation_id: referenceId });
       return ok();
     }
+
+    // BIND THE ADAPTER FIRST — see the note in the cron route. This one was the
+    // more dangerous of the two: the catch below returns 200 unconditionally, so
+    // an unbound adapter here looked exactly like a healthy callback from the
+    // outside. It is the reason `POST /api/momo/callback/collection` has been
+    // reported as verified since F7 while never having reached the database.
+    ensureMoneyDb();
 
     // AUTHORITATIVE READ. The callback told us WHICH transaction to look at and
     // nothing more; MTN tells us what happened to it.

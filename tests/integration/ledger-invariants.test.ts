@@ -15,6 +15,7 @@ import { afterAll, beforeAll, describe, expect, test, vi } from 'vitest';
 import type { Client } from 'pg';
 import { randomUUID } from 'node:crypto';
 import { asRole, connect, failure, hasDb, inRollback, makeAccount, makeJournal, post } from './_db';
+import { createMoneyTx } from '@/server/db/postgres';
 
 /**
  * Every statement here is a round trip to eu-west-2 and back — roughly 200ms.
@@ -485,6 +486,70 @@ describe.skipIf(!hasDb)('ledger invariants, against real Postgres', () => {
           }
         });
       });
+    });
+  });
+});
+
+/**
+ * The ledger has to work MORE THAN ONCE.
+ *
+ * `ensureAccount` inserts with `on conflict do nothing` and falls back to a
+ * SELECT when the row already exists. That fallback was passing six parameters
+ * to SQL that referenced five of them, so Postgres refused the call:
+ *
+ *     error: could not determine data type of parameter $5
+ *
+ * The consequence is the reason this test exists. The failing branch runs ONLY
+ * when the account already exists, so the FIRST journal against any account
+ * succeeded and every one after it threw. A ledger that works exactly once
+ * passes every unit test, every property test, and every rolled-back
+ * integration test in this suite — because none of them ever reuses a
+ * committed account.
+ *
+ * It surfaced on the second real collection ever made, in production.
+ */
+describe.skipIf(!hasDb)('ensureAccount is idempotent', () => {
+  let client: Client;
+
+  beforeAll(async () => {
+    client = await connect();
+  });
+
+  afterAll(async () => {
+    await client?.end();
+  });
+
+  test('a second call with the same natural key returns the same id', async () => {
+    await inRollback(client, async (c) => {
+      const tx = createMoneyTx({
+        query: async (text, params) => (await c.query(text, params as unknown[])).rows,
+      });
+
+      // A subject-scoped account, so this test never collides with another.
+      const ref = { type: 'SUSPENSE', subjectId: randomUUID() } as const;
+
+      const first = await tx.ensureAccount(ref);
+      // The insert conflicts this time, which is the branch that was broken.
+      const second = await tx.ensureAccount(ref);
+
+      expect(second).toBe(first);
+    });
+  });
+
+  test('a system account with no owner and no subject round-trips too', async () => {
+    await inRollback(client, async (c) => {
+      const tx = createMoneyTx({
+        query: async (text, params) => (await c.query(text, params as unknown[])).rows,
+      });
+
+      // MOMO_SETTLEMENT is the canonical null/null key — the coalesce dance
+      // around the expression index, and the account every collection touches.
+      const ref = { type: 'MOMO_SETTLEMENT' } as const;
+
+      const first = await tx.ensureAccount(ref);
+      const second = await tx.ensureAccount(ref);
+
+      expect(second).toBe(first);
     });
   });
 });

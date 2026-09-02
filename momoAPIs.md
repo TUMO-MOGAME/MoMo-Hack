@@ -90,14 +90,44 @@ X-Reference-Id: <UUID v4 you generate — this becomes your apiUser>
 Ocp-Apim-Subscription-Key: <subscription key>
 Content-Type: application/json
 
-{ "providerCallbackHost": "momo-kasi.vercel.app" }
+{ "providerCallbackHost": "momo.tumoolo.tech" }
 ```
 `201 Created`, empty body.
 
-> **[P]** `providerCallbackHost` is a **host**, not a URL — no scheme, no path. The per-request
-> `X-Callback-Url` must live on this host or callbacks are silently dropped.
-> **Confirm on the portal before relying on callbacks.** Our design does not depend on it
-> (the reconciler is the source of truth), but the live demo is much better with it working.
+> **[V] MEASURED 2026-09-02, and the earlier guess was wrong in the way that matters.**
+>
+> `providerCallbackHost` is a **host**, not a URL — no scheme, no path. That part was right.
+>
+> This section previously said a mismatched `X-Callback-Url` means "callbacks are silently
+> dropped". **It does not. It fails the entire payment.**
+>
+> ```
+> POST /collection/v1_0/requesttopay
+> X-Callback-Url: https://<a host that is not providerCallbackHost>/...
+>
+> 500 {"message":"Callback URL does not match the configured value.",
+>      "code":"INVALID_CALLBACK_URL_HOST"}
+> ```
+>
+> So `X-Callback-Url` is not the optional latency optimisation the docs imply — get the host
+> wrong and **no money moves at all**. Measured as a controlled experiment: with the API user
+> bound to host A, sending host B returns 500 and host A returns 202; after re-provisioning the
+> same user against host B, the results invert exactly. Sending **no** `X-Callback-Url` returns
+> 202 under either binding.
+>
+> **The operational consequence.** The callback host is fixed at provisioning time and there is
+> no documented way to change it on an existing API user. **Moving the deployment to a new domain
+> means provisioning a new API user and key** (§4.1, §4.2) — it is not an environment-variable
+> change. `MOMO_CALLBACK_HOST` in `.env.local` and on Vercel must always equal the
+> `providerCallbackHost` that `GET /v1_0/apiuser/{id}` (§4.3) reports.
+>
+> Verify the binding before trusting it — one request, and it is the difference between a working
+> demo and a 500 on stage:
+>
+> ```
+> GET /v1_0/apiuser/{apiUser}
+> → {"providerCallbackHost":"momo.tumoolo.tech","targetEnvironment":"sandbox"}
+> ```
 
 ### 4.2 Create API key — **[V]**
 
@@ -109,13 +139,19 @@ Ocp-Apim-Subscription-Key: <subscription key>
 
 **This is shown once.** Store it immediately in GitHub Secrets and `.env.local`.
 
-### 4.3 Get API user — **[P]**
+### 4.3 Get API user — **[V] 2026-09-02**
 
 ```http
 GET https://sandbox.momodeveloper.mtn.com/v1_0/apiuser/{apiUser}
 Ocp-Apim-Subscription-Key: <subscription key>
 ```
-Useful to confirm the callback host actually registered.
+`200 OK` → `{"providerCallbackHost":"momo.tumoolo.tech","targetEnvironment":"sandbox"}`
+
+Note it needs only the subscription key — **no token, no `X-Target-Environment`**.
+
+Not merely "useful". Since a mismatched callback host is a **500 on every payment** (§4.1), this
+is the one request that tells you whether the deployment and the credentials agree. Run it when
+the domain changes, and before a demo.
 
 ---
 
@@ -190,6 +226,11 @@ Content-Type: application/json
 
 - `currency` **must be `EUR`** in sandbox. See §11 for our ZAR shim. **[V]**
 - `amount` is a decimal **string**. **[V]**
+- `X-Callback-Url` **must be on the API user's `providerCallbackHost`**, or the whole request
+  returns **`500 INVALID_CALLBACK_URL_HOST`** and no payment is created. See §4.1 — this is a
+  measured 500, not a dropped callback. **[V]**
+- Omitting `X-Callback-Url` entirely is always accepted (`202`). That is the safe fallback when
+  the binding is uncertain: the reconciler is authoritative anyway (docs/03 §3). **[V]**
 
 ### 7.2 Request to Pay status — **[V]**
 
@@ -399,7 +440,7 @@ Rules:
 
 Tick these off with a signed-in browser session and update the ratings above.
 
-- [ ] Confirm `providerCallbackHost` format (host vs full URL) and whether callbacks fire in sandbox
+- [x] ~~Confirm `providerCallbackHost` format (host vs full URL) and whether callbacks fire in sandbox~~ — **done, §4.1.** Host, not URL. A mismatch is a **500**, not a dropped callback.
 - [ ] Confirm the exact `disbursement/v1_0/transfer` request body and response codes
 - [ ] Confirm the exact `remittance/v1_0/transfer` request body and response codes
 - [ ] Confirm the official test MSISDN table, including the success number
@@ -430,3 +471,4 @@ Tick these off with a signed-in browser session and update the ratings above.
 |---|---|---|
 | 2026-09-02 | Created. Provisioning, auth, collections and the EUR shim established from public sources. Disbursements, remittances and test MSISDNs recorded as **[P]**, pending portal confirmation. | Planning session |
 | 2026-09-02 | **§10 rewritten from live measurement.** Credentials provisioned and verified; tokens issue for all three products. Ran `scripts/momo-smoke.mjs` + a 40s poll. Four of six documented MSISDN outcomes were wrong. Discovered an undocumented `CREATED` status and added it to §12. `REJECTED`/`TIMEOUT` appear unreachable in sandbox. Idempotency (202 then 409) confirmed against the real API. Promoted §10 to **[V]**. | Live sandbox |
+| 2026-09-02 | **§4.1 promoted [P] → [V], and it was wrong in the dangerous direction.** A mismatched `X-Callback-Url` does not silently drop the callback — it returns **`500 INVALID_CALLBACK_URL_HOST`** and creates no payment. Proved by a controlled experiment: bound to host A, sending B is 500 and A is 202; after re-provisioning against B the results invert exactly, and sending no callback URL is 202 either way. Consequence recorded: the callback host is fixed at provisioning, so a new domain needs a **new API user**. §7.1 gained two bullets. | Live sandbox |

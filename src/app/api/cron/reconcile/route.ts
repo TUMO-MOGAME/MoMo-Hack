@@ -10,6 +10,7 @@
  */
 
 import { getMoneyDb } from '@/server/db';
+import { ensureMoneyDb } from '@/server/db/bootstrap';
 import { isAuthorisedCron } from '@/server/cron/auth';
 import { log } from '@/server/log';
 import { reconcile } from '@/server/momo/reconcile';
@@ -25,6 +26,13 @@ export async function POST(request: Request): Promise<Response> {
   }
 
   try {
+    // BIND THE ADAPTER FIRST. `setMoneyDb` writes a module-scoped singleton, and
+    // in serverless each route is its own isolated instance — so a binding made
+    // by `/api/health` does not exist here. Locally it looks fine, because
+    // `next dev` is ONE process and hitting health first binds it for everybody.
+    // In production this route 500s on every tick until it binds its own.
+    ensureMoneyDb();
+
     // One tick, 50 rows, one attempt each — comfortably inside the 10s Vercel
     // Hobby budget. Anything it does not reach, the next tick does.
     const report = await reconcile({ db: getMoneyDb(), client: getMomoClient() });
