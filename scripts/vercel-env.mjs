@@ -92,6 +92,10 @@ const SECRETS = [
   ['NEXT_PUBLIC_SUPABASE_ANON_KEY', 'public by design; RLS is what protects us'],
   ['SUPABASE_SERVICE_ROLE_KEY', 'bypasses RLS — server only, never the browser'],
   ['CRON_SECRET', 'guards /api/cron/reconcile'],
+  // The agent's prose. Absent, `respond()` still answers from the ledger with
+  // its deterministic sentence — but the warmth is the difference between a
+  // demo and a database query, so it belongs in the push.
+  ['GEMINI_API_KEY', 'agent prose (ADR-0012 fallback path)'],
 ];
 
 /**
