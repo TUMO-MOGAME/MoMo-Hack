@@ -78,6 +78,18 @@ Base: `POST /disbursement/v1_0/transfer`, `GET /disbursement/v1_0/transfer/{id}`
 | **Rank gig payout** | Rank admin approves a wash/marshal task | Youth worker | Task rate | `RANK_GIG_PAYOUT` | `ESCROW_HOLD(rank) +A`, `MOMO_SETTLEMENT -A` |
 | **Bulk payroll** (C4) | Rank admin pays N workers at once | N workers | Per worker | `BULK_PAYOUT` | One journal per worker; all created in one DB transaction, dispatched individually |
 | **Insurance claim** (C1) | Approved claim | Claimant | Claim amount | `INSURANCE_CLAIM` | `INSURANCE_POOL +A`, `MOMO_SETTLEMENT -A` |
+| **`/send` — the demo payout** (M3a) | A human types `/send 0.10` in Telegram or the web chat, from an allowlisted chat | `MOMO_DEMO_MSISDN`, **configuration only** | ≤ R0.50 at this surface, ≤ R0.10 live | `DEMO_PAYOUT` | `SUSPENSE +A`, `MOMO_SETTLEMENT -A` — the exact mirror of the `AIRTIME` collection, so a demo pair nets SUSPENSE to zero |
+
+**`/send` is the only row above that is built.** It exists because every other payout purpose needs
+an id the reconciler does not have — a job, an owner, a driver — and `required()` throws *inside the
+resolve transaction*, which on a payout means the money has already left and no journal can be
+written for it (the M6b trap, one direction over). `DEMO_PAYOUT` needs no context.
+
+> **⚠️ Disbursement writes return `403 Forbidden` on production** (`momoAPIs.md` §8a, measured
+> 2026-09-03). A deliberately malformed body returns the same 403, so MTN never reads the request:
+> it is an authorization gate above the MoMo service, not a defect here. Collections POSTs succeed
+> on the same credentials. Every row in this section is therefore **sandbox-only today**, and the
+> code is ready for the moment the gate opens.
 
 **Bulk payroll is N separate MoMo calls**, each with its own reference id and its own
 `momo_transaction` row. There is no batch endpoint, and pretending there is would be a lie in the

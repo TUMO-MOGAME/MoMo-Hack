@@ -37,6 +37,15 @@ export interface MoneyCommands {
   readonly allowlist: ReadonlySet<number>;
   readonly pay: (text: string) => Promise<string>;
   readonly status: () => Promise<string>;
+  /**
+   * `/send` — money OUT (M3a). Optional, and it is the ONE field here that is.
+   *
+   * `pay` and `status` are required because a bot wired for money must be able
+   * to do both. A payout is a strictly larger capability: it needs no second
+   * human, so a deployment may reasonably wire the money commands WITHOUT it.
+   * Absent means `/send` says so plainly rather than erroring.
+   */
+  readonly send?: (text: string) => Promise<string>;
 }
 
 export interface HandleDeps {
@@ -164,15 +173,15 @@ export async function handleUpdate(
     // payment: the human types the verb and the amount, the server chooses the
     // payee from configuration, and MTN asks the payer for their own PIN on
     // their own handset. No model is anywhere in that sentence.
-    if (command === 'pay' || command === 'status') {
+    if (command === 'pay' || command === 'status' || command === 'send') {
       const money = deps.money;
       if (!money) {
         await deps.telegram.sendMessage({
           chatId,
           text:
-            command === 'pay'
-              ? 'Payments are not switched on for this bot right now.'
-              : 'No ledger connected right now.',
+            command === 'status'
+              ? 'No ledger connected right now.'
+              : 'Payments are not switched on for this bot right now.',
         });
         return { kind: 'replied', source: 'command' };
       }
@@ -199,8 +208,25 @@ export async function handleUpdate(
         return { kind: 'replied', source: 'denied' };
       }
 
+      // `/send` is checked AFTER the allowlist, deliberately. A chat that may
+      // not spend money is told it may not spend money — it is never told which
+      // capabilities this deployment happens to have.
+      if (command === 'send' && !money.send) {
+        await deps.telegram.sendMessage({
+          chatId,
+          text: 'Paying out is not switched on for this bot right now.',
+        });
+        return { kind: 'replied', source: 'command' };
+      }
+
       await deps.telegram.sendChatAction(chatId, 'typing').catch(() => undefined);
-      const reply = command === 'pay' ? await money.pay(text) : await money.status();
+      const reply =
+        command === 'pay'
+          ? await money.pay(text)
+          : command === 'send'
+            ? // Non-null: guarded immediately above.
+              await money.send!(text)
+            : await money.status();
       await deps.telegram.sendMessage({ chatId, text: reply });
       return { kind: 'replied', source: 'command' };
     }

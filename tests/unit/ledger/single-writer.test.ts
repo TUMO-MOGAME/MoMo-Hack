@@ -77,9 +77,23 @@ describe('one ledger writer', () => {
 
 describe('one reference id, generated once', () => {
   test('only the initiate path mints a uuid for a transaction', () => {
-    // A fresh id on a retry double-pays (A1 §5). `initiate.ts` is the only
-    // module allowed to call randomUUID, and it does so BEFORE the insert.
-    const ALLOWED = new Set(['server/momo/initiate.ts', 'server/db/memory.ts']);
+    // A fresh id on a retry double-pays (A1 §5). Only the two INITIATE paths
+    // may call randomUUID, and each does so BEFORE its insert.
+    //
+    // `payout.ts` was added by M3a and earns its place on exactly the same
+    // terms as `initiate.ts`: it mints one id, persists it, and sends it as
+    // `X-Reference-Id`. It is listed individually rather than by a
+    // `server/momo/` prefix, because the whole value of this guard is that
+    // adding a third money-moving module has to be a deliberate edit here.
+    //
+    // The stakes are higher on this one. A fresh id on a retried COLLECTION
+    // charges someone twice; a fresh id on a retried PAYOUT pays someone twice,
+    // out of our own float, with nobody in the loop to notice.
+    const ALLOWED = new Set([
+      'server/momo/initiate.ts',
+      'server/momo/payout.ts',
+      'server/db/memory.ts',
+    ]);
 
     const minters = sourceFiles()
       .filter(({ body }) => codeLines(body).some((l) => /randomUUID\s*\(/.test(l)))

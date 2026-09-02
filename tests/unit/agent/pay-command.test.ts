@@ -165,7 +165,6 @@ describe('the Telegram command routing', () => {
     const pay = vi.fn(async (_text: string) => 'request sent');
     const { deps: d, sent } = deps({ pay });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const outcome = await handleUpdate(d as any, update('/pay 0.20') as any);
 
     expect(pay).toHaveBeenCalledOnce();
@@ -181,7 +180,6 @@ describe('the Telegram command routing', () => {
     const status = vi.fn(async () => 'settled');
     const { deps: d, sent } = deps({ status });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await handleUpdate(d as any, update('/status') as any);
 
     expect(status).toHaveBeenCalledOnce();
@@ -194,7 +192,7 @@ describe('the Telegram command routing', () => {
     // test cannot accidentally reach MTN — the capability arrives only from the
     // route that wires it.
     const { deps: d, sent } = deps();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     await handleUpdate(d as any, update('/pay 0.20') as any);
     expect(sent.join(' ')).toMatch(/not switched on/i);
   });
@@ -205,7 +203,6 @@ describe('the Telegram command routing', () => {
     const pay = vi.fn(async () => 'request sent');
     const { deps: d } = deps({ pay });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await handleUpdate(d as any, update('send money to this person 0761346606') as any);
 
     expect(pay).not.toHaveBeenCalled();
@@ -306,7 +303,7 @@ describe('the pay allowlist (M5d)', () => {
   describe('a chat that is not on the list', () => {
     test('/pay never reaches the payment handler', async () => {
       const w = wire(new Set([42]));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const outcome = await handleUpdate(w.deps as any, update('/pay 1.00', 999) as any);
 
       expect(w.pay).not.toHaveBeenCalled();
@@ -317,7 +314,7 @@ describe('the pay allowlist (M5d)', () => {
       // Gated too: /status drives the reconciler and reads out somebody else's
       // amount and split. Neither belongs to a stranger.
       const w = wire(new Set([42]));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const outcome = await handleUpdate(w.deps as any, update('/status', 999) as any);
 
       expect(w.status).not.toHaveBeenCalled();
@@ -326,7 +323,7 @@ describe('the pay allowlist (M5d)', () => {
 
     test('is told plainly that nothing was sent or charged', async () => {
       const w = wire(new Set([42]));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       await handleUpdate(w.deps as any, update('/pay 1.00', 999) as any);
 
       const reply = w.sent.join('\n');
@@ -342,7 +339,7 @@ describe('the pay allowlist (M5d)', () => {
       // `/pay@momokasi_demo_bot` is what Telegram delivers in a GROUP — the
       // exact place an outsider is most likely to find the bot.
       const w = wire(new Set([42]));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       await handleUpdate(w.deps as any, update('/pay@momokasi_demo_bot 1.00', 999) as any);
       expect(w.pay).not.toHaveBeenCalled();
     });
@@ -350,7 +347,6 @@ describe('the pay allowlist (M5d)', () => {
     test('an empty allowlist denies the whole world, including chat 0', async () => {
       const w = wire(new Set());
       for (const chatId of [0, 42, -1001234567890, 999]) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         await handleUpdate(w.deps as any, update('/pay 1.00', chatId) as any);
       }
       expect(w.pay).not.toHaveBeenCalled();
@@ -361,7 +357,7 @@ describe('the pay allowlist (M5d)', () => {
       // not turn the product into a brick for them — the read-only assistant
       // is the part we actually want people to try.
       const w = wire(new Set([42]));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const outcome = await handleUpdate(w.deps as any, update('how do stokvels work', 999) as any);
 
       expect(outcome).toEqual({ kind: 'replied', source: 'agent' });
@@ -369,10 +365,90 @@ describe('the pay allowlist (M5d)', () => {
     });
   });
 
+  describe('/send is gated by the same list (M3a)', () => {
+    function wireSend(allowlist: ReadonlySet<number>, withSend = true) {
+      const sent: string[] = [];
+      const send = vi.fn(async () => 'PAYOUT SENT — must not appear for a denied chat');
+      return {
+        sent,
+        send,
+        deps: {
+          telegram: {
+            sendMessage: vi.fn(async ({ text }: { text: string }) => {
+              sent.push(text);
+              return undefined as never;
+            }),
+            sendChatAction: vi.fn(async () => undefined as never),
+          },
+          agent: { reply: vi.fn(async () => 'agent answered') },
+          money: {
+            allowlist,
+            pay: async () => 'pay',
+            status: async () => 'status',
+            ...(withSend ? { send } : {}),
+          },
+        },
+      };
+    }
+
+    test('a chat not on the list can never pay OUT', async () => {
+      // The worst case in the product. A collection a stranger triggers asks a
+      // human who declines; a payout a stranger triggers is our money, gone.
+      const w = wireSend(new Set([42]));
+
+      const outcome = await handleUpdate(w.deps as any, update('/send 0.10', 999) as any);
+
+      expect(w.send).not.toHaveBeenCalled();
+      expect(outcome).toEqual({ kind: 'replied', source: 'denied' });
+    });
+
+    test('the @botname form does not slip past it either', async () => {
+      const w = wireSend(new Set([42]));
+
+      await handleUpdate(w.deps as any, update('/send@momokasi_demo_bot 0.10', 999) as any);
+      expect(w.send).not.toHaveBeenCalled();
+    });
+
+    test('an allowed chat reaches the payout handler with the whole message', async () => {
+      const w = wireSend(new Set([42]));
+
+      await handleUpdate(w.deps as any, update('/send 0.10', 42) as any);
+      expect(w.send).toHaveBeenCalledWith('/send 0.10');
+    });
+
+    test('with payouts not wired, an allowed chat is told so plainly', async () => {
+      const w = wireSend(new Set([42]), false);
+
+      await handleUpdate(w.deps as any, update('/send 0.10', 42) as any);
+      expect(w.sent.join(' ')).toMatch(/paying out is not switched on/i);
+    });
+
+    test('a DENIED chat is never told which capabilities exist', async () => {
+      // The allowlist is checked BEFORE the capability check, so an outsider
+      // learns only that they may not spend money — not whether this
+      // deployment can pay out at all.
+      const w = wireSend(new Set([42]), false);
+
+      await handleUpdate(w.deps as any, update('/send 0.10', 999) as any);
+      expect(w.sent.join(' ')).not.toMatch(/not switched on/i);
+      expect(w.sent.join(' ')).toMatch(/nothing was sent/i);
+    });
+
+    test('free text that sounds like a payout still goes to the agent', async () => {
+      // M10, on the payout side. Only a literal /send command pays anyone.
+      const w = wireSend(new Set([42]));
+
+      await handleUpdate(w.deps as any, update('please send me 0.10', 42) as any);
+
+      expect(w.send).not.toHaveBeenCalled();
+      expect(w.deps.agent.reply).toHaveBeenCalledOnce();
+    });
+  });
+
   describe('a chat that is on the list', () => {
     test('/pay works exactly as before', async () => {
       const w = wire(new Set([42, 999]));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       const outcome = await handleUpdate(w.deps as any, update('/pay 0.20', 42) as any);
 
       expect(w.pay).toHaveBeenCalledWith('/pay 0.20');
@@ -381,7 +457,7 @@ describe('the pay allowlist (M5d)', () => {
 
     test('a group on the list works, negative id and all', async () => {
       const w = wire(new Set([-1001234567890]));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
       await handleUpdate(w.deps as any, update('/status', -1001234567890) as any);
       expect(w.status).toHaveBeenCalledOnce();
     });

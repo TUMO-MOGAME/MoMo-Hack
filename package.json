@@ -21,6 +21,7 @@
     "pr:merge": "node scripts/safe-merge.mjs",
     "agent:worktree": "node scripts/agent-worktree.mjs",
     "check:momo": "node scripts/momo-smoke.mjs",
+    "momo:preflight": "node scripts/momo-preflight.mjs",
     "check:telegram": "node scripts/telegram-check.mjs",
     "env:push": "node scripts/vercel-env.mjs",
     "format": "prettier --write .",

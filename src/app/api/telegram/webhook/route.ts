@@ -44,7 +44,7 @@ import { isFromTelegram, readPayAllowlist, readTelegramConfig } from '@/lib/tele
 import { parseUpdate } from '@/lib/telegram/types';
 import { log } from '@/server/log';
 import { handleUpdate } from '@/server/telegram/handle';
-import { payReply, statusReply } from '@/server/momo/pay-replies';
+import { payReply, sendReply, statusReply } from '@/server/momo/pay-replies';
 import { claimUpdate } from '@/server/telegram/memory';
 
 export const runtime = 'nodejs';
@@ -100,6 +100,7 @@ export async function POST(request: Request): Promise<Response> {
           allowlist: readPayAllowlist(),
           pay: (text) => payReply(text, 'telegram'),
           status: statusReply,
+          send: (text) => sendReply(text, 'telegram'),
         },
       },
       update,

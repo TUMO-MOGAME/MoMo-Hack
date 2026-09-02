@@ -46,6 +46,7 @@ export const POSTING_PURPOSES = [
   'OWNER_PAYOUT',
   'DRIVER_WAGE',
   'STOKVEL_PAYOUT',
+  'DEMO_PAYOUT',
   // Remittances — money in (docs/11 §4)
   'REMIT_IN',
   'REMIT_TOOL',
@@ -98,6 +99,25 @@ export interface PostingInput {
   /** `momo_transaction.id`. Carried onto the journal for reconciliation. */
   readonly referenceId?: string | null;
   readonly context?: PostingContext;
+  /**
+   * Which way the money went — and it exists because of the `default:` branch.
+   *
+   * An unrecognised purpose falls through to SUSPENSE, which is the right
+   * instinct: the money has already moved at MTN, and refusing to post it would
+   * leave the ledger disagreeing with reality. But "post it to SUSPENSE" is not
+   * a direction, and until M3a every purpose that reached here was a
+   * COLLECTION, so the fallback hard-coded money coming IN.
+   *
+   * A disbursement with an unknown purpose would therefore have recorded money
+   * we SENT as money we RECEIVED. **The journal still balances**, so no database
+   * trigger and no invariant test would have caught it — MOMO_SETTLEMENT would
+   * simply be wrong by twice the amount, silently, in the one account that says
+   * how much money we hold at MTN.
+   *
+   * Defaults to 'IN', which is exactly the previous behaviour, so no collection
+   * changes. `resolve.ts` passes the transaction's product.
+   */
+  readonly direction?: 'IN' | 'OUT';
 }
 
 function required(value: string | null | undefined, what: string, purpose: string): string {
@@ -194,7 +214,7 @@ export function journalDraftFor(input: PostingInput): JournalDraft {
 
   const ctx = input.context ?? {};
   const fee = ctx.feeMinor ?? 0n;
-  const postings = buildPostings(input.purpose, amount, ctx, fee);
+  const postings = buildPostings(input.purpose, amount, ctx, fee, input.direction ?? 'IN');
 
   const draft: JournalDraft = {
     kind: input.purpose,
@@ -214,6 +234,7 @@ function buildPostings(
   amount: Minor,
   ctx: PostingContext,
   fee: bigint,
+  direction: 'IN' | 'OUT',
 ): DraftPosting[] {
   switch (purpose) {
     // ── Collections — money in ──────────────────────────────────────────────
@@ -271,11 +292,33 @@ function buildPostings(
     case 'STOKVEL_PAYOUT':
       return payOutOf(stokvelPool(required(ctx.subjectId, 'subjectId', purpose)), amount, fee);
 
-    default:
+    case 'DEMO_PAYOUT':
+      // The mirror of AIRTIME, and the reason it needs no context at all.
+      //
+      // A demo collection parks the money in SUSPENSE ("taken, not yet
+      // delivered"). A demo payout draws it back out of the same account, so
+      // the pair nets to zero and SUSPENSE returns to where docs/02 §2 says it
+      // must end the day: empty.
+      //
+      // Every other payout purpose requires an id — a job, an owner, a driver,
+      // a stokvel — and `required()` throws inside the resolve transaction when
+      // the reconciler supplies only `subjectId` (the M6b trap, which took a
+      // FARE collection's money and never posted it). A demo payout has no such
+      // subject and must not pretend to; SUSPENSE is the account for money
+      // whose owner is not yet named.
+      return payOutOf({ ...SUSPENSE, subjectId: ctx.subjectId ?? null }, amount, 0n);
+
+    default: {
       // An unknown purpose is NOT an error we can afford to throw on: the money
-      // has already arrived at MTN, and refusing to post it would leave the
+      // has already moved at MTN, and refusing to post it would leave the
       // ledger disagreeing with reality. It goes to SUSPENSE with the reference
       // attached, and end-of-day reconciliation surfaces it as an alarm.
-      return collectInto({ ...SUSPENSE, subjectId: ctx.subjectId ?? null }, amount);
+      //
+      // BUT IT MUST GO THE RIGHT WAY. Posting an unknown DISBURSEMENT as money
+      // in would balance perfectly and be wrong by twice the amount in
+      // MOMO_SETTLEMENT — see `PostingInput.direction`.
+      const parked = { ...SUSPENSE, subjectId: ctx.subjectId ?? null };
+      return direction === 'OUT' ? payOutOf(parked, amount, 0n) : collectInto(parked, amount);
+    }
   }
 }

@@ -22,15 +22,18 @@
 
 import { type EnvBag, readMomoConfig } from '../config';
 import { MomoRequestError, upstream } from '../errors';
-import { toMomoAmount } from '../currency';
+import { toMomoAmount, toPayoutAmount } from '../currency';
 import { assertExternalId, assertReferenceId } from '../client';
 import { TEST_MSISDN } from '../test-msisdns';
 import type {
   CollectionsApi,
+  DisbursementsApi,
   MomoClient,
   RequestToPayInput,
   RequestToPayResult,
   RequestToPayStatus,
+  TransferResult,
+  TransferStatus,
 } from '../types';
 import type { MomoStatus } from '@/domain/ledger/state-machine';
 import { requestToPayStatusBody } from './fixtures';
@@ -250,5 +253,83 @@ export function createEmulatorClient(options: EmulatorOptions = {}): MomoClient 
     },
   };
 
-  return { mode: 'emulator', collections };
+  /**
+   * Payouts, emulated (M3a).
+   *
+   * The emulator exists so the demo survives the sandbox dying ninety seconds
+   * before we present (ADR-0009), and a payout half that only works against a
+   * live upstream would be a hole in exactly that guarantee.
+   *
+   * It shares `store` with collections deliberately: a reference id is unique
+   * across the whole of MoMo, so a transfer reusing a collection's id must
+   * still 409. Two separate stores would let that pass and hide a real
+   * double-pay bug.
+   *
+   * `toPayoutAmount`, not `toMomoAmount` — the emulator must enforce the caps
+   * the real path enforces, or a test proves the wrong thing.
+   */
+  const disbursements: DisbursementsApi = {
+    async transfer(referenceId, input): Promise<TransferResult> {
+      const cfg = readMomoConfig(env());
+      assertReferenceId(cfg, referenceId);
+      assertExternalId(input.externalId);
+      maybeInjectFailure(referenceId);
+
+      if (store.has(referenceId)) return { outcome: 'ALREADY_ACCEPTED', referenceId };
+
+      const money = toPayoutAmount(input.amountMinor, cfg.targetEnvironment);
+      store.put({
+        referenceId,
+        input,
+        acceptedAt: now(),
+        amount: money.amount,
+        currency: money.currency,
+      });
+
+      return { outcome: 'ACCEPTED', referenceId };
+    },
+
+    async getTransferStatus(referenceId): Promise<TransferStatus> {
+      const cfg = readMomoConfig(env());
+      assertReferenceId(cfg, referenceId);
+
+      const txn = store.get(referenceId);
+      if (!txn) {
+        throw new MomoRequestError('HTTP', upstream(404, false), 'emulator: unknown reference id');
+      }
+
+      maybeInjectFailure(`${referenceId}:status`);
+
+      const plan = outcome(txn.input.msisdn);
+      const elapsed = now() - txn.acceptedAt;
+      const status: MomoStatus =
+        plan.settled !== null && elapsed >= plan.settleAfterMs ? plan.settled : plan.initial;
+
+      const raw = requestToPayStatusBody({
+        referenceId,
+        status,
+        amount: txn.amount,
+        currency: txn.currency,
+        externalId: txn.input.externalId,
+        msisdn: txn.input.msisdn,
+        payerMessage: txn.input.payerMessage,
+        payeeNote: txn.input.payeeNote,
+      });
+
+      return {
+        referenceId,
+        status,
+        externalId: txn.input.externalId,
+        amount: txn.amount,
+        currency: txn.currency,
+        ...(typeof raw.financialTransactionId === 'string'
+          ? { financialTransactionId: raw.financialTransactionId }
+          : {}),
+        ...(typeof raw.reason === 'string' ? { reason: raw.reason } : {}),
+        raw,
+      };
+    },
+  };
+
+  return { mode: 'emulator', collections, disbursements };
 }

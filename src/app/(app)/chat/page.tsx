@@ -137,7 +137,7 @@ export default function ChatPage() {
       // different endpoint because `/api/agent` is read-only and its docstring
       // promises so — see the note at the top of `/api/pay`. Free text that
       // merely sounds like a payment still goes to the agent, which refuses it.
-      if (/^\/(pay|status)\b/i.test(text)) {
+      if (/^\/(pay|status|send)\b/i.test(text)) {
         const response = await fetch('/api/pay', {
           method: 'POST',
           // `x-momo-chat` marks this as our own page's request. A browser will

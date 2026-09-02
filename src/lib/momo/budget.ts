@@ -47,6 +47,80 @@ export const DEFAULT_LIVE_MAX_MINOR = 100n;
 /** The env var that raises or lowers the ceiling, for a deliberate exception. */
 export const LIVE_MAX_ENV = 'MOMO_LIVE_MAX_MINOR';
 
+/**
+ * ── THE PAYOUT CEILING, AND WHY IT IS LOWER THAN THE INBOUND ONE ─────────────
+ *
+ * A `requesttopay` and a `transfer` are not symmetric risks, and giving them
+ * one shared cap would pretend they are.
+ *
+ * **A collection that goes wrong annoys somebody.** MTN pushes a prompt to a
+ * handset, a human reads it, and if it is wrong they decline. There is a second
+ * person in the loop and they hold the veto — no money moves without their PIN.
+ *
+ * **A transfer that goes wrong is money gone.** There is no prompt, no PIN, no
+ * decline: we say pay, and MTN pays. The only thing between a bug and an empty
+ * wallet is this number. So the payout default is **R0.10** — a tenth of the
+ * inbound cap, enough to prove a payout end to end and small enough that a loop
+ * which fires a hundred times before anyone notices has spent R10, not R100.
+ *
+ * Raise it deliberately, per transaction, knowing what it guards.
+ */
+export const DEFAULT_PAYOUT_MAX_MINOR = 10n;
+
+/** The env var for the payout ceiling. Separate from the inbound one, on purpose. */
+export const PAYOUT_MAX_ENV = 'MOMO_PAYOUT_MAX_MINOR';
+
+export class PayoutBudgetError extends RangeError {
+  readonly amountMinor: bigint;
+  readonly capMinor: bigint;
+
+  constructor(amountMinor: bigint, capMinor: bigint, targetEnvironment: string) {
+    super(
+      `refusing to PAY OUT ${formatMinor(amountMinor)} to the "${targetEnvironment}" MoMo ` +
+        `environment: the payout cap is ${formatMinor(capMinor)} per transfer. ` +
+        'Unlike a collection, a transfer has no second human in the loop — nobody ' +
+        `approves it on a handset, so this cap is the only brake. Raise ` +
+        `${PAYOUT_MAX_ENV} deliberately if you mean it.`,
+    );
+    this.name = 'PayoutBudgetError';
+    this.amountMinor = amountMinor;
+    this.capMinor = capMinor;
+  }
+}
+
+/** The payout ceiling now in force. Same malformed-value reasoning as `liveCapMinor`. */
+export function payoutCapMinor(env: EnvLike = process.env): bigint {
+  const raw = env[PAYOUT_MAX_ENV];
+  if (!raw) return DEFAULT_PAYOUT_MAX_MINOR;
+  try {
+    const parsed = BigInt(raw.trim());
+    return parsed > 0n ? parsed : DEFAULT_PAYOUT_MAX_MINOR;
+  } catch {
+    return DEFAULT_PAYOUT_MAX_MINOR;
+  }
+}
+
+/**
+ * Throw unless this amount may be PAID OUT to this environment.
+ *
+ * Applied on top of `assertWithinLiveBudget`, never instead of it: a payout
+ * must satisfy both the general live cap and the tighter payout one. Sandbox is
+ * exempt for the same reason as ever — sandbox money is not real, and the demo
+ * pays out R12.50 there.
+ */
+export function assertWithinPayoutBudget(
+  amountMinor: bigint,
+  targetEnvironment: string | undefined,
+  env: EnvLike = process.env,
+): void {
+  if (!isLiveEnvironment(targetEnvironment)) return;
+
+  const cap = payoutCapMinor(env);
+  if (amountMinor > cap) {
+    throw new PayoutBudgetError(amountMinor, cap, targetEnvironment ?? '(unset)');
+  }
+}
+
 export class LiveBudgetError extends RangeError {
   readonly amountMinor: bigint;
   readonly capMinor: bigint;

@@ -94,6 +94,77 @@ export interface CollectionsApi {
 }
 
 /**
+ * `POST /disbursement/v1_0/transfer` body — **[V] MEASURED 2026-09-03**.
+ *
+ * Identical to `RequestToPayBody` except that `payer` becomes `payee`, which is
+ * the entire difference between asking for money and sending it. Verified by a
+ * `202 Accepted` against the sandbox with exactly these fields; momoAPIs.md §8.
+ *
+ * The two bodies are deliberately NOT unified into one generic type. They are
+ * one field apart today and that field is the direction money travels — the
+ * kind of similarity worth keeping visible rather than abstracting away.
+ */
+export interface TransferBody {
+  /** Decimal STRING, e.g. "0.10". Never a number — see `currency.ts`. */
+  readonly amount: string;
+  readonly currency: string;
+  readonly externalId: string;
+  readonly payee: { readonly partyIdType: 'MSISDN'; readonly partyId: string };
+  readonly payerMessage: string;
+  readonly payeeNote: string;
+}
+
+export interface TransferInput {
+  /** ZAR minor units. Passes the PAYOUT cap, which is tighter than the inbound one. */
+  readonly amountMinor: bigint;
+  readonly msisdn: string;
+  readonly externalId: string;
+  readonly payerMessage: string;
+  readonly payeeNote: string;
+  readonly callbackUrl?: string;
+}
+
+/** Same 202/409 reasoning as a collection — see `RequestToPayOutcome`. */
+export type TransferOutcome = 'ACCEPTED' | 'ALREADY_ACCEPTED';
+
+export interface TransferResult {
+  readonly outcome: TransferOutcome;
+  readonly referenceId: string;
+}
+
+/**
+ * `GET /disbursement/v1_0/transfer/{referenceId}` — **[V] MEASURED 2026-09-03**.
+ *
+ * The measured body, from the sandbox (currency label elided — the containment
+ * rule in `tests/contract/currency.test.ts` allows the sandbox label in exactly
+ * one file, and that file is `currency.ts`):
+ *
+ * ```json
+ * {"amount":"12.5","currency":"<label>","externalId":"payout-…",
+ *  "payee":{"partyIdType":"MSISDN","partyId":"46733123453"},
+ *  "payerMessage":"…","payeeNote":"…","status":"PENDING"}
+ * ```
+ *
+ * Note `"12.5"`, not `"12.50"` — MTN normalises the decimal it echoes back.
+ * Anything comparing this to what we sent must compare MONEY, not strings.
+ */
+export interface TransferStatus {
+  readonly referenceId: string;
+  readonly status: MomoStatus;
+  readonly financialTransactionId?: string;
+  readonly externalId?: string;
+  readonly amount?: string;
+  readonly currency?: string;
+  readonly reason?: string;
+  readonly raw: unknown;
+}
+
+export interface DisbursementsApi {
+  transfer(referenceId: string, input: TransferInput): Promise<TransferResult>;
+  getTransferStatus(referenceId: string): Promise<TransferStatus>;
+}
+
+/**
  * The interface the emulator implements identically (ADR-0009). If the sandbox
  * dies ninety seconds before we present, `MOMO_MODE=emulator` swaps the whole
  * thing at runtime with no redeploy.
@@ -101,4 +172,5 @@ export interface CollectionsApi {
 export interface MomoClient {
   readonly mode: MomoMode;
   readonly collections: CollectionsApi;
+  readonly disbursements: DisbursementsApi;
 }

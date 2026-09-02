@@ -414,6 +414,58 @@ same correction where the wrong conclusion was published.
 
 ---
 
+## M14 · Two read-only checks were published as "nothing is blocked but the code"
+
+**What happened.** Having found that production disbursements returned a token, a balance of
+**R35.83 ZAR**, and `{"result":true}` for the payee, I wrote into `momoAPIs.md` §8, `PLANNING.md`
+§MUST and `STATUS.md`:
+
+> *"**R35.83 of real money is sitting in the disbursement account and the intended payee is
+> reachable.** Nothing is blocked but the code."*
+
+That was promoted to a **MUST** and handed to the next session as a build instruction. It was
+wrong. `POST /disbursement/v1_0/transfer` returns **`403 Forbidden`** on production and always had.
+So had `deposit`. The whole payout half of the product was gated at MTN, and the plan said the only
+missing thing was our code.
+
+**Why.** **Read-only checks only ever prove read-only things.** `account/balance` answers "can we
+read our balance". `accountholder/{n}/active` answers "can MTN see this wallet". Neither is evidence
+that a `POST` is *permitted*, and the difference between reading and writing is the entire product.
+
+The trap is that this is M13's own remedy, over-applied. M13's lesson was *"find the read-only call
+that asks the system directly, because a diagnosis that costs nothing to verify must be verified"* —
+and that lesson is correct. But it answers **"is this thing broken?"**, not **"will this thing
+work?"**. I used a cheap negative test as though it were a positive one. Two green GETs felt like
+evidence of readiness because they were *measurements* rather than guesses, and measurements of the
+wrong question are still the wrong question.
+
+The cost is worth naming: the conclusion did not merely sit in a document. It was written as a
+requirement, and the next session's instructions said *"Nothing is blocked but the code"* — which
+would have produced a fully built, tested, reviewed payout path that could never once have run.
+
+**The rule.** **A capability is proven only by exercising the capability.** Before recording that a
+write operation is available, *call it* — and find the call that costs nothing:
+
+- an amount far above the balance (it can only ever return `NOT_ENOUGH_FUNDS`, and moves no money);
+- a **deliberately malformed body**, which distinguishes "the gateway refuses us" from "our schema
+  is wrong" — if a bad body and a good body get the same rejection, nothing read the body;
+- a **positive control** on a sibling endpoint that is known to work, so "the API is down" and
+  "this operation is forbidden" cannot be confused.
+
+And when a read and a write disagree, **say which one you measured.** `[V]` on
+`GET .../account/balance` must never be read as `[V]` on the product.
+
+**The guard.** `momoAPIs.md` §8's table now rates **every operation separately**, with the measured
+status code beside each — `transfer` and `deposit` carry **403 on production** in the table itself,
+where the old table carried one `[P]` for the lot. §8a records the full matrix including the
+malformed-body row and the `requesttopay` control, so the next person meets the *method* before they
+meet any conclusion. `scripts/momo-preflight.mjs` runs that matrix on demand, read-only except for
+amounts that cannot clear, and prints per-operation authorization for both products — so "can we
+pay out today?" is a command, not a memory. `PLANNING.md` M3a and `STATUS.md` carry the correction
+where the wrong conclusion was published.
+
+---
+
 ## What has gone right, and why
 
 Worth recording, because these are the patterns to keep:
