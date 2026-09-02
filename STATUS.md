@@ -276,6 +276,15 @@ shows the wrong card, where a model choosing its own tools could be talked into 
 the same real data. Gemini slow, rate-limited, unconfigured or refusing all degrade to a correct
 answer with the correct card. Silence is the one outcome not allowed on a stage.
 
+**Verified live on `momo.tumoolo.tech`, and the fallback proved itself first.** The initial
+production deploy answered with `modelled: false` — correct numbers, correct card, no model. Cause:
+`GEMINI_API_KEY` was on Vercel as a `sensitive` variable and, exactly like the Telegram pair, was not
+effective at runtime. It is now in `npm run env:push`; after a redeploy: `modelled: true`,
+*"Howzit! You have R2.00 spendable, R30.00 awaiting delivery, and R32.00 held at MTN."*
+
+That the fallback path was the first thing to run in production, unplanned, and nobody could tell
+from the answer, is the strongest evidence it works.
+
 **One core, both channels.** `src/server/agent/respond.ts` is what the web route calls and what the
 Telegram handler will call — so "they should both respond the same" is a property of the code
 rather than two handlers promising it separately. *Telegram is not cut over yet.*
