@@ -54,7 +54,7 @@ export function Confirm({ a, onConfirm, onCancel }: ConfirmProps) {
           </div>
         )}
 
-        <dl className="mt-5 divide-y divide-border">
+        <dl className="mt-5 divide-y divide-divider">
           <Row>
             <dt>
               <Label sub={action.payeeMasked}>To</Label>

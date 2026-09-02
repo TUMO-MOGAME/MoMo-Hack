@@ -62,7 +62,7 @@ export function SplitBreakdown({ a }: { a: SplitArtifact }) {
         ))}
       </div>
 
-      <ul className="mt-4 divide-y divide-border">
+      <ul className="mt-4 divide-y divide-divider">
         {a.parts.map((p, i) => (
           <li key={p.key}>
             <Row>

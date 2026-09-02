@@ -174,7 +174,7 @@ export default function ChatPage() {
           behind it — never a cramped column stealing width from the chat. */}
       <aside
         aria-label="Your position"
-        className="hidden w-72 shrink-0 border-r border-border xl:block"
+        className="hidden w-72 shrink-0 border-r border-divider xl:block"
       >
         {context ? <ContextPanel context={context} onOpen={openArtifact} /> : null}
       </aside>
@@ -184,16 +184,28 @@ export default function ChatPage() {
         aria-label="Conversation"
         className="flex min-h-0 flex-1 flex-col lg:max-w-[520px] lg:border-r lg:border-border"
       >
-        <header className="flex items-center justify-between gap-3 border-b border-border px-5 py-4">
-          <Link href="/" className="flex min-h-11 min-w-0 items-baseline gap-2 rounded-md">
-            <span className="whitespace-nowrap font-display text-2xl text-brand">MoMo Kasi</span>
-            {/* At 320px the wordmark plus the sandbox badge is the whole width,
-                and a broken wordmark looks like a bug. The tagline is the part
-                that can go. */}
-            <span className="hidden truncate text-xs text-muted-foreground sm:inline">
-              daily money for Mzansi
-            </span>
-          </Link>
+        {/* A3-02: this page rendered ZERO headings — no h1, nothing. Verified
+            against production HTML. Heading navigation is how a screen-reader
+            user orients on a page, and this is the product's main surface.
+
+            The wordmark becomes the h1 rather than adding a hidden one: it
+            already IS the page's title, it is already the first thing in the
+            document, and a visible heading that matches what a sighted user
+            reads is better than a duplicate nobody can see. The link stays
+            inside it, which is valid and keeps "go home" where the thumb
+            expects it. */}
+        <header className="flex items-center justify-between gap-3 border-b border-divider px-5 py-4">
+          <h1 className="min-w-0">
+            <Link href="/" className="flex min-h-11 min-w-0 items-baseline gap-2 rounded-md">
+              <span className="whitespace-nowrap font-display text-2xl text-brand">MoMo Kasi</span>
+              {/* At 320px the wordmark plus the sandbox badge is the whole
+                  width, and a broken wordmark looks like a bug. The tagline is
+                  the part that can go. */}
+              <span className="hidden truncate text-xs text-muted-foreground sm:inline">
+                daily money for Mzansi
+              </span>
+            </Link>
+          </h1>
           <span className="shrink-0 rounded-full border border-border px-2 py-1 text-xs uppercase tracking-widest text-muted-foreground">
             sandbox
           </span>
@@ -246,7 +258,7 @@ export default function ChatPage() {
           ) : null}
         </main>
 
-        <div className="space-y-3 border-t border-border px-5 py-4">
+        <div className="space-y-3 border-t border-divider px-5 py-4">
           {/* No rail until the ledger has answered. An empty gap for a moment
               beats a confident number that is not true. */}
           {context ? (

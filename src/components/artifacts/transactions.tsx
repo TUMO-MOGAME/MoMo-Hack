@@ -45,7 +45,7 @@ export function Transactions({ a }: { a: TransactionsArtifact }) {
   return (
     <div>
       {a.caption ? <p className="mb-4 text-sm text-muted-foreground">{a.caption}</p> : null}
-      <ul className="divide-y divide-border">
+      <ul className="divide-y divide-divider">
         {a.items.map((t) => (
           <li key={t.id}>
             <Row>

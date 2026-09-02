@@ -39,9 +39,9 @@ export function ContextDrawer({
         aria-modal="true"
         aria-labelledby={titleId}
         tabIndex={-1}
-        className="absolute inset-y-0 left-0 flex w-[min(20rem,88vw)] flex-col border-r border-border bg-popover animate-drawer"
+        className="absolute inset-y-0 left-0 flex w-[min(20rem,88vw)] flex-col border-r border-divider bg-popover animate-drawer"
       >
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-4 py-3">
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-divider px-4 py-3">
           <h2 id={titleId} className="text-base font-semibold text-foreground">
             At a glance
           </h2>

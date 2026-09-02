@@ -37,7 +37,7 @@ import { formatZAR, type Minor } from '@/domain/money';
 import type { Artifact } from '@/lib/artifacts/types';
 import { createAgentClient, type AgentMessage } from '@/lib/agent/gemini';
 import { SYSTEM_PROMPT } from '@/lib/agent/persona';
-import { log } from '@/server/log';
+import { log, scrub } from '@/server/log';
 import { readFareSplit, readTransactions, readWallet } from './tools';
 
 export interface AgentTurn {
@@ -108,9 +108,21 @@ const ROUTES: readonly { intent: Intent; test: RegExp }[] = [
   },
   {
     intent: 'transactions',
-    test: /\b(transaction|spent|spend|history|activity|statement|last month|three months|3 months|recent)\b/i,
+    // `s?` before every closing boundary, and it is not cosmetic: `\btransaction\b`
+    // does NOT match "transactions", because the boundary must fall between "n"
+    // and "s" and both are word characters. So *"show me my transactions"* — the
+    // most natural way anyone asks this — routed to `none` and got the generic
+    // "I can show you your balance…" reply while a perfectly good tool sat
+    // unused. Found by reading a real reply, not by reading the regex.
+    //
+    // Same shape as the `\d` vs `\d+` bug in the route above. A trailing `\b`
+    // after a singular noun is a plural-shaped hole, every time.
+    test: /\b(transactions?|payments?|spent|spend|history|activity|activities|statements?|last month|three months|3 months|recent)\b/i,
   },
-  { intent: 'wallet', test: /\b(balance|wallet|how much|money|afford|have|left)\b/i },
+  {
+    intent: 'wallet',
+    test: /\b(balances?|wallets?|how much|money|afford|have|left)\b/i,
+  },
 ];
 
 function classify(message: string): Intent {
@@ -256,10 +268,28 @@ export async function respond(message: string, options: RespondOptions = {}): Pr
   let modelled = false;
   try {
     const client = createAgentClient(options.env ?? process.env);
+
+    // ── NOTHING LEAVES FOR GOOGLE WITH A PHONE NUMBER IN IT (A5-02) ───────────
+    //
+    // `scrub()` masks a bare 9-15 digit run to its last four. It was written for
+    // the log drain and, until the A5 audit, was applied ONLY there — so the
+    // logger was careful and the outbound prompt was not, which is the wrong way
+    // round: a log line stays on our infrastructure, a prompt goes to a third
+    // party and may be retained by them.
+    //
+    // This is not hypothetical. The transcript behind MISTAKES.md M10 —
+    // *"send 0.01 the number is 0761346606"* — put a real South African mobile
+    // number in a user message, and it was transmitted verbatim. POPIA s105/106.
+    //
+    // Applied to the HISTORY too, not just the current turn: the client sends
+    // the last 8 messages back with every request, so an unscrubbed number would
+    // otherwise be re-transmitted on every subsequent turn of the conversation.
+    // The scrubber deliberately spares uuids (see its lookaround), so grounding
+    // ids survive.
     const history: AgentMessage[] = [
       { role: 'user', text: `${SYSTEM_PROMPT}\n\n${grounding(artifact)}` },
-      ...(options.history ?? []),
-      { role: 'user', text: message },
+      ...(options.history ?? []).map((m) => ({ role: m.role, text: scrub(m.text) })),
+      { role: 'user', text: scrub(message) },
     ];
     const text = await client.reply(history);
     if (text.trim().length > 0) {

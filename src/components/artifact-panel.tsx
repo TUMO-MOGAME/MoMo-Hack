@@ -83,7 +83,7 @@ export function ArtifactSheet({ artifact, status, onClose }: SurfaceProps) {
         aria-labelledby={titleId}
         aria-describedby={`${titleId}-summary`}
         tabIndex={-1}
-        className={`absolute inset-x-0 bottom-0 flex flex-col border-t border-border bg-popover animate-sheet ${
+        className={`absolute inset-x-0 bottom-0 flex flex-col border-t border-divider bg-popover animate-sheet ${
           fullHeight ? 'top-0' : 'max-h-[85dvh] rounded-t-xl'
         }`}
       >

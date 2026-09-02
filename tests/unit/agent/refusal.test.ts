@@ -122,6 +122,22 @@ describe('the money questions still work', () => {
     expect(turn.reply).not.toMatch(/aren't built|payouts/i);
   });
 
+  test.each([
+    ['show me my transactions', 'read_transactions'],
+    ['my transactions', 'read_transactions'],
+    ['transaction history', 'read_transactions'],
+    ['show me my payments', 'read_transactions'],
+    ['what is my balance', 'read_wallet'],
+    ['check my balances', 'read_wallet'],
+  ])('%j routes to %s — plurals included', async (msg, tool) => {
+    // `\btransaction\b` cannot match "transactions": the boundary would have to
+    // fall between "n" and "s", and both are word characters. So the most
+    // natural phrasing of the most common question fell through to `none` and
+    // got a generic reply while the tool sat unused.
+    const turn = await respond(msg, { env: {} });
+    expect(turn.tool).toBe(tool);
+  });
+
   test('"did i get my R60" is a wallet question, not a fare split', async () => {
     // `60` was in the split pattern as shorthand for the 60/25/10/5 ratio and
     // matched any bare "R60" — so the persona's own example of a small win
