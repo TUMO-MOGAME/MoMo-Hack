@@ -38,6 +38,7 @@
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
+  --overlay: oklch(0 0 0 / 55%);
   --chart-1: oklch(0.842 0.166 89.5);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.707 0.165 254.624);
@@ -80,6 +81,7 @@
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(1 0 0 / 35%);
+  --overlay: oklch(0 0 0 / 72%);
   --chart-1: oklch(0.862 0.176 90.5);
   --chart-2: oklch(0.765 0.177 163.223);
   --chart-3: oklch(0.707 0.165 254.624);
@@ -121,6 +123,7 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-overlay: var(--overlay);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -172,6 +175,62 @@ body {
   box-shadow: var(--glow-brand);
 }
 
+/* ── focus ────────────────────────────────────────────────────────────────
+   One visible ring, on everything, everywhere. A3: "every interactive element
+   keyboard-reachable with a visible focus ring". 3px and offset, because the
+   target device has a cracked screen in direct Highveld sunlight and a 1px
+   hairline is simply not there. `:where()` keeps specificity at 0 so a
+   component can still opt out, and `--ring` is the semantic role — never a
+   raw value (A2). */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 3px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* A dialog takes focus programmatically when it opens; that is not keyboard
+   navigation and must not draw a ring the user did not ask for. */
+[role="dialog"]:focus,
+[role="dialog"]:focus-visible {
+  outline: none;
+}
+
+/* Skip link — the chat is long, and reaching the composer by Tab should not
+   mean walking the whole history. */
+.skip-link {
+  position: absolute;
+  left: 0.5rem;
+  top: -100%;
+  z-index: 100;
+  border-radius: var(--radius-md);
+  background: var(--brand);
+  color: var(--brand-foreground);
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+}
+.skip-link:focus {
+  top: 0.5rem;
+}
+
+/* ── loading ──────────────────────────────────────────────────────────────
+   The agent streams, so an artifact exists before it is finished (docs/13 §2).
+   A shimmer shaped like the thing that is coming beats a blank rectangle on
+   Slow 3G. */
+.skeleton {
+  background-color: var(--muted);
+  background-image: linear-gradient(90deg, var(--muted) 0%, var(--accent) 50%, var(--muted) 100%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
 @keyframes rise {
   from {
     opacity: 0;
@@ -213,6 +272,12 @@ body {
   animation: pulse-dot 1.2s ease-in-out infinite;
 }
 
+/* ── motion ───────────────────────────────────────────────────────────────
+   A3 asks that reduced motion is VERIFIED, not merely declared. The blanket
+   rule below collapses durations, but a collapsed animation parks its element
+   on the LAST keyframe — which for the thinking dots is opacity 0.3 at 80%
+   scale, and for the shimmer is a half-drawn gradient. So the three animations
+   we actually ship are switched off by name and reset to their resting state. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -220,5 +285,24 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .animate-sheet,
+  .animate-rise {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .dot {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  .skeleton {
+    animation: none !important;
+    background-image: none !important;
   }
 }

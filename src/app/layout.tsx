@@ -1,3 +1,4 @@
+/** @jsxRuntime automatic */
 import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono, Playfair_Display } from 'next/font/google';
 import './globals.css';
@@ -13,6 +14,9 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
+  // The one literal colour in the codebase: <meta name="theme-color"> cannot
+  // take a CSS variable. This is `--background` in the dark theme, and the app
+  // is dark-only today. Keep the two in step by hand.
   themeColor: '#000000',
   width: 'device-width',
   initialScale: 1,
