@@ -1,16 +1,20 @@
 /**
  * The database handle for a request.
  *
- * Routes call `getMoneyDb()`. Nothing binds a driver yet — see `postgres.ts` —
- * so this throws a named INTERNAL error rather than pretending. That is
- * deliberate: a route that silently no-ops on a money path is far worse than a
- * route that 500s with "no database adapter configured".
+ * Routes call `getMoneyDb()`. If nothing has been bound this throws a named
+ * INTERNAL error rather than pretending — deliberately: a route that silently
+ * no-ops on a money path is far worse than one that 500s with "no database
+ * adapter configured".
  *
- * Wiring, once F4/F5 land and a driver exists in `package.json`:
+ * The binding now exists. `bootstrap.ts` calls:
  *
  * ```ts
- * setMoneyDb(createPostgresMoneyDb(myServiceRoleConnection));
+ * setMoneyDb(createPostgresMoneyDb(createSqlConnection()));
  * ```
+ *
+ * Call `ensureMoneyDb()` from `./bootstrap` at the top of a money route. It is
+ * idempotent, and it is a no-op when `DATABASE_URL` is unset so that a build
+ * without one still succeeds.
  *
  * ADR-0010: that connection uses the SERVICE-ROLE key and is only ever
  * constructed in `src/server/**`. It must never be imported by a client

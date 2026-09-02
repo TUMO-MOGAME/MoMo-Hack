@@ -60,3 +60,9 @@ yarn-error.log*
 # src/assets/images/ is committed. Regenerate with:
 #   node scripts/optimise-images.mjs
 /assets-src/
+
+# Reference documents (hackathon briefs, judging criteria, MTN API PDFs).
+# Kept locally, never committed: this repository is PUBLIC (ADR-0005) and these
+# are not ours to redistribute. Facts we need from them go into momoAPIs.md or
+# docs/, cited, in our own words.
+*.pdf

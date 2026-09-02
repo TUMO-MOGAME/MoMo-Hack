@@ -219,15 +219,16 @@ Rationale and alternatives: `docs/01-ARCHITECTURE.md` and `docs/adr/`.
 
 | # | Question | Blocks | Owner | Needed by |
 |---|---|---|---|---|
-| Q1 | **Confirmed hackathon submission deadline and portal?** | Freeze date, and the whole cut list | Tumo | **overdue — asked twice** |
+| ~~Q1~~ | ~~Confirmed hackathon submission deadline and portal?~~ | — | — | Dropped 2026-09-02. No longer tracked. |
 | ~~Q2~~ | ~~GitHub repo URL~~ | — | — | ✅ `TUMO-MOGAME/MoMo-Hack` |
 | ~~Q3~~ | ~~Public repo acceptable?~~ | — | — | ✅ decided, ADR-0005 |
 | Q4 | Any hackathon-mandated stack, region or template? | Scope | Tumo | Day 4 |
 | Q5 | Team name / entry registration required first? | Submission | Tumo | Day 5 |
-| Q6 | Supabase region — **measured as `eu-west-2` (London), not an African region.** Keep it or recreate? | Phase 3 integration tests | Tumo | **now — it is free to change today and expensive later** |
+| ~~Q6~~ | ~~Supabase region~~ | — | — | Decided 2026-09-02: **keep `eu-west-2` (London)**. See below. |
 
-**Q1 is the one that matters.** Every date in §7 and §10 assumes 28 Sep. If the real deadline is
-earlier, the cut list in `docs/05` §7 starts applying immediately rather than as a contingency.
+**Q1 is dropped.** The dates in §7 and §10 still assume 28 Sep and remain the working plan; they
+are simply no longer treated as a hard external constraint. The cut list in `docs/05` §7 stays
+available if the schedule tightens.
 
 **Q6 now has a measurement, and a deadline of its own.** The first Supabase project resolves to
 AWS `eu-west-2`, London — established by matching the database host's IPv6 address against
@@ -241,7 +242,12 @@ Amazon's published `ip-ranges.json`, not by reading the dashboard. Two consequen
   minutes. Once migrations, storage objects and demo data exist it costs a rebuild, and the free
   tier allows exactly two projects — so a throwaway attempt burns the staging slot.
 
-Decide before F5 applies the first migration.
+**Decided 2026-09-02: keep `eu-west-2`.** Tumo's call, taken before the first migration ran,
+which is the right moment for it. The consequence to carry forward is that POPIA s72 compliance
+now rests on an *argument* — the UK's adequacy under UK GDPR — rather than on the data never
+leaving the country. That belongs in the submission's privacy note and in `docs/14` §7, stated
+plainly rather than left for a judge to notice. Not revisited: once migrations, storage objects
+and demo data exist, moving costs a rebuild, and the free tier allows exactly two projects.
 
 ---
 

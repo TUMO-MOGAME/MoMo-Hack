@@ -60,15 +60,42 @@ an `esbuild` block is silently ignored under Vite 8). Two lessons worth keeping:
 
 ### The next three actions
 
-1. **Require the new checks on `main`.** The ruleset has **no required status checks**, so the
-   gate exists but nothing stops a merge past a red one. This is a five-minute settings change
-   and it is what makes everything above load-bearing.
-2. **Supabase — apply the migrations (F5).** The project is live and verified, but the two
-   migrations have never touched a real database, so the money engine still runs on the in-memory
-   adapter and there are still no integration or RLS tests. Settle Q6 (region) first: the project
-   is in `eu-west-2`, London, and it is free to recreate today and expensive later.
-3. **Wire the walking skeleton**: a real `requesttopay` from a deployed function writing
-   balanced ledger rows. Every piece now exists; nothing has been joined end to end.
+1. **`DATABASE_URL` — the one credential in the way.** Everything for F5 is built and green:
+   the migration runner, the `pg` binding, the bootstrap that finally calls `setMoneyDb`, and
+   35 integration and RLS tests. They **skip, announcing themselves**, until a connection string
+   exists. Supabase → Project Settings → Database → Connection string → **Session pooler** URI.
+   One line in `.env.local`, then `npm run db:migrate` and `npm run test:int`.
+2. **Vercel (F7).** Needed twice over: the walking skeleton's definition is *"a real
+   `requesttopay` from a **deployed** function"*, and the Telegram bot cannot work at all without
+   a public HTTPS URL — Telegram will not deliver to localhost. F9's secrets also need to reach
+   GitHub Secrets and Vercel, where nothing has been set yet.
+3. **Telegram handler (M5a).** `/api/telegram/webhook` does not exist. See the note below.
+
+### Why the Telegram bot does not reply
+
+Diagnosed 2026-09-02 against the live bot. **The bot is fine; nothing is listening.** Three
+separate things are missing, and all three are needed:
+
+| | State |
+|---|---|
+| Bot itself | ✅ `@momokasi_demo_bot` live, `getMe` 200 |
+| **Webhook URL** | ❌ **none set.** Telegram has **1 update queued** — that is the message that was sent. |
+| **Handler route** | ❌ `/api/telegram/webhook` **does not exist.** M5a is not built; the only routes are `health`, `cron/reconcile` and `momo/callback`. |
+| **Public HTTPS URL** | ❌ Telegram will not deliver to `localhost`. Needs F7 (Vercel). |
+
+So a sent message is being queued by Telegram with nowhere to go. Nothing is broken — this part
+of the product has not been written yet. It is Phase 4, and it is gated on F7.
+
+One thing to change while it is queued: `/setprivacy` → **Disable** in @BotFather. Split-a-bill
+needs to see who replied in a group, and the bot currently cannot read group messages.
+
+### Decisions taken 2026-09-02
+
+- **Q6 — Supabase region: keep `eu-west-2` (London).** Decided by Tumo. POPIA s72 is satisfied
+  by the UK's adequacy under UK GDPR; the cost is that it is an argument we have to make rather
+  than one we do not. Not revisited — recreating the project after migrations land is expensive
+  and the free tier allows exactly two.
+- **Q1 — submission deadline: dropped.** No longer tracked as a blocker.
 
 ---
 
@@ -149,7 +176,7 @@ Test column: `none` / `unit` / `+prop` (property-based) / `+int` (integration in
 | F3c | Frozen contracts: `money`, `split`, `errors`, `artifacts/types` | `[x]` | **manual** | +prop | — | Split verified exact across 200,000 amounts. Needs the real fast-check suite (M1d). |
 | F3d | Starter chat + artifact UI (mock agent) | `[x]` | manual | +e2e | — | 7 artifact renderers, chip + panel + bottom sheet, zero keys needed |
 | F4 | Supabase staging + prod projects | `[~]` | none | +int | — | **Project 1 of 2 live and verified** — URL, anon and service_role all resolve to ref `edtduvwbejdfahkmfort`, service_role authenticates 200. **Region is `eu-west-2` (London)**, measured from the DB host's IPv6 against AWS's published ranges — not an African region. See Q6. |
-| F5 | Migration pipeline (local, CI, deploy) | `[ ]` | none | +int | — | Two migrations exist and have never been applied to a real database. **And nothing in `src/` calls `setMoneyDb`** — the Postgres adapter is written and tested but never bound, so the app has no code path to Supabase whatever the env holds. `/api/health` reports `database: unconfigured` for that reason, not a missing key. This is the walking skeleton, exactly. |
+| F5 | Migration pipeline (local, CI, deploy) | `[~]` | unit | +int | #17 | **Pipeline built, not yet run against a database.** `npm run db:migrate` applies `supabase/migrations/*.sql` in order, once, and **refuses to continue if an applied file's checksum changed** (CLAUDE.md #4). `pg` is bound via `connection.ts`, and `bootstrap.ts` finally calls `setMoneyDb` — the link that did not exist. Blocked only on `DATABASE_URL`. |
 | F6 | CI quality gate workflow | `[x]` | **verified** | n/a | #13, #14 | Lockfile · Typecheck · Lint · Format · Tests · Build · Money guards, each a separate named job. Guards tested against synthetic violations to prove they fire. |
 | F7 | Vercel project + preview deploys | `[ ]` | none | +e2e | — | |
 | F8 | GitHub Actions scheduler + keep-alive | `[ ]` | none | +int | — | ADR-0006 |
@@ -236,7 +263,7 @@ is the honest one, and it is why the percentage in §Progress counts both ways.
 | ID | Item | State | Tests | Required tests | PR | Notes |
 |---|---|---|---|---|---|---|
 | Q1 | Property-test suite for money invariants | `[ ]` | — | — | — | `docs/04` §3 |
-| Q2 | RLS policy test suite | `[ ]` | — | — | — | One test per policy |
+| Q2 | RLS policy test suite | `[~]` | written, not yet run | — | #17 | 6 RLS tests written, using `set local role` + `request.jwt.claims` — the only way to test a policy, since the connection we hold is the owner and bypasses RLS entirely. Covers: ledger tables unreachable by `anon` **and** `authenticated`, no client INSERT, split rules publicly readable on purpose, a user sees only their own transactions, and a user **cannot mark their own transaction SUCCESSFUL** — the most valuable forgery in the system. |
 | Q3 | MoMo contract tests (2xx/4xx/5xx/timeout) | `[ ]` | — | — | — | |
 | Q4 | E2E critical path (Playwright) | `[ ]` | — | — | — | |
 | Q5 | Load test: 500 concurrent fares | `[ ]` | — | — | — | k6, asserts balance |
@@ -277,6 +304,9 @@ Format: one line per merged workstream, with the evidence.
 | 2026-09-02 | Prettier + reformat (#14) | **verified** | 41 code files reformatted. 315 tests, typecheck, lint and build all still clean afterwards. Markdown deliberately excluded — see `.prettierignore`. |
 | 2026-09-02 | App runs on the merged tree | manual | `next dev` on the fully merged tree: `/` and `/chat` both **200**, `/api/health` `ok:true`. `database: unconfigured` is correct and expected — nothing binds the adapter yet (F5). |
 | 2026-09-02 | Landing page photography (#15) | manual + build | Five WebP, **52MB of source JPEGs → 908KB**. Verified against the production build: `/` 200, all five `alt` texts present, `next/image` srcset emitting 8 widths, optimised variant serves 200, `aspect-ratio:4/5` generated. Originals moved to a gitignored `assets-src/` and regenerable with `npm run images`. |
+| 2026-09-02 | Required status checks on `main` | **verified** | 8 checks now required — Lockfile, Typecheck, Lint, Format, Tests, Build, Money guards, A8 — with **`strict` on**, so a branch must be up to date with `main` before it merges. Read back from the API, not assumed. That last setting is what would have caught the #10 + #11 interaction *before* the merge instead of after. |
+| 2026-09-02 | Telegram bot | **integration** | Re-checked live. Bot healthy; **no webhook set and 1 update queued**; `/api/telegram/webhook` does not exist (M5a). A sent message has nowhere to go. Not a fault — unbuilt, and gated on F7. |
+| 2026-09-02 | DB wiring (#17) | unit + skip-verified | `pg` bound, bootstrap calls `setMoneyDb`, migration runner with checksum enforcement. **35 integration + RLS tests written**; they skip cleanly and visibly without `DATABASE_URL` (315 passed, 29 skipped). Typecheck, lint, format and build all green. |
 
 ---
 
@@ -291,7 +321,7 @@ Nothing yet. Anything merged at a lower test level than
 | `src/domain/money.ts` | typecheck only | unit tests for `parseMinor` / `formatZAR` edge cases | Day 5 | as above |
 | ~~Artifact renderers~~ | — | ~~fixture unit tests~~ | **PAID** | 90 tests in PR #11. axe sweep still owed. |
 | Money engine (PR #10) | unit/property/contract | **integration against real Postgres** | Day 9 | Supabase does not exist yet — runs on the in-memory adapter |
-| RLS policies | none | **one allow + one deny test per policy** | Day 9 | Same — needs a real database |
+| RLS policies | none | ~~write the tests~~ **run them** | Day 9 | Written in #17 (6 tests). They skip until `DATABASE_URL` exists — a skip that announces itself, never a fake pass. |
 | Context sidebar | unit | drawer focus trap verified at 320px | Day 5 | Agent stopped mid-verification |
 | `src/lib/agent/mock.ts` | manual | becomes the UI test fixture source | Day 18 | Replaced by the real agent route (S7a) |
 
