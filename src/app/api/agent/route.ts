@@ -59,7 +59,48 @@ function readHistory(value: unknown): AgentMessage[] {
     }));
 }
 
+/**
+ * Is this request from one of our own pages? (A5-03)
+ *
+ * The audit found this route answering `200` to a POST carrying
+ * `Origin: https://evil.example`. No `Access-Control-Allow-Origin` means a
+ * browser will not let that page READ the reply — so this was never data theft.
+ * It was **resource theft**: any third-party page could make its visitors'
+ * browsers spend our Gemini free-tier quota, at 20/min per IP across an
+ * unbounded number of IPs. A quota exhausted by someone else's site, on the
+ * morning of a demo, is indistinguishable from a broken product.
+ *
+ * A MISSING `Origin` is allowed. Browsers always send it on a cross-origin POST,
+ * so absence means a non-browser client — `curl`, the demo script, a health
+ * probe — which is not the attack this defends against and is a caller we
+ * actively want to keep working. This closes the browser vector, which is the
+ * only one that can be pointed at strangers en masse; the rate limiter remains
+ * the answer for a determined direct caller.
+ */
+function fromOurOwnPage(request: Request): boolean {
+  const origin = request.headers.get('origin');
+  if (!origin) return true;
+
+  let host: string;
+  try {
+    host = new URL(origin).host;
+  } catch {
+    return false;
+  }
+
+  // The request's own host covers production, the Vercel alias, every preview
+  // deployment and localhost on any port — without a list to keep in step with
+  // deployment reality, which is a list that goes stale silently.
+  if (host === new URL(request.url).host) return true;
+  return host === 'momo.tumoolo.tech' || /^localhost(:\d+)?$/.test(host);
+}
+
 export async function POST(request: Request): Promise<Response> {
+  if (!fromOurOwnPage(request)) {
+    log('warn', 'agent.origin.rejected', {});
+    return Response.json({ error: 'forbidden' }, { status: 403 });
+  }
+
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
   if (rateLimited(ip)) {
     return Response.json({ error: 'slow down' }, { status: 429 });

@@ -21,7 +21,7 @@ function Bar({ w = 'w-full', h = 'h-4' }: { w?: string; h?: string }) {
 
 function Lines({ n }: { n: number }) {
   return (
-    <div className="divide-y divide-border">
+    <div className="divide-y divide-divider">
       {Array.from({ length: n }, (_, i) => (
         <div key={i} className="flex items-center justify-between gap-4 py-3">
           <div className="min-w-0 flex-1 space-y-2">

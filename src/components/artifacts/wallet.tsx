@@ -71,7 +71,7 @@ export function Wallet({ a }: { a: WalletArtifact }) {
       ) : null}
 
       {rest.length > 0 ? (
-        <div className="divide-y divide-border">
+        <div className="divide-y divide-divider">
           {rest.map((b) => (
             <Row key={b.label}>
               <Label sub={b.note}>{b.label}</Label>

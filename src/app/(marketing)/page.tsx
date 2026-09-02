@@ -221,7 +221,7 @@ function Section({
     <section
       id={id}
       aria-labelledby={`${id}-h`}
-      className="border-t border-border px-5 py-14 sm:px-8"
+      className="border-t border-divider px-5 py-14 sm:px-8"
     >
       <div className="mx-auto max-w-4xl">
         <p className="text-xs uppercase tracking-widest text-muted-foreground">{kicker}</p>
@@ -241,7 +241,7 @@ export default function LandingPage() {
         Skip to the content
       </a>
 
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4 sm:px-8">
+      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-divider px-5 py-4 sm:px-8">
         <span className="font-display text-2xl text-brand">MoMo Kasi</span>
         <Link
           href="/chat"
@@ -331,7 +331,7 @@ export default function LandingPage() {
         </section>
 
         {/* the habit loop, in three frames */}
-        <section aria-labelledby="loop-h" className="border-t border-border px-5 py-14 sm:px-8">
+        <section aria-labelledby="loop-h" className="border-t border-divider px-5 py-14 sm:px-8">
           <div className="mx-auto max-w-4xl">
             <p className="text-xs uppercase tracking-widest text-muted-foreground">The loop</p>
             <h2 id="loop-h" className="mt-2 font-display text-3xl leading-tight text-foreground">
@@ -391,7 +391,7 @@ export default function LandingPage() {
         </Section>
 
         {/* the quote */}
-        <section aria-label="What MTN said" className="border-t border-border px-5 py-14 sm:px-8">
+        <section aria-label="What MTN said" className="border-t border-divider px-5 py-14 sm:px-8">
           <figure className="mx-auto max-w-4xl">
             <blockquote className="border-l-2 border-brand pl-5 font-display text-2xl leading-snug text-foreground sm:text-3xl">
               “We started by giving customers access to financial services. Now we want to move from
@@ -477,7 +477,7 @@ export default function LandingPage() {
         {/* close */}
         <section
           aria-labelledby="close-h"
-          className="relative isolate overflow-hidden border-t border-border"
+          className="relative isolate overflow-hidden border-t border-divider"
         >
           <Image
             src={identityBeadwork}
@@ -519,7 +519,7 @@ export default function LandingPage() {
         is a badge you cannot miss, and the trademark line is one sentence. What
         was lost is the wall, not the honesty.
       */}
-      <footer className="border-t border-border">
+      <footer className="border-t border-divider">
         {/* A single gold thread, the brand colour used once, to close the page. */}
         <div
           aria-hidden="true"
@@ -562,7 +562,7 @@ export default function LandingPage() {
             is the reason the app can move money at all, and Tumo Olo is the
             answer to "who do we talk to".
           */}
-          <div className="mt-12 grid gap-8 border-t border-border pt-8 sm:grid-cols-2 sm:items-start">
+          <div className="mt-12 grid gap-8 border-t border-divider pt-8 sm:grid-cols-2 sm:items-start">
             <div className="flex items-center gap-3.5">
               <MomoMark size={44} />
               <div>
@@ -595,7 +595,7 @@ export default function LandingPage() {
             the trademark sentence has no break opportunity short enough to save
             it — so the small print is two blocks that cannot fight each other.
           */}
-          <div className="mt-10 flex flex-col gap-4 border-t border-border pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-10 flex flex-col gap-4 border-t border-divider pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
             {/*
               Kept, and made louder rather than quieter. We are showing MTN's
               mark on a page that says "tap to pay your fare"; without this the

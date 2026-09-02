@@ -2,7 +2,31 @@
 
 **Project:** MoMo Kasi · **Phase:** 3 — Money engine · **Date:** 2026-09-02
 **Commit:** `162faed` · **Audit source:** tumoOLO_Audits @ `main` (no pinned sha)
-**Result:** 0 Critical · 3 High · 2 Medium · 2 Low · 0 waived · 4 not measured
+**Result:** 0 Critical · 2 High · 2 Medium · 3 Low · 0 waived · 4 not measured
+
+> ### ⚠️ Corrected 2026-09-02, after publication — A3-03 was withdrawn
+>
+> **This report originally filed a third High: the focus ring at 2.98:1 on cards. That number was
+> wrong, and the error was mine, not the codebase's.**
+>
+> `scripts/contrast.mjs` composited every alpha token over `--background` *once*, then compared
+> that single result against each surface. So the "ring on card" row asked what the contrast is
+> between *a ring painted on the page ground* and *a card* — two things that are never adjacent.
+> An alpha colour has no value until you say what is behind it.
+>
+> Composited correctly — over the card, because that is what a ring drawn on a card sits on —
+> the ring is **3.03:1 on cards and 3.01:1 on the background. It passes.** It is restated below
+> as **A3-08 (Low)**, because passing by 0.01 is not a margin worth relying on.
+>
+> **A3-01 is unaffected and if anything slightly worse than first reported** — the correct
+> compositing gives `--input` **1.40:1** on cards and **1.39:1** on the background, `--border`
+> **1.28:1** and **1.27:1**. Those were already computed the right way.
+>
+> The script now takes the surface as a parameter and uses it for both the composite and the
+> comparison, so the malformed question cannot be asked again;
+> `tests/unit/design/contrast.test.ts` pins known-answer pairs. This is the second false finding
+> this session produced by a hand-written checker reading tokens (see A2-01), and the same
+> conclusion follows: **generate, do not re-implement.**
 
 **Scope:** `/`, `/chat`, `/ledger` as rendered in production; `src/components/**`;
 `src/app/globals.css`. Graded against the overlay's user — **320px low-end Android, cracked screen,
@@ -14,7 +38,7 @@ direct Highveld sunlight, one hand, often a second or third language.**
 ## 1. Executive summary
 
 **The deliberate accessibility work here is real and unusually thoughtful, and it is undercut by
-three specific measured failures.** The design decisions that are hardest to get right have been got
+two specific measured failures.** The design decisions that are hardest to get right have been got
 right: money is announced in words rather than digits ("twelve rand fifty", not "R one two five
 zero"), the confirmation card stacks Confirm and Cancel vertically with Cancel *lowest* because
 that is where a thumb lands first, `prefers-reduced-motion` genuinely suppresses the animations
@@ -27,12 +51,15 @@ tokens, and the **worst is 7.26:1** against a 4.5:1 requirement. In direct sunli
 the difference between reading your balance and not, and the overlay is right to weight it heavily.
 The team has earned that.
 
-**But non-text contrast fails, and it fails on the two elements that matter most.** The border token
-is white at 12% opacity, which composites to **1.27:1** against the black ground where SC 1.4.11
-requires 3:1 — and that token draws the message input's boundary (`--input`, 15%, **1.39:1**). On a
-cracked screen in sunlight the text field a user must find to type into is, by measurement,
-effectively not there. The focus ring is 3px and well-considered, and at 35% white it lands at
-**3.01:1** on the page background — passing by 0.01 — and **2.98:1** on cards, where it fails.
+**But non-text contrast fails on the element the user must find first.** The border token is white
+at 12% opacity, which composites to **1.27:1** against the black ground where SC 1.4.11 requires
+3:1 — and the same family of token draws the message input's boundary (`--input`, 15%, **1.39:1**
+on the ground, **1.40:1** on a card). On a cracked screen in sunlight the text field a user must
+locate in order to say anything at all has, by measurement, no perceivable edge.
+
+The focus ring, by contrast, is fine: 3px, 2px offset, and **3.01:1 / 3.03:1** — it passes, though
+with essentially no headroom (A3-08). An earlier draft of this report said it failed at 2.98:1;
+that was a compositing error in my own measurement script and is corrected at the top.
 
 Separately, **`/chat` renders no headings at all** — zero `h1`–`h6` in the production HTML. The
 wordmark is a `<span>` inside a link. A screen-reader user landing on the primary surface of this
@@ -46,8 +73,8 @@ together they would move this from "thoughtfully designed" to "actually accessib
 1. **Input and border contrast at 1.27–1.39:1 (A3-01, High).** The overlay says treat unreadability
    as High, and this is the control the user must find first.
 2. **`/chat` has no heading structure (A3-02, High).** Zero headings on the main surface.
-3. **Focus ring fails 3:1 on card surfaces (A3-03, High).** 2.98:1 — and the ring is the whole
-   keyboard story.
+3. ~~**Focus ring fails 3:1 on card surfaces (A3-03, High).**~~ **Withdrawn — see the correction
+   above.** The ring passes at 3.01/3.03:1. Restated as A3-08 (Low): it passes with no margin.
 4. **axe has never been run (Q7).** Programmatic checks are a *floor*, and this floor is unmeasured.
 5. **No real keyboard journey or AT testing** — no Playwright, no screen reader. See *Not measured*.
 
@@ -59,7 +86,8 @@ together they would move this from "thoughtfully designed" to "actually accessib
 |---|---|---|---|---|---|
 | A3-01 | **High** | `src/app/globals.css` dark block — `--border: oklch(1 0 0 / 12%)`, `--input: oklch(1 0 0 / 15%)` | **Measured non-text contrast: border 1.27:1, input 1.39:1** against the black ground. SC 1.4.11 requires **3:1** for the boundary of any control a user must perceive. Computed by OKLCH→sRGB conversion with alpha compositing over `--background` | The message composer's border is `border-input`. On the overlay's target device — cracked screen, direct sunlight — the field the user must locate to say anything at all has no perceivable edge. The same token draws every card outline and every secondary button | Raise `--input` to roughly 38–40% white (≈3:1) and `--border` to about 30% for interactive boundaries. If the soft look is wanted for *decorative* dividers, split the role: a low-contrast `--divider` for non-informational rules, and a compliant `--border` for anything bounding a control |
 | A3-02 | **High** | `src/app/(app)/chat/page.tsx:182-200` | **`/chat` renders no headings.** Verified against production HTML: `curl … /chat \| grep -oE "<h[1-6]"` returns nothing. `/` returns 21 headings, `/ledger` returns 4 | WCAG 2.4.6 and 1.3.1. Heading navigation is the primary way a screen-reader user orients on a page, and this is the product's main surface. The wordmark is a `<span>` inside a `<Link>`, so there is not even an implicit title | Make the wordmark an `<h1>` (it can still be a link), or add a visually-hidden `<h1>Chat with MoMo Kasi</h1>`. The `<section aria-label="Conversation">` and `<main aria-label="Messages">` landmarks are already correct and should stay |
-| A3-03 | **High** | `src/app/globals.css:186` — `--ring: oklch(1 0 0 / 35%)` | **Focus ring measured 3.01:1 on `--background` and 2.98:1 on `--card`.** Passes on the page ground by 0.01; fails on every card, panel and sheet | SC 1.4.11 and 2.4.11. `globals.css` correctly puts a 3px offset ring on every interactive element — the geometry is right and the colour is one step too dim. A focus indicator that fails on the surfaces where forms and buttons actually sit is the keyboard user's whole experience | Raise `--ring` to about 50% white. That gives roughly 4.2:1 on cards with headroom, and the ring is transient so the visual cost is small. This is a one-value change |
+| ~~A3-03~~ | ~~High~~ **WITHDRAWN** | `src/app/globals.css:186` — `--ring` | ~~Focus ring fails at 2.98:1 on cards.~~ **The measurement was wrong** — see the correction at the top. Composited over the surface it is actually painted on, the ring is **3.01:1 on background and 3.03:1 on cards, and passes.** Restated as A3-08 | — | None required. The remaining observation is A3-08 |
+| A3-08 | Low | `src/app/globals.css:186` — `--ring: oklch(1 0 0 / 35%)` | The focus ring **passes SC 1.4.11 by 0.01–0.03** (3.01:1 and 3.03:1 against a 3:1 requirement) | Compliant, with no margin at all. Any future darkening of `--card`, or any surface introduced between the ring and the ground, drops it below without anyone noticing. The 3px geometry and 2px offset are already well judged; only the headroom is thin | Optional. Raising `--ring` to 45% gives ~4.4:1 and costs nothing visually, since the ring is transient. Worth doing next time the palette is touched rather than as urgent work |
 | A3-04 | Medium | No axe run anywhere; no `axe-core`, `jest-axe` or Playwright in `package.json` | Q7 is owed and has never run. `tests/unit/components/accessibility.test.ts` asserts specific design claims well, but it is not a programmatic sweep | Automated checks catch perhaps a third of WCAG issues — but they catch that third reliably and cheaply, and this project has never seen the list. It is also the cheapest design credibility available before a judged demo | `axe-core` against the rendered markup the existing component tests already produce (`renderToStaticMarkup`), so no browser and no Playwright dependency is needed |
 | A3-05 | Medium | `src/app/(app)/chat/page.tsx:196` | The message log is `role="log"` with `aria-live="polite"` on the scroll container, and the thinking indicator is a second `aria-live` region nested inside it | Nested live regions can double-announce, and a `role="log"` that also contains a status region may re-read prior messages on some AT. Not verified with a real screen reader — see *Not measured* | Move the thinking indicator's `role="status"` out of the log container, or drop `aria-live` from the log and let the status region alone announce |
 | A3-06 | Low | `src/app/(app)/chat/page.tsx` mic button | Voice is unbuilt, and the control is honest about it — `aria-label="Voice input is not available yet — use the message box"`, and it focuses the composer | Correct per the overlay ("voice is never the only route to anything"). Reported only to note that a control whose sole action is *"focus that other control"* is arguably better as no control at all until S8c — a screen-reader user tabs onto a button that does nothing they wanted | Either keep as-is with the honest label (defensible) or hide it until voice lands |
@@ -87,7 +115,7 @@ None.
 ## 5. Remediation roadmap
 
 **Quick wins (< 1 day) — all three Highs are in this bucket**
-- A3-03: raise `--ring` to ~50%. One line.
+- ~~A3-03~~ withdrawn — the ring passes. A3-08 (raise `--ring` to 45% for headroom) is optional.
 - A3-01: raise `--input` and split `--border`. Two lines plus a decision about dividers.
 - A3-02: one `<h1>` on `/chat`.
 

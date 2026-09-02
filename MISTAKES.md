@@ -285,6 +285,79 @@ disabling the `unbuilt` route fails 9 tests by name.
 
 ---
 
+## M11 · A checker I wrote produced two false findings, and both were believed
+
+**What happened.** Auditing Phase 3, I wrote two throwaway scripts to read the design tokens. Both
+were confidently, specifically wrong.
+
+The first compared `src/design/tokens.ts` to `src/app/globals.css` and reported **all 30 dark
+colour roles had drifted**. It had matched the *light* scale out of the TypeScript file against the
+`.dark` block of the CSS. Re-extracting by line range gave **zero** drift.
+
+The second computed WCAG contrast and reported the focus ring failing at **2.98:1** on cards. It
+composited every alpha token over `--background` *once*, then compared that single result against
+each surface — so "ring on card" asked what the contrast is between a ring painted on the page
+ground and a card, two things that are never adjacent. Composited correctly it is **3.03:1** and it
+passes. **That one reached a published audit report as a High finding before I caught it.**
+
+Then, having fixed the second script, I raised `--input` from 15% to 40% — and the script went on
+reporting 1.39:1, because it kept its own hardcoded copy of the token values with a comment asking
+the next person to keep them in step. **It drifted within the hour**, from the same session that
+had just filed drift as a High finding.
+
+**Why.** All three are one cause. **A tool that reads a source of truth was allowed to keep its own
+idea of what that source says.** Two copies of a value, or two ways to parse one, and nothing
+compares them. The output looks authoritative precisely because it is numeric — nobody eyeballs a
+contrast ratio to sanity-check it, which is the entire reason the tool exists.
+
+The compounding factor: an audit's output is *acted on*. A false High sends someone to change a
+token that was correct. `MISTAKES.md` M1 already says this about a merge guard — **a guard that
+misdiagnoses is worse than no guard, because it is obeyed** — and I did not carry the lesson across
+from guards to measurements.
+
+**The rule.** **A tool that measures the codebase derives its inputs; it never restates them.**
+Parse the real file or import the real module — no second copy, no "keep these in step" comment,
+because that comment is a wish. And **the measuring tool gets its own test**, with known-answer
+cases, before any number it produces is written into a document. If a checker cannot be tested,
+its output is an opinion.
+
+**The guard.** `scripts/contrast.mjs` now parses `src/app/globals.css` and throws by name if a
+token it needs is missing, rather than carrying values. `tests/unit/design/contrast.test.ts` pins
+known answers — white on black is exactly 21:1; a white overlay on the *lighter* of two surfaces
+must yield the *higher* ratio, which is the ordering the compositing bug inverted; and the parse is
+asserted to have actually found tokens, because a parser that silently returns nothing is the
+failure mode that matters. Runs in the `Tests` CI job.
+
+---
+
+## M12 · `\btransaction\b` cannot match "transactions"
+
+**What happened.** *"Show me my transactions"* — the most natural phrasing of the most common
+question this product answers — routed to no tool at all and got a generic fallback, while a
+working `read_transactions` sat unused. In the same file, `save (?:me |up )?r?\d` never matched
+"save R200", because after `\d` consumed the `2` the trailing `\b` had to fall between `2` and `0`.
+
+**Why.** A word boundary after a singular noun is a **plural-shaped hole**. `\btransaction\b`
+requires a non-word character after "transaction", and the `s` is a word character, so the plural
+can never match. The same applies to any pattern whose alternative is a prefix of what users
+actually type — `\d` inside a longer number, `balance` inside "balances", `payment` inside
+"payments".
+
+These regexes had been read, reviewed and shipped. They *look* right, and they are wrong only for
+inputs nobody typed while testing — which on an intent router means the phrasings real users
+prefer.
+
+**The rule.** **Route tests assert on real phrasings, not on the pattern.** Every intent gets the
+plural, the contraction and the lazy lowercase form a person actually types. Reading a regex is not
+testing it; the bug is invisible at exactly the level of detail a reviewer operates at.
+
+**The guard.** `tests/unit/agent/refusal.test.ts` pins six phrasings to their expected tool —
+including "show me my transactions", "my transactions" and "check my balances" — and the refusal
+suite covers nine payment phrasings with the typos and missing punctuation of the real transcript
+that produced M10. Both were proved to fire before being trusted.
+
+---
+
 ## What has gone right, and why
 
 Worth recording, because these are the patterns to keep:

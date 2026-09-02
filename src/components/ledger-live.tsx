@@ -139,7 +139,7 @@ function Journal({ postings }: { postings: readonly LedgerPosting[] }) {
   const total = postings.reduce((t, p) => t + BigInt(p.amountMinor), 0n);
   return (
     <div>
-      <div className="divide-y divide-border">
+      <div className="divide-y divide-divider">
         {postings.map((p) => {
           const amount = BigInt(p.amountMinor);
           const debit = amount > 0n;
@@ -161,7 +161,7 @@ function Journal({ postings }: { postings: readonly LedgerPosting[] }) {
           );
         })}
       </div>
-      <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-border pt-3">
+      <div className="mt-3 flex items-baseline justify-between gap-4 border-t border-divider pt-3">
         <span className="text-sm font-medium">Sum</span>
         <span className={`tabular text-base ${total === 0n ? 'text-success' : 'text-destructive'}`}>
           {formatZAR(total as Minor)}

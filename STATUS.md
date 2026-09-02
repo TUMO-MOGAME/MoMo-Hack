@@ -6,7 +6,7 @@ Every PR must update it. If you are a fresh session, read this before touching a
 - **⏰ PRESENTATION: Thu 3 Sep 2026, 09:30.** Everything below is now read against that, not
   against the 27 Sep code freeze. See **§Tomorrow 09:30** for what is in and what is cut.
 - **Last updated:** 2026-09-02 (session 5 — the agent claimed a payment it had not made
-  (`MISTAKES.md` M10, fixed in #35), and **Phase 3's six audits ran**: 0 Critical, 13 High)
+  (`MISTAKES.md` M10, fixed in #35), and **Phase 3's six audits ran** — 12 Highs opened, 9 fixed the same day)
 - **Phase:** Phase 3 — money engine. **Exit criterion met**; its six audits are still owed.
 - **Local path:** `C:\MoMo-Hack`
 - **Repo:** <https://github.com/TUMO-MOGAME/MoMo-Hack> — **public**, `main` **protected**, and as of
@@ -30,9 +30,9 @@ Every PR must update it. If you are a fresh session, read this before touching a
 | | |
 |---|---|
 | **Current phase** | Phase 3 — Money engine |
-| **Phase state** | **Phase 0 closed.** Phase 3 exit criterion met and **all six audits now run** — the phase stays open because the gate says so. |
+| **Phase state** | **Phase 0 closed.** Phase 3 exit criterion met, **all six audits run, and 9 of their 12 Highs already fixed.** The phase stays open because the gate says so. |
 | **Audits owed at close** | Phase 3: A1 A2 A3 A4 A5 A6 — **all six run 2026-09-02**, results in `docs/audits/results/`. A8 passes, 0 vulnerabilities. |
-| **Blocking findings** | **13 High, 0 Critical.** `npm run audit:gate` → *"Gate shut"*. Nineteen of the 22 High/Medium items are perimeter work — headers, auth, loading states, metadata. **Every money-integrity check passed.** |
+| **Blocking findings** | **3 High, 0 Critical.** Twelve Highs were opened by the audits; **nine are fixed and verified on the wire**. The three left share one root cause each: no auth (A5-04, A1-01) and no token-generation gate (A2-01). `audit:gate` still shut. **Every money-integrity check passed.** |
 | **Next milestone** | **PRESENTATION Thu 3 Sep 09:30** — hours away, not days |
 | **Days to code freeze** | 25 (27 Sep 2026) |
 | **Open PRs** | none. #10, #11, #13-#21, #23-#25, #35 merged. |
@@ -138,7 +138,7 @@ the message log's own `scrollTop` is set — which cannot touch an ancestor — 
 ### Phase 3's six audits ran, and they agree with each other about where the risk is
 
 **A1 A2 A3 A4 A5 A6, all six, results in [`docs/audits/results/`](docs/audits/results/).** A8
-passes with 0 vulnerabilities. **0 Critical · 13 High · 19 Medium · 15 Low.**
+passes with 0 vulnerabilities. **0 Critical · 12 High · 19 Medium · 16 Low** — one High (A3-03) was withdrawn after publication as a measurement error of mine, see below.
 
 The gate is **shut** — `npm run audit:gate` names all thirteen — so Phase 3 stays open. That is the
 system working as designed, not a setback: an audit suite that never blocks anything is decoration.
@@ -164,7 +164,20 @@ converged on the same split:
 | **A3-01 / A3-03** — measured contrast failures | Computed from the OKLCH tokens, not eyeballed. Text contrast is *excellent* (worst pairing 7.26:1 against a 4.5 requirement). But `--input` composites to **1.39:1** and `--border` to **1.27:1** against a 3:1 requirement, and the focus ring lands at **2.98:1** on cards. On a cracked screen in Highveld sun the composer has no visible edge |
 | **A2-01** — the token gate does not exist | `tokens.ts` instructs the reader to regenerate CSS with `npm run tokens`. **There is no such script.** `globals.css` is a second hand-maintained copy. Verified 60/60 roles agree *today*; nothing keeps them agreeing |
 
-**A correction worth keeping, because it nearly became a headline.** My first token-drift script
+**A finding was withdrawn after publication, and the withdrawal is the more useful record.**
+A3-03 said the focus ring failed at 2.98:1 on cards. **It does not — it is 3.03:1 and it passes.**
+`scripts/contrast.mjs` composited every alpha token over `--background` once and then compared that
+one result against each surface, so the "ring on card" row asked what the contrast is between a
+ring painted on the page ground and a card — two things that are never adjacent. An alpha colour
+has no value until you say what is behind it. A3-01 was unaffected: `--border` and `--input` were
+already composited correctly and did fail, at 1.27:1 and 1.39:1.
+
+The script now takes the surface as a parameter and reads its values from the stylesheet rather
+than keeping a copy, and `tests/unit/design/contrast.test.ts` pins the invariant. **A checker that
+is wrong is worse than no checker, because its output is believed and acted on** — which is
+`MISTAKES.md` M1's addendum almost word for word, about a merge guard that misdiagnosed.
+
+**And a second correction, from the same session and the same cause.** My first token-drift script
 reported **all 30 dark roles drifted** — a confident, specific, entirely false Critical. It had
 matched the *light* scale out of `tokens.ts` against the `.dark` CSS block. Re-extracting by line
 range gave zero drift. `MISTAKES.md` M5 says verify before reporting a fault; this is the second
@@ -839,7 +852,7 @@ written up. Only the audits listed are run at that phase — see `PLANNING.md` �
 | 0 | Foundation and walking skeleton | **DONE.** Skeleton closed — real requesttopay → deployed function → balanced journal, measured | 1-3 | A1 A8 ⚪ |
 | 1 | Design system and app shell | built, in PR #11 | 4-5 | A1 A2 A3 ⚪ |
 | 2 | Narrative and content surfaces | landing page built, in PR #11 | 6 | A1 A6 ⚪ |
-| 3 | Money engine | exit criterion met; **all six audits run** ✅ — 13 Highs open, so the gate holds the phase open | 7-13 | A1 A2 A3 A4 A5 A6 ✅ |
+| 3 | Money engine | exit criterion met; **all six audits run** ✅ — 9 of 12 Highs fixed same-day; the gate holds on 3 | 7-13 | A1 A2 A3 A4 A5 A6 ✅ |
 | 4 | Channels and products | not started | 14-19 | A1 A2 A3 A4 A5 A8 ⚪ |
 | 5 | Reach — offline, USSD, voice | not started | 20-23 | A1 A2 A3 A4 A7 ⚪ |
 | 6 | Hardening, demo and submission | not started | 24-28 | A1 A3 A4 A5 A6 A7 A8 S1 ⚪ |
@@ -1065,13 +1078,13 @@ finding is never re-reported as new. **An audit not written here did not happen.
 |---|---|---|---|---|---|---|---|
 | 3 | A1 Comprehensive codebase | 0 | 2 | 5 | 4 | run · [`PHASE-3-A1.md`](docs/audits/results/PHASE-3-A1.md) | 2026-09-02 |
 | 3 | A2 Design fidelity | 0 | 1 | 1 | 3 | run · [`PHASE-3-A2.md`](docs/audits/results/PHASE-3-A2.md) | 2026-09-02 |
-| 3 | A3 Accessibility | 0 | 3 | 2 | 2 | run · [`PHASE-3-A3.md`](docs/audits/results/PHASE-3-A3.md) | 2026-09-02 |
+| 3 | A3 Accessibility | 0 | 2 | 2 | 3 | run · [`PHASE-3-A3.md`](docs/audits/results/PHASE-3-A3.md) | 2026-09-02 |
 | 3 | A4 Performance & CWV | 0 | 1 | 3 | 2 | run · [`PHASE-3-A4.md`](docs/audits/results/PHASE-3-A4.md) | 2026-09-02 |
 | 3 | A5 Security | 0 | 4 | 4 | 2 | run · [`PHASE-3-A5.md`](docs/audits/results/PHASE-3-A5.md) | 2026-09-02 |
 | 3 | A6 SEO & content | 0 | 2 | 4 | 2 | run · [`PHASE-3-A6.md`](docs/audits/results/PHASE-3-A6.md) | 2026-09-02 |
 | 3 | A8 Dependency & supply chain | 0 | 0 | 0 | 0 | pass · `npm audit --audit-level=high`, 0 vulnerabilities | 2026-09-02 |
 
-**Totals: 0 Critical · 13 High · 19 Medium · 15 Low.** Nineteen of the 22 High/Medium items are
+**Totals: 0 Critical · 12 High · 19 Medium · 16 Low.** Nineteen of the 22 High/Medium items are
 in the *perimeter* — headers, auth, loading states, metadata. **Every money-integrity check
 passed**, structurally rather than by convention (A5 §3).
 
@@ -1082,25 +1095,43 @@ passed**, structurally rather than by convention (A5 §3).
 Critical and High block the phase gate. `runner/audit.mjs gate` fails while any row here is
 unresolved — where resolved means fixed, or accepted with a written reason.
 
-**13 open Highs, 0 Criticals.** `audit:gate` fails while these stand, so **Phase 3 cannot be
-declared closed** — which is the gate working, not a setback. Ordered by value-per-minute, and the
-first six are collectively about two hours.
+**12 Highs were opened by the audits. Nine are now fixed and verified against a running production
+build; three remain**, and all three are the same root cause wearing different hats.
 
 | ID | Audit | Severity | Location | Summary | Status |
 |---|---|---|---|---|---|
-| A5-02 | A5 | High | `src/server/agent/respond.ts` | The user's raw message goes to Gemini unscrubbed. POPIA s105/106 — a real MSISDN has **already** been sent (the M10 transcript). `scrub()` exists and is tested; it is simply not applied here | open |
-| A3-03 | A3 | High | `globals.css` `--ring` | Focus ring measured **2.98:1** on cards, **3.01:1** on the ground. SC 1.4.11 needs 3:1. One value | open |
-| A3-01 | A3 | High | `globals.css` `--border` / `--input` | Non-text contrast **1.27:1** and **1.39:1** against 3:1. The message composer's border is effectively invisible on the target device | open |
-| A6-02 | A6 | High | `public/`, `src/app/` | No favicon — `/favicon.ico` is **404**. Blank browser tab beside every other submission | open |
-| A6-01 | A6 | High | `src/app/layout.tsx` | No Open Graph or Twitter tags. Every shared link renders as a bare grey URL in WhatsApp, Slack and LinkedIn | open |
-| A4-01 | A4 | High | `src/app/(app)/ledger/` | No `loading.tsx` on a route with a measured **722–1432 ms** TTFB. The page looks frozen; `ChipSkeleton` already exists | open |
-| A3-02 | A3 | High | `src/app/(app)/chat/page.tsx` | `/chat` renders **zero** headings. No `h1` on the product's primary surface. Filed again as A6-05 (Medium), where it is an SEO problem — one `<h1>` closes both | open |
-| A1-02 | A1 | High | `src/app/**` | No `error.tsx` anywhere — a thrown Server Component renders Next's generic "Application error" | open |
-| A5-03 | A5 | High | `src/app/api/agent/route.ts` | Accepts cross-origin POSTs (verified: `Origin: evil.example` → 200). A third-party page can drain the Gemini quota through its visitors | open |
-| A5-01 | A5 | High | no `headers()` / `middleware` | **No security headers at all** — no CSP, `nosniff`, `Referrer-Policy` or `frame-ancestors`. The A5 overlay explicitly said to flag this if Phase 3 closed without a CSP | open |
-| A2-01 | A2 | High | `src/design/tokens.ts`, `package.json` | `tokens.ts` documents `npm run tokens` and **that script does not exist**. `globals.css` is a second hand-maintained copy. Verified 60/60 roles agree *today*; nothing keeps them agreeing | open |
-| A5-04 | A5 | High | whole app | **No authentication.** Every RLS policy across 8 tables is therefore unexercised — design, not control. M9a | open · blocked on M9a |
-| A1-01 | A1 | High | `/api/agent`, `/api/context` | Same root cause as A5-04, from the architecture side: both money-reading endpoints answer any caller and the read tools are scoped to no user | open · blocked on M9a |
+| A5-04 | A5 | High | whole app | **No authentication.** Every RLS policy across 8 tables is therefore unexercised — design, not control. M9a | **open** · blocked on M9a |
+| A1-01 | A1 | High | `/api/agent`, `/api/context` | The same gap from the architecture side: both money-reading endpoints answer any caller and the read tools are scoped to no user | **open** · blocked on M9a |
+| A2-01 | A2 | High | `src/design/tokens.ts`, `package.json` | `tokens.ts` instructs the reader to regenerate CSS with `npm run tokens` and **that script does not exist**. `globals.css` is a second hand-maintained copy. Verified 60/60 roles agree *today*; nothing keeps them agreeing | **open** · needs `scripts/tokens.mjs` + a `tokens:check` CI job |
+
+### Fixed this session, each verified on the wire rather than asserted
+
+| ID | What was wrong | What it is now |
+|---|---|---|
+| **A5-02** | The user's raw message went to Gemini unscrubbed. POPIA s105/106, and it had **already happened** — the M10 transcript carried a real SA mobile number to Google | `scrub()` applied to the message **and** the 8-turn history before the prompt is built. Verified live: *"is 0761346606 in my transactions"* reached the model as `•••• 6606` |
+| **A3-01** | `--input` **1.39:1** and `--border` **1.27:1** against SC 1.4.11's 3:1. The composer had no perceivable edge | `--input` 15%→40% (**3.66:1**), `--border` 12%→38% (**3.39:1**). A new `--divider` keeps the old soft 12% for decoration, and every structural rule was moved onto it — so the look is unchanged everywhere it was decorative, and only control boundaries got brighter |
+| **A6-01** | No Open Graph or Twitter tags. Every shared link was a bare grey URL in WhatsApp, Slack and LinkedIn | OG + Twitter tags, `metadataBase`, canonical, and a build-time `opengraph-image.tsx`. Verified: the card renders `200 image/png` |
+| **A6-02** | `/favicon.ico` **404**. Blank browser tab beside every other submission | `src/app/icon.svg` — the product's idea as a shape (money arriving, then splitting) so it survives being 16px wide. Verified 200 |
+| **A4-01** | No loading UI on a route measured at **722–1432 ms** TTFB. The page looked frozen | `loading.tsx` mirroring the real layout so nothing jumps, with `role="status"` and `aria-busy` so it is announced and not merely drawn |
+| **A3-02** | `/chat` rendered **zero** headings | The wordmark is now the `<h1>`. Verified in the rendered HTML |
+| **A1-02** | No error boundary anywhere — a thrown Server Component showed Next's generic *"Application error"* | `src/app/error.tsx`. It says **"nothing was changed"**, which is true by construction rather than by hope (every surface is read-only), and shows a digest — never `error.message`, which can carry a query or a row id |
+| **A5-03** | `/api/agent` accepted cross-origin POSTs, letting any page drain the Gemini quota through its visitors | Origin allowlist. Verified: same-origin **200**, `evil.example` **403**, absent Origin **200** — a missing Origin means a non-browser caller (curl, the demo script), which is not the vector and is a caller we want working |
+| **A5-01** | **No security headers at all** | `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy` enforced; CSP shipped **Report-Only**. All five verified on the wire. The CSP is report-only deliberately and says so in `next.config.ts`: Next inlines its bootstrap, so a strict `script-src` needs nonce middleware, and building that the night before a demo is how you ship a white page. `'unsafe-inline'` is stated openly rather than quietly omitted |
+| ~~A3-03~~ | ~~Focus ring 2.98:1 on cards~~ | **WITHDRAWN — the measurement was mine and it was wrong.** It is 3.03:1 and passes. `--ring` was raised to 45% (**4.43:1**) anyway, since it passed with no headroom at all |
+
+**Two bugs were found by fixing these, both worth more than the fix that surfaced them.**
+
+`contrast.mjs` kept its own copy of the token values with a comment asking the next person to keep
+them in step — and it **drifted within the hour**, still reporting 1.39:1 for a token that had just
+become 40%. It now parses `globals.css`. That is A2-01, the audit's own open finding, reproduced in
+miniature by the script that found it.
+
+And `\btransaction\b` **cannot match "transactions"** — the boundary would have to fall between "n"
+and "s", both word characters. So *"show me my transactions"*, the most natural phrasing of the most
+common question, routed to `none` and got a generic reply while a working tool sat unused. Found by
+reading a real answer, not by reading the regex. Same shape as the `\d` vs `\d+` bug in the refusal
+route: **a trailing `\b` after a singular noun is a plural-shaped hole, every time.** Six phrasings
+now pinned by tests.
 
 ---
 

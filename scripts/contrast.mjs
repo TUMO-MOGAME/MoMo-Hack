@@ -20,13 +20,12 @@
  * Colour maths: Björn Ottosson's oklab. Thresholds: WCAG 2.2 SC 1.4.3 (4.5:1
  * for normal text) and SC 1.4.11 (3:1 for the boundary of a control).
  *
- * KEEP THE VALUES BELOW IN STEP WITH `src/app/globals.css`. They are typed out
- * rather than parsed because the parse is the part that would silently go
- * wrong — and it did, once: the first version of this audit's comparison script
- * matched the LIGHT scale against the dark CSS block and confidently reported
- * 30 drifted tokens that had not drifted. See A2-01 for the real fix, which is
- * to generate the CSS from the tokens so neither copy can be read wrongly.
+ * Token values are READ FROM `src/app/globals.css` and never typed out here —
+ * see the note above `darkTokens()` for why that turned out not to be optional.
  */
+
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 function oklchToSrgb(L, C, hDeg) {
   const h = (hDeg * Math.PI) / 180;
@@ -67,28 +66,108 @@ function ratio(a, b) {
   return (hi + 0.05) / (lo + 0.05);
 }
 
-const T = {
-  background: oklchToSrgb(0, 0, 0),
-  foreground: oklchToSrgb(1, 0, 0),
-  card: oklchToSrgb(0.08, 0, 0),
-  secondary: oklchToSrgb(0.14, 0, 0),
-  secondaryFg: oklchToSrgb(1, 0, 0),
-  muted: oklchToSrgb(0.12, 0, 0),
-  mutedFg: oklchToSrgb(0.72, 0, 0),
-  brand: oklchToSrgb(0.862, 0.176, 90.5),
-  brandFg: oklchToSrgb(0, 0, 0),
-  brandAccent: oklchToSrgb(0.78, 0.183, 55.934),
-  destructive: oklchToSrgb(0.704, 0.191, 22.216),
-  success: oklchToSrgb(0.765, 0.177, 163.223),
-  warning: oklchToSrgb(0.828, 0.189, 84.429),
-};
+/**
+ * ── READ THE STYLESHEET. DO NOT KEEP A SECOND COPY. ──────────────────────────
+ *
+ * These values were typed out here once, with a comment asking the next person
+ * to keep them in step with `globals.css`. They drifted **within the hour** —
+ * the A3-01 fix raised `--input` from 15% to 40% and this file went on
+ * confidently reporting 1.39:1 for a token that no longer existed.
+ *
+ * That is A2-01, the audit's own High finding, reproduced in miniature by the
+ * script that found it: a source of truth is only a source of truth if
+ * something *derives* from it. So this parses the `.dark` block and fails loudly
+ * if a token it needs is absent, rather than carrying a stale duplicate that
+ * looks authoritative.
+ *
+ * Parsing is what produced this session's OTHER false finding — a script that
+ * matched the light scale against the dark block and reported 30 phantom
+ * drifts — so the parse here is deliberately narrow: one named block, one
+ * `--token: value;` shape, and an explicit error naming anything missing.
+ * `tests/unit/design/contrast.test.ts` asserts the parse actually found the
+ * tokens, because a parser that silently returns nothing is the failure mode
+ * that matters.
+ */
+function darkTokens() {
+  const css = readFileSync(join(process.cwd(), 'src/app/globals.css'), 'utf8');
+  const block = css.split('.dark {')[1]?.split('\n}')[0];
+  if (!block) throw new Error('contrast: no `.dark {` block found in globals.css');
 
-// border/input/ring are white at low alpha, composited over the background.
-const white = oklchToSrgb(1, 0, 0);
-T.border = over(white, T.background, 0.12);
-T.input = over(white, T.background, 0.15);
-T.ring = over(white, T.background, 0.35);
-T.borderOnCard = over(white, T.card, 0.12);
+  const out = {};
+  for (const m of block.matchAll(/^\s*--([a-z0-9-]+):\s*([^;]+);/gim)) {
+    out[m[1]] = m[2].trim();
+  }
+  return out;
+}
+
+/** `oklch(0.72 0 0)` or `oklch(1 0 0 / 45%)` → sRGB triple + alpha. */
+function parseOklch(value, name) {
+  const m = /^oklch\(\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*(?:\/\s*([\d.]+)%\s*)?\)$/.exec(value);
+  if (!m) throw new Error(`contrast: cannot parse --${name}: ${value}`);
+  return {
+    rgb: oklchToSrgb(Number(m[1]), Number(m[2]), Number(m[3])),
+    alpha: m[4] === undefined ? 1 : Number(m[4]) / 100,
+  };
+}
+
+const RAW = darkTokens();
+
+function token(name) {
+  const value = RAW[name];
+  if (!value) throw new Error(`contrast: --${name} is not defined in the .dark block`);
+  return parseOklch(value, name);
+}
+
+/** Opaque roles, as sRGB triples. */
+const T = Object.fromEntries(
+  [
+    ['background', 'background'],
+    ['foreground', 'foreground'],
+    ['card', 'card'],
+    ['secondary', 'secondary'],
+    ['secondaryFg', 'secondary-foreground'],
+    ['muted', 'muted'],
+    ['mutedFg', 'muted-foreground'],
+    ['brand', 'brand'],
+    ['brandFg', 'brand-foreground'],
+    ['brandAccent', 'brand-accent'],
+    ['destructive', 'destructive'],
+    ['success', 'success'],
+    ['warning', 'warning'],
+  ].map(([key, cssName]) => [key, token(cssName).rgb]),
+);
+
+/**
+ * `--border`, `--input` and `--ring` are white at low alpha, so they have no
+ * colour of their own — they are whatever they are painted ON.
+ *
+ * ── THE BUG THIS SHAPE EXISTS TO PREVENT ─────────────────────────────────────
+ *
+ * The first version of this file composited all three over `--background` once,
+ * then compared that single result against every surface. So the "ring on card"
+ * row asked: *what is the contrast between a ring painted on the page ground and
+ * a card?* — a question about two things that are never adjacent. It reported
+ * the focus ring at **2.98:1** and PHASE-3-A3 filed a High finding on it.
+ *
+ * **That finding was wrong.** Composited correctly — over the card, because that
+ * is what a ring drawn on a card sits on — it is **3.03:1**, and it passes.
+ *
+ * An alpha colour is meaningless until you say what is behind it, so the surface
+ * is now a parameter and every pairing carries its own. There is no way to ask
+ * the malformed question any more.
+ *
+ * `alphaOn(alpha, surface)` returns the painted colour; each row names the
+ * surface once and it is used for both the composite and the comparison.
+ */
+const alphaOn = (role, surface) => over(role.rgb, surface, role.alpha);
+
+/** Alpha roles, read from the stylesheet — never typed out here. */
+const ALPHA = {
+  border: token('border'),
+  input: token('input'),
+  divider: token('divider'),
+  ring: token('ring'),
+};
 
 const TEXT = [
   ['foreground on background', 'foreground', 'background', 4.5],
@@ -106,22 +185,49 @@ const TEXT = [
   ['warning on background', 'warning', 'background', 4.5],
 ];
 
+/** [label, alpha role, the surface it is painted on]. One surface, used twice. */
 const UI = [
-  ['border on background', 'border', 'background', 3.0],
-  ['border on card', 'borderOnCard', 'card', 3.0],
-  ['input on background', 'input', 'background', 3.0],
-  ['ring on background (focus)', 'ring', 'background', 3.0],
-  ['ring on card (focus)', 'ring', 'card', 3.0],
+  ['border on background', 'border', 'background'],
+  ['border on card', 'border', 'card'],
+  ['input on background (the composer)', 'input', 'background'],
+  ['input on card', 'input', 'card'],
+  ['ring on background (focus)', 'ring', 'background'],
+  ['ring on card (focus)', 'ring', 'card'],
 ];
 
 const fmt = (n) => n.toFixed(2).padStart(6);
-const row = (label, fg, bg, need) => {
-  const r = ratio(T[fg], T[bg]);
-  const ok = r >= need;
-  return `${ok ? 'PASS' : 'FAIL'}  ${fmt(r)}:1  (needs ${need})  ${label}`;
-};
+const verdict = (r, need) => `${r >= need ? 'PASS' : 'FAIL'}  ${fmt(r)}:1  (needs ${need})`;
 
 console.log('--- WCAG 2.2 AA · normal text (>= 4.5:1) · DARK THEME (the only shipped theme) ---');
-for (const [l, f, b, n] of TEXT) console.log(row(l, f, b, n));
+for (const [label, fg, bg, need] of TEXT) {
+  console.log(`${verdict(ratio(T[fg], T[bg]), need)}  ${label}`);
+}
+
 console.log('\n--- Non-text contrast, SC 1.4.11 (>= 3:1) ---');
-for (const [l, f, b, n] of UI) console.log(row(l, f, b, n));
+console.log('    alpha tokens are composited over the surface they are painted on');
+/**
+ * `--divider` is reported but NOT graded, and the distinction is the whole point
+ * of splitting the role. SC 1.4.11 governs what you must perceive in order to
+ * *operate* something — a control's boundary, a state, a meaningful graphic. It
+ * does not govern decoration. A hairline between two sections carries no
+ * information a user needs, so holding it to 3:1 would be inventing a
+ * requirement, and the usual way that ends is someone quietly lowering the real
+ * thresholds to make the report green.
+ *
+ * Printing it as `n/a` rather than hiding it keeps the value visible, so that if
+ * a divider is ever pressed into service as a control boundary, the number is
+ * already on screen.
+ */
+const DECORATIVE = ['divider on background (decorative)', 'divider', 'background'];
+
+for (const [label, role, surfaceName] of UI) {
+  const surface = T[surfaceName];
+  console.log(`${verdict(ratio(alphaOn(ALPHA[role], surface), surface), 3.0)}  ${label}`);
+}
+
+{
+  const [label, role, surfaceName] = DECORATIVE;
+  const surface = T[surfaceName];
+  const r = ratio(alphaOn(ALPHA[role], surface), surface);
+  console.log(`n/a  ${fmt(r)}:1  (not graded)  ${label}`);
+}

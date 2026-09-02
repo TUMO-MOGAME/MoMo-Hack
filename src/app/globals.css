@@ -37,6 +37,7 @@
   --brand-accent-foreground: oklch(0.145 0 0);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
+  --divider: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
   --overlay: oklch(0 0 0 / 55%);
   --chart-1: oklch(0.842 0.166 89.5);
@@ -78,9 +79,27 @@
   --brand-foreground: oklch(0 0 0);
   --brand-accent: oklch(0.78 0.183 55.934);
   --brand-accent-foreground: oklch(0 0 0);
-  --border: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 15%);
-  --ring: oklch(1 0 0 / 35%);
+  /* ── A3-01: these bound CONTROLS, so they owe 3:1 (WCAG SC 1.4.11) ─────────
+     Measured with `npm run contrast`, which composites the alpha over the
+     surface each token is painted on — the step that makes an alpha colour
+     measurable at all.
+
+     Before: --border 12% → 1.27:1, --input 15% → 1.39:1. Against a 3:1
+     requirement, on a device the A3 overlay describes as a cracked screen in
+     direct Highveld sunlight. The message composer is `border-input`, so the
+     one control a user must find in order to say anything had, by measurement,
+     no perceivable edge.
+
+     --divider keeps the old soft 12% for rules and separators that carry NO
+     information. That is the honest split: SC 1.4.11 governs things you must
+     perceive to operate, not decoration, and collapsing the two roles is what
+     put a decorative value on a text field in the first place. */
+  --border: oklch(1 0 0 / 38%);
+  --input: oklch(1 0 0 / 40%);
+  --divider: oklch(1 0 0 / 12%);
+  /* Passes at 35% (3.01:1) but with no headroom at all — A3-08. 45% gives
+     ~4.4:1 and costs nothing, because the ring is transient. */
+  --ring: oklch(1 0 0 / 45%);
   --overlay: oklch(0 0 0 / 72%);
   --chart-1: oklch(0.862 0.176 90.5);
   --chart-2: oklch(0.765 0.177 163.223);
@@ -122,6 +141,7 @@
   --color-brand-accent-foreground: var(--brand-accent-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
+  --color-divider: var(--divider);
   --color-ring: var(--ring);
   --color-overlay: var(--overlay);
   --color-chart-1: var(--chart-1);
@@ -140,8 +160,13 @@
   --radius-xl: calc(var(--radius) + 4px);
 }
 
+/* The DEFAULT border colour is the decorative one. Anything that draws a border
+   without asking for a role gets the soft divider; `border-border` and
+   `border-input` are opt-in and carry the 3:1 values A3-01 requires. Before the
+   split this rule handed every element the control-grade colour, which is how a
+   decorative value ended up on a text field in the first place. */
 * {
-  border-color: var(--border);
+  border-color: var(--divider);
 }
 
 html,
