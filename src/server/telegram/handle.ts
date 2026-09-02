@@ -13,6 +13,32 @@ import type { TelegramUpdate } from '@/lib/telegram/types';
 import { log } from '@/server/log';
 import { appendTurn, readHistory, resetThread } from './memory';
 
+/**
+ * The money commands and the list of chats allowed to use them — ONE OBJECT.
+ *
+ * ── WHY THEY ARE BUNDLED, AND IT IS THE WHOLE POINT ──────────────────────────
+ *
+ * These were two optional fields. An allowlist that is a third optional field
+ * is one a future route can forget to pass, and forgetting it is exactly the
+ * failure M5d exists to prevent — a public bot with production credentials and
+ * no gate. `MISTAKES.md` prefers a guard that makes the mistake IMPOSSIBLE over
+ * one that merely detects it, so the capability and its gate are a single
+ * value: you cannot give this handler the ability to spend money without
+ * saying, in the same expression, who is allowed to.
+ *
+ * That is a compile-time guarantee rather than a convention, and it is the
+ * reason this shape is worth the churn of changing the deps interface.
+ */
+export interface MoneyCommands {
+  /**
+   * Chat ids that may run `/pay` and `/status`. An EMPTY set denies everyone,
+   * which is the correct default — see `readPayAllowlist`.
+   */
+  readonly allowlist: ReadonlySet<number>;
+  readonly pay: (text: string) => Promise<string>;
+  readonly status: () => Promise<string>;
+}
+
 export interface HandleDeps {
   readonly telegram: TelegramClient;
   readonly agent: AgentClient;
@@ -28,13 +54,12 @@ export interface HandleDeps {
    * Absent (the default) means `/pay` politely says it is unavailable, so the
    * bot degrades to a read-only assistant rather than erroring.
    */
-  readonly pay?: (text: string) => Promise<string>;
-  readonly status?: () => Promise<string>;
+  readonly money?: MoneyCommands;
 }
 
 export type HandleOutcome =
   | { readonly kind: 'ignored'; readonly reason: string }
-  | { readonly kind: 'replied'; readonly source: 'command' | 'agent' | 'fallback' };
+  | { readonly kind: 'replied'; readonly source: 'command' | 'agent' | 'fallback' | 'denied' };
 
 /**
  * Telegram sends `/pay@momokasi_demo_bot` in groups. Strip the suffix so a
@@ -68,6 +93,36 @@ export const FALLBACK_TEXT =
   "Eish — my brain's offline for a second there. Nothing to do with your money; " +
   'I just could not reach the model. Try me again in a moment, or send /help for ' +
   'what I can do.';
+
+/**
+ * What a chat that is not on the allowlist is told.
+ *
+ * Three things it must do, and each is a decision:
+ *
+ * 1. **Say nothing happened.** The whole hazard of a payment command is
+ *    ambiguity about whether money moved (`pay-replies.ts`, `MISTAKES.md` M10).
+ *    A refusal is the easiest place in the product to be unambiguous, so it is.
+ * 2. **Give the reason honestly** — the number this rings is a real person's
+ *    phone, not a sandbox. "Not authorised" invites someone to keep trying.
+ * 3. **Echo the chat id.** This is the operator's fix path: the id goes
+ *    straight into `TELEGRAM_PAY_CHAT_IDS`. It gives an attacker nothing — it
+ *    is their own id and the list lives on the server — and it turns a
+ *    30-minute "why is the bot ignoring me" on stage into a paste.
+ *
+ * It does NOT offer to add them, or hint that asking would work. It ends.
+ */
+export function denialText(chatId: number): string {
+  return [
+    'Those commands move real money on MTN, so they only work from the chats set',
+    'up for this demo — a real request rings a real person’s phone.',
+    '',
+    'Nothing was sent and nothing was charged.',
+    '',
+    `If this chat should be on that list, its id is ${chatId}.`,
+    '',
+    'Everything else still works — ask me anything, or send /help.',
+  ].join('\n');
+}
 
 export async function handleUpdate(
   deps: HandleDeps,
@@ -109,26 +164,44 @@ export async function handleUpdate(
     // payment: the human types the verb and the amount, the server chooses the
     // payee from configuration, and MTN asks the payer for their own PIN on
     // their own handset. No model is anywhere in that sentence.
-    if (command === 'pay') {
-      if (!deps.pay) {
+    if (command === 'pay' || command === 'status') {
+      const money = deps.money;
+      if (!money) {
         await deps.telegram.sendMessage({
           chatId,
-          text: 'Payments are not switched on for this bot right now.',
+          text:
+            command === 'pay'
+              ? 'Payments are not switched on for this bot right now.'
+              : 'No ledger connected right now.',
         });
         return { kind: 'replied', source: 'command' };
       }
-      await deps.telegram.sendChatAction(chatId, 'typing').catch(() => undefined);
-      await deps.telegram.sendMessage({ chatId, text: await deps.pay(text) });
-      return { kind: 'replied', source: 'command' };
-    }
 
-    if (command === 'status') {
-      if (!deps.status) {
-        await deps.telegram.sendMessage({ chatId, text: 'No ledger connected right now.' });
-        return { kind: 'replied', source: 'command' };
+      // ── THE ALLOWLIST (M5d) ───────────────────────────────────────────────
+      //
+      // CHECKED BEFORE EITHER HANDLER IS CALLED, and before the typing
+      // indicator — a denied chat should not even see the bot think about it.
+      //
+      // `/status` is gated as well as `/pay`, and that is deliberate rather
+      // than over-caution. It is not read-only from MTN's point of view: it
+      // drives the reconciler, and it reads out the amount and the split of a
+      // payment made by somebody else. Neither belongs to a stranger.
+      if (!money.allowlist.has(chatId)) {
+        // The chat id is the ONLY thing that gets logged, and it is the only
+        // thing worth logging: it is what an operator pastes into
+        // TELEGRAM_PAY_CHAT_IDS to fix a legitimate denial.
+        log('warn', 'telegram.pay.denied', {
+          correlation_id: String(update.update_id),
+          chat_id: String(chatId),
+          command,
+        });
+        await deps.telegram.sendMessage({ chatId, text: denialText(chatId) });
+        return { kind: 'replied', source: 'denied' };
       }
+
       await deps.telegram.sendChatAction(chatId, 'typing').catch(() => undefined);
-      await deps.telegram.sendMessage({ chatId, text: await deps.status() });
+      const reply = command === 'pay' ? await money.pay(text) : await money.status();
+      await deps.telegram.sendMessage({ chatId, text: reply });
       return { kind: 'replied', source: 'command' };
     }
 

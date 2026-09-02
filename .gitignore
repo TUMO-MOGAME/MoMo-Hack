@@ -66,3 +66,6 @@ yarn-error.log*
 # are not ours to redistribute. Facts we need from them go into momoAPIs.md or
 # docs/, cited, in our own words.
 *.pdf
+
+# Agent worktrees (MISTAKES.md M4). A stray `git add -A` must never commit one.
+.claude/worktrees/

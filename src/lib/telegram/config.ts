@@ -41,6 +41,64 @@ export function readTelegramConfig(env: EnvBag = process.env): TelegramConfig {
 }
 
 /**
+ * Which Telegram chats may spend real money (M5d).
+ *
+ * ── WHY THIS EXISTS, STATED PLAINLY ──────────────────────────────────────────
+ *
+ * `@momokasi_demo_bot` is PUBLIC, and from the production deploy it holds
+ * production MoMo credentials. `/pay` asks MTN to push a payment prompt at ONE
+ * configured handset — a real phone belonging to a real person. Without this
+ * gate, every stranger who finds the bot in Telegram's search has a button that
+ * rings that phone, as often as the rate limiter allows.
+ *
+ * The payee being configuration rather than input (`pay-replies.ts`) stops the
+ * bot being aimed at *other* people. It does nothing to stop it being aimed at
+ * *us*. That is what the allowlist is for.
+ *
+ * ── EMPTY MEANS NOBODY, NEVER EVERYBODY ──────────────────────────────────────
+ *
+ * An unset or empty `TELEGRAM_PAY_CHAT_IDS` returns an EMPTY set, and an empty
+ * set denies everyone. This is the one design choice in the file worth
+ * defending: the failure mode of denying too much is a demo that says "not this
+ * chat" until someone pastes an id; the failure mode of allowing too much is a
+ * stranger spending the budget and ringing a personal phone at 03:00. Those are
+ * not comparable, so the default is the safe one even though it is the annoying
+ * one.
+ *
+ * `scripts/vercel-env.mjs` refuses a live push when this is unset, so the
+ * annoying failure is caught at deploy time rather than on stage.
+ *
+ * ── GROUP IDS ARE NEGATIVE ───────────────────────────────────────────────────
+ *
+ * Telegram gives groups and supergroups negative chat ids
+ * (`-1001234567890`). A parser anchored to `\d+` silently drops every group,
+ * which is a bug that only shows up in the one setting — a shared demo group —
+ * where you would least like to debug it.
+ */
+export function parseChatIds(raw: string | undefined): ReadonlySet<number> {
+  if (!raw) return new Set();
+
+  const ids = new Set<number>();
+  for (const token of raw.split(/[,\s]+/)) {
+    if (!token) continue;
+    // Integers only, optionally negative. A malformed entry is DROPPED rather
+    // than throwing: this is read on the request path, and a throw here would
+    // turn one typo in an env var into a webhook that 500s on every update.
+    // Dropping fails closed — the effect is "that chat cannot pay", which is
+    // visible the first time someone tries and is never dangerous.
+    if (!/^-?\d+$/.test(token)) continue;
+    const id = Number(token);
+    if (Number.isSafeInteger(id)) ids.add(id);
+  }
+  return ids;
+}
+
+/** The allowlist as configured. Read per call, like everything else here. */
+export function readPayAllowlist(env: EnvBag = process.env): ReadonlySet<number> {
+  return parseChatIds(env.TELEGRAM_PAY_CHAT_IDS);
+}
+
+/**
  * Is the inbound request really from Telegram?
  *
  * Telegram echoes the `secret_token` given to `setWebhook` back in this header
