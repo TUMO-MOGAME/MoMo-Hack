@@ -104,11 +104,34 @@ export function parsePayAmount(text: string): Minor | null {
   // The whole remainder must be ONE amount. `^…$` with no room for a second
   // token is what makes "0.20 0767221345" fail instead of resolving to one of
   // the two numbers.
-  const m = /^r?\s*(\d{1,6}(?:\.\d{1,2})?)$/i.exec(trimmed);
+  // ── `[.,]`, AND IT IS NOT COSMETIC (docs/12 §2a) ──────────────────────────
+  //
+  // South Africa writes the decimal separator as a COMMA. It is the SI
+  // convention, it is what Afrikaans uses, and it is what an Android numeric
+  // keypad set to af-ZA or zu-ZA puts under the thumb. So `/pay 0,20` — a
+  // correctly written twenty cents — parsed as null and was answered with
+  // "Tell me how much — like /pay 0.20", which tells a user who did type an
+  // amount that they did not.
+  //
+  // This is the language audit reaching the MONEY path. The prompt layer was
+  // taught eleven languages; the parser underneath it read one number format,
+  // and it failed closed and politely — the failure mode nobody reports.
+  //
+  // NO AMBIGUITY IS INTRODUCED. A comma used as a THOUSANDS separator always
+  // has exactly three digits after it, and this pattern allows at most two, so
+  // "1,250" still returns null and still gets the hint. "1,25" means R1.25
+  // under either reading. Liberal in what we accept; formatZAR stays
+  // conservative in what we emit, because "R12.50" is the form the ledger, the
+  // cards and every test in this repo already speak — LANGUAGE_DIRECTIVE pins
+  // it as domain vocabulary that must not be translated or reformatted.
+  const m = /^r?\s*(\d{1,6}(?:[.,]\d{1,2})?)$/i.exec(trimmed);
   if (!m?.[1]) return null;
 
   try {
-    return parseMinor(m[1]);
+    // `parseMinor` is the domain parser and speaks one canonical format. It is
+    // deliberately NOT taught about commas — normalise at the edge instead, so
+    // the money core keeps exactly one way to spell an amount.
+    return parseMinor(m[1].replace(',', '.'));
   } catch {
     return null;
   }

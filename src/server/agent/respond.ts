@@ -91,13 +91,119 @@ type Intent = 'wallet' | 'transactions' | 'split' | 'unbuilt' | 'none';
  * fixed sentence with no artifact. When M3a lands, `send` moves out of here into
  * a real `propose_transfer` — and not one hour before.
  */
-const ROUTES: readonly { intent: Intent; test: RegExp }[] = [
+/**
+ * ── LANGUAGE AUDIT (docs/12 §2a, brief step 6) ──────────────────────────────
+ *
+ * THE PROMPT LAYER IS MULTILINGUAL. THIS LAYER WAS NOT, AND THIS LAYER DECIDES
+ * WHETHER A PAYMENT REQUEST IS REFUSED.
+ *
+ * `LANGUAGE_DIRECTIVE` makes the model mirror eleven languages. Every pattern
+ * below used to be keyed on English verbs, which made this a two-tier product
+ * in the worst possible place:
+ *
+ *   *"ngicela ukuthumela imali ku-0761346606"* matched NOTHING. Not `send`, not
+ *   `transfer`, not `pay`. So it fell past the `unbuilt` route to `none`, and
+ *   the model was asked to write prose about a payment request with no card and
+ *   no refusal in front of it — the exact configuration that produced *"I've
+ *   prepared a transfer of R0.01…"* in MISTAKES.md M10 and `refusal.test.ts`.
+ *
+ * An English speaker got the STRUCTURAL guarantee: fixed text, no model call, a
+ * refusal that cannot be reworded. An isiZulu speaker got the PROMPT guarantee,
+ * which is the one we already know is not enough — that is why this route
+ * exists at all. Same product, same question, two different safety levels,
+ * chosen by which language you happen to write in.
+ *
+ * And it concealed itself. `agent.intent.unbuilt` would have reported a clean
+ * 0% fire rate for non-English traffic, which reads as "no payment requests"
+ * when it actually means "not measured". `classify` now returns which pattern
+ * family matched and `respond` logs it, so the gap can be seen rather than
+ * inferred.
+ *
+ * DECISION: extend the patterns. Not a model-based classifier — this route's
+ * whole value is that it never reaches a model, so a refusal cannot be talked
+ * out of being a refusal. Not an accepted gap either: CLAUDE.md #11 does not
+ * have an English-only clause.
+ *
+ * ── HOW THE `also` PATTERNS ARE BUILT, AND THEIR LIMITS ─────────────────────
+ *
+ * They are STEMS, not whole words. `\b` is an ASCII word boundary and the Nguni
+ * and Sotho-Tswana languages agglutinate: "ukuthumela", "ngithumele" and
+ * "thumela" are one verb wearing three prefixes, and `\bthumela\b` matches only
+ * the bare form nobody actually types. So the verbs match on stem + inflection
+ * (`thumel[ae]\b`) and the nouns match on stem + the concords that attach to
+ * them (`(?:i|ne|ye|ze|kwe|nge|se)?mali\b`).
+ *
+ * Two things they deliberately do NOT do:
+ *
+ *  1. **No bare `mali`.** It is a substring of "normalise", "formality" and
+ *     "Somalia". The concord alternation above anchors both ends instead.
+ *  2. **No `rumela`.** It is Tshivenda for "send" AND a Sesotho/Sepedi greeting
+ *     — "Rumela!" would be answered with "I can't send money to anyone yet",
+ *     which is worse than not matching. Tshivenda keeps `badel[ae]` and
+ *     `\brenga\b`; its send verb is an accepted gap, named here so the next
+ *     person does not "fix" it back in.
+ *
+ * THESE WORD LISTS ARE DERIVED, NOT VALIDATED. They came from the vocabulary
+ * already in this product (`mock.ts` has carried "ngingakanani", "umgalelo" and
+ * "khokha" since S7a) plus the obvious money verbs — not from a native speaker.
+ * `npm run eval:language` is where they get graded, and only English, isiZulu,
+ * Afrikaans and Setswana are graded today (`EVAL_VERIFIED`). The other seven
+ * are attempted, not verified, and docs/12 §2a says so in public.
+ */
+interface Route {
+  readonly intent: Intent;
+  /** English — the original patterns, unchanged. Their comments are scar tissue. */
+  readonly test: RegExp;
+  /** Every other language in LANGUAGES. Kept separate so the two review separately. */
+  readonly also: RegExp;
+}
+
+const ROUTES: readonly Route[] = [
   {
     intent: 'unbuilt',
     // `\d+`, not `\d`: the trailing `\b` cannot follow a single digit inside a
     // longer number, so `save R2|00` failed to match "save R200 a month" and
     // that request fell through to the generic fallback. Caught by the test.
     test: /\b(send|sending|transfer|pay|paying|payout|withdraw|cash ?out|eft|deposit|top ?up|buy|purchase|schedule|automate|remind|save (?:me |up )?r?\d+)\b/i,
+    // send · pay · buy · withdraw · save, in the other ten.
+    //
+    // `khokh[ae]\b` and not `khokh`: the noun "izinkokhelo" (payments) must NOT
+    // land here. That is the isiZulu spelling of the `\btransaction\b`-cannot-
+    // match-"transactions" bug two routes down — a stem that swallows the plural
+    // noun turns "show me my payments" into a refusal.
+    also: new RegExp(
+      [
+        // Nguni: isiZulu, isiXhosa, siSwati, isiNdebele
+        'thumel[ae]\\b',
+        'tfumel[ae]\\b',
+        'khokh[ae]\\b',
+        'hlawul[ae]\\b',
+        'theng[ae]\\b',
+        'londoloz[ae]\\b',
+        // Sotho-Tswana: Sepedi, Setswana, Sesotho
+        'romel[ae]\\b',
+        'patal[ae]\\b',
+        'bolok[ae]\\b',
+        '\\bduel[ae]\\b',
+        '\\blefa\\b',
+        '\\breka\\b',
+        // Afrikaans
+        '\\bstuur',
+        'betaal',
+        'oorbetaal|oorplaas|oordrag',
+        '\\bkoop\\b|aankoop',
+        'onttrek',
+        '\\bspaar',
+        'skeduleer|herinner',
+        // Xitsonga, Tshivenda
+        'rhumel[ae]\\b',
+        'hakel[ae]\\b',
+        'badel[ae]\\b',
+        '\\bxava\\b',
+        '\\brenga\\b',
+      ].join('|'),
+      'i',
+    ),
   },
   {
     intent: 'split',
@@ -105,6 +211,10 @@ const ROUTES: readonly { intent: Intent; test: RegExp }[] = [
     // bare "R60" — so "did I get my R60" asked for a fare breakdown. It now
     // only matches as part of a written ratio.
     test: /\b(split|fare|taxi|divide|breakdown|60\s*[/:]\s*25|where did.*(go|money))\b/i,
+    // "tekisi" is the taxi in isiZulu, isiXhosa and the Sotho-Tswana group alike,
+    // and it carries most of this route on its own. `\bkarolo\b` (share/part) is
+    // spelled out rather than stemmed as `arol`, which is inside "parole".
+    also: /hlukanis|verdeel|opdeel|tekisi|\barola\b|\bkarolo\b|\bavanyis/i,
   },
   {
     intent: 'transactions',
@@ -118,15 +228,41 @@ const ROUTES: readonly { intent: Intent; test: RegExp }[] = [
     // Same shape as the `\d` vs `\d+` bug in the route above. A trailing `\b`
     // after a singular noun is a plural-shaped hole, every time.
     test: /\b(transactions?|payments?|spent|spend|history|activity|activities|statements?|last month|three months|3 months|recent)\b/i,
+    // The noun forms the `unbuilt` route above is careful to leave alone.
+    also: /transaksie|geskiedenis|uitgawe|bestee|onlangs|umlando|nkokhel|dipatel|ditef|ditshenyegelo|\bhistori/i,
   },
   {
     intent: 'wallet',
     test: /\b(balances?|wallets?|how much|money|afford|have|left)\b/i,
+    // "money" in ten languages, plus "how much". The concord alternation on
+    // `mali` is what keeps this out of "normalise" and "Somalia" — see the
+    // header comment.
+    also: /\b(?:i|ne|ye|ze|kwe|nge|se)?mali\b|\bmalini\b|ngakanani|bhalansi|sikhwama|\bgeld\b|\bbalans\b|\bsaldo\b|hoeveel|beursie|\bmadi\b|t[sš]helete|chelete|tshelede|bokae/i,
   },
 ];
 
-function classify(message: string): Intent {
-  return ROUTES.find((r) => r.test.test(message))?.intent ?? 'none';
+/** Which pattern family answered. `multi` means "any language but English". */
+type Matched = 'en' | 'multi' | 'none';
+
+/**
+ * Deterministic routing, now in eleven languages.
+ *
+ * BOTH patterns are tested against the SAME string, which is what makes a
+ * code-switched sentence work without a single line of special handling:
+ * *"ngifuna ukukhokha my electricity"* — docs/12's own example — matches
+ * `khokh[ae]\b` on the isiZulu half, and would equally have matched `pay` if the
+ * user had written the verb in English. Mirroring is not a mode we enter.
+ *
+ * `matched` is returned rather than discarded so `respond` can log it. Without
+ * it, a non-English speaker who is never routed anywhere is indistinguishable
+ * in the drain from a non-English speaker who never asked.
+ */
+function classify(message: string): { intent: Intent; matched: Matched } {
+  for (const route of ROUTES) {
+    if (route.test.test(message)) return { intent: route.intent, matched: 'en' };
+    if (route.also.test(message)) return { intent: route.intent, matched: 'multi' };
+  }
+  return { intent: 'none', matched: 'none' };
 }
 
 /**
@@ -140,14 +276,57 @@ function classify(message: string): Intent {
  * None of them acknowledges an amount or a payee. Repeating *"your R0.01 to
  * 0761346606"* back at someone reads as a receipt even when the sentence around
  * it is a refusal, and that is the exact confusion this route exists to end.
+ *
+ * ── ACCEPTED GAP: THESE SENTENCES ARE ENGLISH, IN EVERY LANGUAGE ────────────
+ *
+ * The router now understands eleven languages; the refusal answers in one. So
+ * someone who writes *"ngicela ukuthumela imali"* is correctly refused — in
+ * English. That is a real mirroring failure and it is chosen, not overlooked.
+ *
+ * The alternative is worse. The model is the only translator we have, and this
+ * route exists precisely BECAUSE the model may not write this sentence: a
+ * refusal it can reword is a refusal it can be talked out of (MISTAKES.md M10).
+ * Shipping machine-translated safety text in ten languages nobody on this team
+ * reads is how a refusal quietly becomes a maybe. Fixed English that is
+ * correct beats fluent isiZulu that might not be.
+ *
+ * USER-VISIBLE CONSEQUENCE: an isiZulu, Sesotho or Afrikaans speaker asking to
+ * send money gets a safe, accurate, English answer where the rest of the
+ * product would have mirrored them.
+ *
+ * THE FIX, when it comes: verified translations from a native speaker, one
+ * language at a time, gated on `EVAL_VERIFIED` — never on a model call. Same
+ * applies to HELP_TEXT, ABOUT_TEXT, `denialText` and `pay-replies.ts`, which
+ * are English for the same reason and none of which a model may rewrite.
  */
 function unbuiltProse(message: string): string {
+  // Same audit as ROUTES. These two sub-patterns choose WHICH refusal a person
+  // reads, so an unmatched non-English request got the generic payout sentence
+  // when it had asked about airtime — correct, but not an answer to the
+  // question. Both are extended; the refusals themselves stay English, and that
+  // is an accepted gap stated in full below.
   if (
-    /\b(schedule|automate|remind|every (month|week|day)|save (?:me |up )?r?\d)\b/i.test(message)
+    /\b(schedule|automate|remind|every (month|week|day)|save (?:me |up )?r?\d)\b/i.test(message) ||
+    /\bspaar|skeduleer|herinner|elke maand|bolok[ae]\b|londoloz[ae]\b|njalo nge(nyanga|sonto)/i.test(
+      message,
+    )
   ) {
     return "I can't set up anything that runs on its own yet — scheduled and recurring payments aren't built. What I can do right now is show you your balance, your recent transactions, or how a taxi fare splits.";
   }
-  if (/\b(buy|purchase|top ?up|airtime|electricity|data)\b/i.test(message)) {
+  if (
+    /\b(buy|purchase|top ?up|airtime|electricity|data)\b/i.test(message) ||
+    // "airtime" is airtime in every South African language. Electricity is not:
+    // ugesi · motlakase · mohlagase · elektrisiteit · krag.
+    /theng[ae]\b|\breka\b|\bkoop\b|\bxava\b|\brenga\b|ugesi|m[ou]tlakase|mohlagase|elektrisiteit|\bkrag\b/i.test(
+      message,
+    )
+  ) {
+    // ⚠️ The multilingual CONDITION is taken from `feat/language-mirroring`; the
+    // SENTENCE is not. That branch predates #43 and #45 and its version added
+    // "Money can come into this ledger, but nothing can go out of it yet" —
+    // which #45 removed precisely because it stopped being true when
+    // disbursements landed (M3a). Merging the branch whole would have
+    // reinstated the expired claim, for the fourth time this pattern has bitten.
     return "I can't buy airtime or electricity yet — that part isn't built. I can show you your balance, your recent transactions, or how a taxi fare splits.";
   }
   // ── THIS SENTENCE HAD EXPIRED, AND THAT IS M10's SECOND CAUSE AGAIN ────────
@@ -257,7 +436,18 @@ async function fetchArtifact(intent: Intent): Promise<Artifact | null> {
 }
 
 export async function respond(message: string, options: RespondOptions = {}): Promise<AgentTurn> {
-  const intent = classify(message);
+  const { intent, matched } = classify(message);
+
+  // WHICH LANGUAGE FAMILY ROUTED THIS, on every turn including `none`.
+  //
+  // Before this line, a non-English question that matched nothing was logged
+  // identically to an English one that matched nothing, so the coverage gap
+  // reported as silence. `matched: "none"` climbing while `multi` stays at zero
+  // is the shape of a word list that needs a word, and it is now visible in the
+  // drain instead of inferable only from a user complaint we will not get.
+  //
+  // The message itself is NOT logged — three enum values, no content, no PII.
+  log('info', 'agent.intent', { intent, matched });
 
   // Asked to DO something that does not exist. Answer and stop — no ledger read,
   // so there is no card to write misleading prose against, and no model call, so
@@ -265,7 +455,7 @@ export async function respond(message: string, options: RespondOptions = {}): Pr
   // thing standing between a payment request and an invented receipt, so it is
   // deliberately the shortest path in the function.
   if (intent === 'unbuilt') {
-    log('info', 'agent.intent.unbuilt', {});
+    log('info', 'agent.intent.unbuilt', { matched });
     return { reply: unbuiltProse(message), tool: 'none', modelled: false };
   }
 

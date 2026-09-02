@@ -1,0 +1,40 @@
+#!/bin/sh
+#
+# The language-wiring guard, before anything leaves this machine.
+#
+# ── WHY THIS HOOK EXISTS WHEN CI ALREADY RUNS THE SAME TEST ──────────────────
+#
+# Because of what the failure looks like. If an edit drops ${LANGUAGE_DIRECTIVE}
+# out of SYSTEM_PROMPT, nothing throws: typecheck passes, lint passes, the build
+# passes, and every other test passes because they all assert on English input
+# and English output. The product just starts answering every isiZulu, Setswana
+# and Afrikaans message in English — and the users that lands on are the least
+# likely of anyone to file a bug about it. They conclude it is not for them.
+#
+# CI catches it too, and CI is the backstop. This is the fast one: two seconds
+# before a push, rather than four minutes after it, on the one guard in this
+# repository whose absence is completely silent.
+#
+# Deliberately NOT the whole suite. A pre-push hook that costs a minute is a
+# pre-push hook people learn to pass --no-verify to, and then it guards nothing.
+#
+# Install with:  npm run hooks:install
+# Skip once:     git push --no-verify
+
+set -e
+
+if [ -n "$SKIP_LANGUAGE_HOOK" ]; then
+  exit 0
+fi
+
+printf '\n  language wiring… '
+
+if ! npx vitest run tests/unit/agent/language.test.ts --reporter=dot >/tmp/language-hook.log 2>&1; then
+  printf '\033[31mFAILED\033[0m\n\n'
+  cat /tmp/language-hook.log
+  printf '\n  The language directive is no longer wired into every prompt.\n'
+  printf '  Nothing else would have caught this — see tests/unit/agent/language.test.ts.\n\n'
+  exit 1
+fi
+
+printf '\033[32mok\033[0m\n\n'

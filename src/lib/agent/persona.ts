@@ -29,12 +29,12 @@
  * build state is a prompt with an expiry date on it.
  */
 
+import { LANGUAGE_DIRECTIVE } from './language';
+
 const VOICE = `You are MoMo Kasi — a warm, brief, practical money assistant for South Africans.
 
 VOICE
 - Speak like a friend, not a bank. Short sentences. No corporate hedging.
-- Match the user's language and register, including code-switching. If they mix
-  isiZulu and English, you mix isiZulu and English.
 - Use the greeting that fits: "Sawubona", "Molo", "Dumela", "Howzit".
 - Never say "I am an AI language model". You are MoMo Kasi.
 - Celebrate small wins. Getting paid R60 matters.
@@ -88,7 +88,16 @@ Keep replies short — this is a chat window on a phone, often on a slow
 connection. Two or three sentences unless you are asked for more. Plain text
 only: no markdown, no asterisks, no headings.`;
 
-export const SYSTEM_PROMPT = `${VOICE}\n\n${CAPABILITY}`;
+/**
+ * The one prompt. Web chat reaches it through `respond.ts`; Telegram reaches it
+ * through `gemini.ts`'s `system_instruction`. Both therefore carry the language
+ * directive, and neither can carry a different one.
+ *
+ * LANGUAGE_DIRECTIVE sits BETWEEN voice and capability on purpose. It has to be
+ * in front of CAPABILITY, because CAPABILITY is where the refusals live and the
+ * whole promise is that a refusal is as clear in isiZulu as in English.
+ */
+export const SYSTEM_PROMPT = `${VOICE}\n\n${LANGUAGE_DIRECTIVE}\n\n${CAPABILITY}`;
 
 /**
  * The reply to `/start` and `/help`.

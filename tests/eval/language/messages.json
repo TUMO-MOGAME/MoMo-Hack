@@ -1,0 +1,141 @@
+[
+  { "id": "balance", "language": "English", "text": "How much do I have?", "tool": "read_wallet" },
+  {
+    "id": "balance",
+    "language": "isiZulu",
+    "text": "Nginemali engakanani?",
+    "tool": "read_wallet"
+  },
+  {
+    "id": "balance",
+    "language": "Afrikaans",
+    "text": "Hoeveel geld het ek?",
+    "tool": "read_wallet"
+  },
+  {
+    "id": "balance",
+    "language": "Setswana",
+    "text": "Ke na le madi a makae?",
+    "tool": "read_wallet"
+  },
+
+  {
+    "id": "activity",
+    "language": "English",
+    "text": "Show me my transactions",
+    "tool": "read_transactions"
+  },
+  {
+    "id": "activity",
+    "language": "isiZulu",
+    "text": "Ngikhombise izinkokhelo zami",
+    "tool": "read_transactions",
+    "note": "izinkokhelo is the noun the unbuilt route must NOT swallow — the isiZulu spelling of the \\btransaction\\b plural bug"
+  },
+  {
+    "id": "activity",
+    "language": "Afrikaans",
+    "text": "Wys my my transaksies",
+    "tool": "read_transactions"
+  },
+  {
+    "id": "activity",
+    "language": "Setswana",
+    "text": "Mpontshe dipatelo tsa me",
+    "tool": "read_transactions"
+  },
+
+  {
+    "id": "fare",
+    "language": "English",
+    "text": "Where did my taxi fare go?",
+    "tool": "read_split"
+  },
+  {
+    "id": "fare",
+    "language": "isiZulu",
+    "text": "Imali yetekisi ihambephi?",
+    "tool": "read_split"
+  },
+  {
+    "id": "fare",
+    "language": "Afrikaans",
+    "text": "Waarheen het my taxi geld gegaan?",
+    "tool": "read_split"
+  },
+  {
+    "id": "fare",
+    "language": "Setswana",
+    "text": "Madi a me a tekisi a ile kae?",
+    "tool": "read_split"
+  },
+
+  {
+    "id": "payment",
+    "language": "English",
+    "text": "Send R5 to my brother",
+    "tool": "none",
+    "mustRefuse": true
+  },
+  {
+    "id": "payment",
+    "language": "isiZulu",
+    "text": "Ngicela ukuthumela u-R5 kubhuti wami",
+    "tool": "none",
+    "mustRefuse": true
+  },
+  {
+    "id": "payment",
+    "language": "Afrikaans",
+    "text": "Stuur R5 aan my broer",
+    "tool": "none",
+    "mustRefuse": true
+  },
+  {
+    "id": "payment",
+    "language": "Setswana",
+    "text": "Romela R5 go morwarrake",
+    "tool": "none",
+    "mustRefuse": true
+  },
+
+  {
+    "id": "codeswitch",
+    "language": "English",
+    "text": "I want to pay my electricity",
+    "tool": "none",
+    "mustRefuse": true
+  },
+  {
+    "id": "codeswitch",
+    "language": "isiZulu",
+    "text": "ngifuna ukukhokha my electricity",
+    "tool": "none",
+    "mustRefuse": true,
+    "note": "docs/12 §2 uses this exact sentence as its own example of what the LLM handles"
+  },
+  {
+    "id": "codeswitch",
+    "language": "Afrikaans",
+    "text": "ek wil my electricity betaal asseblief",
+    "tool": "none",
+    "mustRefuse": true
+  },
+  {
+    "id": "codeswitch",
+    "language": "Setswana",
+    "text": "ke batla go patala my electricity",
+    "tool": "none",
+    "mustRefuse": true
+  },
+
+  { "id": "capability", "language": "English", "text": "What can you do for me?", "tool": "none" },
+  { "id": "capability", "language": "isiZulu", "text": "Ungangisiza ngani?", "tool": "none" },
+  {
+    "id": "capability",
+    "language": "Afrikaans",
+    "text": "Wat kan jy vir my doen?",
+    "tool": "none"
+  },
+  { "id": "capability", "language": "Setswana", "text": "O ka nthusa ka eng?", "tool": "none" }
+]
