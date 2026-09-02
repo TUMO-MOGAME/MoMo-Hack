@@ -15,10 +15,8 @@
  * Sends real requestToPay calls to the SANDBOX. No real money exists there.
  */
 
-import { readFileSync, existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { loadEnv } from './_env.mjs';
 // Mirrored from src/lib/momo/test-msisdns.ts — plain node cannot import a .ts
 // module. If that file changes, change this. The whole point of this script is
 // to check whether these numbers behave as documented.
