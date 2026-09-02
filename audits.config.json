@@ -1,0 +1,66 @@
+{
+  "$schema": "../tumoOLO_Audits/templates/audits.config.schema.json",
+  "$comment": "What the shared tumoOLO_Audits grade this project against. Anything left empty is reported as 'Not measured', never as a pass — so fill a field or accept the gap honestly.",
+  "suite": {
+    "repo": "https://github.com/TUMO-MOGAME/tumoOLO_Audits",
+    "ref": "main",
+    "path": "resolved by scripts/audit.mjs — AUDIT_SUITE env var, ../tumoOLO_Audits, .audit-suite, or C:/MY BUSINESS COMPANY/tumoOLO_Audits"
+  },
+  "project": {
+    "name": "MoMo Kasi",
+    "kind": "web",
+    "launchPhase": "Phase 6",
+    "locale": "en-ZA",
+    "market": "South Africa",
+    "siteUrl": "",
+    "$note": "designSpec/designReference are camelCase because resolveRequirement() in the runner flattens {cfg, cfg.project, cfg.placeholders} and looks up the literal key from registry.json's `requires`. The SCREAMING_SNAKE twins below fill the {{TOKENS}} inside the audit text. Both are needed; they are not a duplicate.",
+    "designSpec": "src/design/tokens.ts + docs/13-CHAT-ARTIFACTS-UI.md",
+    "designReference": "C:/Social-Assembly-Main/apps/web"
+  },
+  "placeholders": {
+    "$comment": "These fill the {{TOKENS}} in the shared audit files.",
+    "DISPLAY_FONT": "Playfair Display",
+    "BODY_FONT": "Geist",
+    "MONO_FONT": "Geist Mono",
+    "FONT_STACK": "var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif",
+    "PRIMARY_CTA": "Confirm payment — the only control in the app that moves money (ADR-0014)",
+    "PRIMARY_ENDPOINT": "/api/momo/collections",
+    "DESIGN_SPEC": "src/design/tokens.ts (token source of truth) + docs/13-CHAT-ARTIFACTS-UI.md (structure and behaviour)",
+    "DESIGN_REFERENCE": "C:/Social-Assembly-Main/apps/web — the frontend template this UI is modelled on. Same token architecture, same glowing-black dark palette, same Geist/Playfair pairing; brand deliberately retuned from violet to MTN gold.",
+    "TARGET_DEVICE": "Low-end Android, 320px wide, Slow 3G, direct Highveld sunlight. Not a desktop.",
+    "CRITICAL_JOURNEY": "Ask a question in chat -> an artifact opens with real ledger numbers -> confirm a payment"
+  },
+  "resultsDir": "docs/audits/results",
+  "overlayDir": "docs/audits",
+  "audits": {
+    "$comment": "Per-audit overrides. A disabled audit needs a reason — the reason is what the next person reads.",
+    "A1": { "enabled": true, "reason": "" },
+    "A2": {
+      "enabled": true,
+      "reason": "The design reference is the Social-Assembly frontend. The seam between 'adopted the system' and 'drifted from it' is exactly what A2 exists to find."
+    },
+    "A3": {
+      "enabled": true,
+      "reason": "Judges score design, and the target user is on a cracked screen in the sun. A3 outranks A4 for this project."
+    },
+    "A4": { "enabled": true, "reason": "" },
+    "A5": { "enabled": true, "reason": "" },
+    "A6": {
+      "enabled": true,
+      "reason": "Light scope — one public landing page. There is no content marketing surface to grade."
+    },
+    "A7": {
+      "enabled": true,
+      "reason": "No native app, but the offline-first PWA is demoed live in airplane mode. Scoped to PWA / offline / safe-area by docs/audits/A7.project.md; store readiness is N/A."
+    },
+    "A8": { "enabled": true, "reason": "" },
+    "A9": {
+      "enabled": false,
+      "reason": "Needs secret.ANTHROPIC_API_KEY, which costs money, and this project is R0 (docs/10). Its role — reading each PR diff for introduced vulnerabilities — is covered by manual PR review plus A5 at phases 3, 4 and 6. This is a real gap, not a pass. Re-enable the moment a key exists."
+    },
+    "S1": {
+      "enabled": true,
+      "reason": "Needs project.siteUrl and a deployment. Set the Vercel URL at Phase 6 and run it once; non-blocking, so it can never gate the submission."
+    }
+  }
+}

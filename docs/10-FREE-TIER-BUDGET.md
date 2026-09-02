@@ -112,8 +112,9 @@ plan. That is the single highest-value paid upgrade in this project — see §4.
 
 ### Language coverage caveat
 
-ElevenLabs supports **no South African language** (ADR-0011). Lelapa AI's Vulavula does, and has
-**no free tier** ($9.99/mo). Tier 2 languages therefore use human recordings — free, and better.
+ElevenLabs supports **no South African language** (ADR-0011), so v1 speaks **English only**. Lelapa AI
+does, but has **no free tier** ($9.99/mo). Every other language is still understood and answered in **text** —
+that runs on the LLM and costs nothing. Human recordings for isiZulu et al. are deferred to COULD.
 
 ### CopilotKit — MIT, self-hosted
 
@@ -133,10 +134,10 @@ keeps licence-disc images off our storage entirely. Lower accuracy, accepted —
 |---|---|---|---|
 | Groq (agent LLM) | Free | no | ✅ |
 | Google Gemini (fallback LLM) | Free | no | ✅ |
-| ElevenLabs (voice) | Free | no | ⚠️ no commercial rights; phrase bank keeps us inside it |
+| ElevenLabs (voice, English only) | Free | no | ⚠️ no commercial rights; phrase bank keeps us inside it |
 | CopilotKit | MIT, self-hosted | no | ✅ |
 | Web Speech API (STT + fallback TTS) | browser built-in | no | ✅ |
-| Lelapa AI Vulavula (SA languages) | **no free tier**, $9.99/mo | yes | ❌ documented paid exit |
+| Lelapa AI MoMo Kasivula (SA languages) | **no free tier**, $9.99/mo | yes | ❌ documented paid exit |
 | GitHub | Free, public | no | ✅ |
 | GitHub Actions | Free (unlimited, public) | no | ✅ |
 | Vercel | Hobby | no | ✅ |
@@ -182,7 +183,7 @@ Useful to state, because a judge may ask what it takes to run this for real:
 2. **Supabase Pro ($25/mo)** — no pausing, daily backups, 8GB DB. The pause risk alone justifies it.
 3. **Vercel Pro ($20/mo)** — 60s functions and per-minute crons; the scheduler collapses back into
    the platform and the architecture simplifies.
-4. **Lelapa AI Vulavula ($9.99/mo)** — real isiZulu, Sesotho and Afrikaans speech, from a South
+4. **Lelapa AI MoMo Kasivula ($9.99/mo)** — real isiZulu, Sesotho and Afrikaans speech, from a South
    African company. The right answer for the language goal, and a good story in itself.
 5. **GitHub Team ($4/user/mo)** — branch protection on a private repo, if the code had to stay closed.
 

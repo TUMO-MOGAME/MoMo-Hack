@@ -177,7 +177,7 @@ For agents doing large, long-running features, give them their own git worktree 
 tree cannot collide with yours:
 
 ```bash
-git worktree add ../vula-agent-telegram -b agent/w3-telegram
+git worktree add ../momo-kasi-agent-telegram -b agent/w3-telegram
 ```
 
 Use it for W3-W5 (the big feature agents). Skip it for small, short tasks where the overhead is not

@@ -1,4 +1,4 @@
-# Vula — Agent Standing Orders
+# MoMo Kasi — Agent Standing Orders
 
 > **Read this first, every session.** Then read `PLANNING.md` (what we're building and why)
 > and `STATUS.md` (what is done, what is in flight, what is tested).
@@ -7,7 +7,7 @@
 
 ## What this is
 
-Vula is a hackathon submission for the **MTN MoMo API Hackathon** (South Africa).
+MoMo Kasi is a hackathon submission for the **MTN MoMo API Hackathon** (South Africa).
 It is a daily-use money app for Mzansi: youth **earn** through micro-gigs, money **circulates**
 through stokvels and shared bills, and is **spent** on taxi fare, electricity, school fees and airtime.
 It orchestrates three MoMo APIs (Collections, Disbursements, Remittances) over a double-entry ledger.
@@ -41,7 +41,10 @@ Target submission: **28 Sep 2026**. Code freeze: **27 Sep 2026**. Solo developer
     confirm, at any amount. See ADR-0014.
 12. **The agent never emits markup.** It emits zod-validated typed data rendered by a fixed
     component registry. No `dangerouslySetInnerHTML` in the artifact path, ever. See ADR-0013.
-13. **Never put a number in an artifact that did not come from a tool call.** Every monetary value
+13. **Run the phase's audits before declaring a phase done.** Only the audits that phase owes —
+    `npm run audit:status` says which. Report only, never fix while auditing, and write the result
+    to `STATUS.md`: an audit not written there did not happen. See `PLANNING.md` §11.
+14. **Never put a number in an artifact that did not come from a tool call.** Every monetary value
     carries a `sourceTxnId` or `sourceAccountId`. The model does not get to invent amounts.
 
 ## Where things live
@@ -64,6 +67,9 @@ Target submission: **28 Sep 2026**. Code freeze: **27 Sep 2026**. Solo developer
 | Demo script + fallbacks | `docs/08-DEMO-RUNBOOK.md` |
 | Risks and mitigations | `docs/09-RISK-REGISTER.md` |
 | Free-tier limits and headroom | `docs/10-FREE-TIER-BUDGET.md` |
+| Phases, and the audits each one owes | `PLANNING.md` §10-11 |
+| Audit results | `docs/audits/results/` |
+| Project-specific audit rules | `docs/audits/<ID>.project.md` |
 | Decisions and their rationale | `docs/adr/` |
 
 ## Session start checklist
@@ -73,6 +79,7 @@ Target submission: **28 Sep 2026**. Code freeze: **27 Sep 2026**. Solo developer
 2. git log --oneline -10          # what actually landed
 3. gh pr list                     # what is open
 4. npm run verify                 # is the tree green right now
+5. npm run audit:status           # which phase, and what it owes
 ```
 
 ## Session end checklist

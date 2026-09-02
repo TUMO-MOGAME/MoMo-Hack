@@ -42,3 +42,37 @@ not survive real traffic. Documented as a paid exit in `docs/10-FREE-TIER-BUDGET
 **Deliberately rejected:** the multi-agent A2A architecture used by the reference project. Each
 additional agent hop is another slice of a 10s budget, and it violates ADR-0001. One agent with good
 tools beats three agents that time out.
+
+---
+
+## Amendment — 2026-09-02 (same day, before implementation)
+
+**Gemini is primary; Groq becomes the fallback.** Decided by Tumo, who has a Gemini API key.
+
+The decision above is unchanged in substance — free tier, no card, an automatic second provider on
+rate-limit. Only the order swaps.
+
+| | Before | After |
+|---|---|---|
+| Primary | Groq | **Google Gemini Flash** |
+| Fallback on 429 / 5xx | Gemini Flash | **Groq** |
+
+**Why the swap is right:** a key that exists beats a key that does not. Groq's advantages were
+theoretical for this project until someone signed up; Gemini's are available today. Both remain
+free and card-free, so the fallback costs nothing to keep.
+
+**What we give up, stated plainly:**
+
+1. **Latency.** Gemini Flash is roughly 1.5s to first token against Groq's ~200ms. That is
+   comfortably inside Vercel Hobby's 10s budget for text, but it is noticeable in voice, where
+   perceived silence above ~1.2s makes an assistant feel dead (`docs/12` §4.4). Mitigation: the
+   phrase bank answers the common cases in ~50ms without touching the model at all, so the slower
+   model is hidden behind cached audio for exactly the replies said most often.
+2. **Data handling.** Google's free tier may use submitted data to improve its products; Groq does
+   not train on API data. For a payments-adjacent agent this matters — and it is precisely why the
+   POPIA prompt scrubber (`docs/14` §7, ADR-0015) is now **load-bearing rather than belt-and-braces**.
+   No MSISDN, no name, no identifier may appear in an outbound prompt. The test asserting that is
+   no longer optional.
+
+**Consequence for the build:** the scrubber moves from a Phase 4 nicety to a Phase 3 requirement,
+shipped with the agent route rather than after it.

@@ -29,7 +29,7 @@ Architecture is mostly the shadow cast by constraints. Ours, verified 2026-09-02
                                  |
                                  v
                     +-------------------------+
-                    |          VULA           |
+                    |        MOMO KASI        |
                     |  Next.js on Vercel      |
                     |  Supabase Postgres      |
                     +------------+------------+
@@ -114,7 +114,7 @@ This is the flow we demo, and the flow every architectural decision serves.
         |
  3. POST sandbox /collection/v1_0/requesttopay
         |  X-Reference-Id: <that same uuid>          <-- idempotency key
-        |  X-Callback-Url: https://vula.../api/momo/callback/collection
+        |  X-Callback-Url: https://momo-kasi.../api/momo/callback/collection
         |  amount in EUR (shim), currency EUR
         |  <- 202 Accepted, no body
         |
@@ -135,9 +135,9 @@ This is the flow we demo, and the flow every architectural decision serves.
         - write the journal: 4 balanced postings
              debit  momo_settlement        +1250
              credit owner_wallet:Thabo      -750   (6000 bps)
-             credit driver_float:Sipho      -312   (2500 bps)
+             credit driver_float:Sipho      -313   (2500 bps, +1 remainder cent)
              credit fuel_pool:rank-42       -125   (1000 bps)
-             credit insurance_pool:rank-42   -63   ( 500 bps, +1 remainder cent)
+             credit insurance_pool:rank-42   -62   ( 500 bps)
         - INSERT outbox rows (notify commuter, notify driver, notify owner)
         - COMMIT
         |
@@ -265,7 +265,7 @@ judges see".
 One shared error shape across every boundary, so agents write consistent code.
 
 ```ts
-type VulaError =
+type AppError =
   | { kind: 'VALIDATION';    field: string; message: string }        // 400, user fixable
   | { kind: 'AUTHZ';         message: string }                        // 403
   | { kind: 'NOT_FOUND';     resource: string }                       // 404

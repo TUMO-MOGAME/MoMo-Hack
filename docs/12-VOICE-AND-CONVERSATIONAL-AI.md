@@ -33,14 +33,18 @@ about which languages have which quality of voice today.
 
 | Option | SA languages | Free? | Verdict |
 |---|---|---|---|
-| **ElevenLabs** | none | 10k credits/mo, no commercial rights, watermarked | ✅ for English + Swahili/Hausa/Lingala/Somali |
-| **Lelapa AI (Vulavula)** — a South African company | isiZulu, Afrikaans, Sesotho, English | **no free tier**, $9.99/mo Dev Pass | ⏸ ideal partner, costs money |
+| **ElevenLabs** | none | 10k credits/mo, no commercial rights, watermarked | ✅ **English only for v1** (decision, 2026-09-02) |
+| **Lelapa AI (MoMo Kasivula)** — a South African company | isiZulu, Afrikaans, Sesotho, English | **no free tier**, $9.99/mo Dev Pass | ⏸ ideal partner, costs money |
 | **Browser Web Speech API** | device-dependent (`af-ZA`, `zu-ZA` on many Android builds) | **free, on-device, offline** | ✅ fallback, zero cost, zero data |
-| **Human-recorded phrase bank** | any, perfectly | **free** (a person and a microphone) | ✅ **best quality for the demo** |
+| **Human-recorded phrase bank** | any, perfectly | **free** (a person and a microphone) | ⏸ deferred, see §2 |
 
 ---
 
 ## 2. The language strategy
+
+**Scope decision, 2026-09-02: ElevenLabs is English only for v1.**
+The provider-per-language architecture stays — that is what makes the roadmap credible and what
+makes adding a language a config change. What narrows is the *initial roster*.
 
 ```
                         ┌──────────────────────────────────────┐
@@ -48,50 +52,62 @@ about which languages have which quality of voice today.
                         └──────────────────┬───────────────────┘
                                            v
                         ┌──────────────────────────────────────┐
-                        │  UNDERSTAND  (always all languages)  │
+                        │  UNDERSTAND   ← UNCHANGED, ALL LANGS │
                         │  LLM handles isiZulu, isiXhosa,      │
                         │  Sepedi, Afrikaans, code-switching   │
                         │  ("ngifuna ukukhokha my electricity") │
                         └──────────────────┬───────────────────┘
                                            v
                         ┌──────────────────────────────────────┐
-                        │  RESPOND  (text: always all langs)   │
+                        │  RESPOND      ← UNCHANGED, ALL LANGS │
+                        │  text, in the user's own language    │
                         └──────────────────┬───────────────────┘
                                            v
                         ┌──────────────────────────────────────┐
-                        │  SPEAK  (provider chosen per language)│
+                        │  SPEAK        ← NARROWED FOR v1      │
                         └──────────────────────────────────────┘
-                             │              │              │
-            ┌────────────────┘              │              └────────────────┐
-            v                               v                               v
-   ┌─────────────────┐          ┌────────────────────┐          ┌──────────────────┐
-   │  ElevenLabs     │          │  Human phrase bank │          │  Web Speech API  │
-   │  en, sw, ha,    │          │  zu, xh, st, af    │          │  device fallback │
-   │  ln, so         │          │  recorded once     │          │  any language    │
-   └─────────────────┘          └────────────────────┘          └──────────────────┘
+                                    │                  │
+                  ┌─────────────────┘                  └──────────────────┐
+                  v                                                       v
+       ┌────────────────────────┐                          ┌──────────────────────┐
+       │  ElevenLabs — ENGLISH  │                          │  Web Speech API      │
+       │  phrase bank + capped  │                          │  device fallback,    │
+       │  live TTS              │                          │  any language it has │
+       └────────────────────────┘                          └──────────────────────┘
 ```
 
-**Understanding is universal; speaking is tiered.** A user can always *talk to us* in isiZulu and
-always *read* isiZulu. What varies by language is how good the spoken reply sounds — and we say so
-in the UI rather than hiding it.
+**This is the important part: the multilingual claim does not weaken.** A user still talks to MoMo Kasi
+in isiZulu and still gets an isiZulu reply — in text. Only the *spoken* reply is English in v1.
+The LLM handles every South African language at **zero marginal cost**, so the thing that actually
+differentiates us for a South African panel is fully intact.
 
-### Tier 1 — full synthetic voice (ElevenLabs)
-English (South African-accented voice), Swahili, Hausa, Lingala, Somali.
-Those four African languages are not decoration: they cover East, West and Central Africa, which is
-exactly the "we built for all of Africa" expansion claim, and it is **true** rather than aspirational.
+### Tier 1 — synthetic voice (ElevenLabs)
+**English only**, South African-accented voice.
 
-### Tier 2 — human phrase bank (the demo languages)
-isiZulu, isiXhosa, Sesotho, Afrikaans. A native speaker records ~60 phrases once. Free, perfect
-pronunciation, and warmer than any TTS. For a demo in front of a South African panel, a real
-isiZulu voice beats synthetic English every time.
+### Tier 2 — on-device voice (Web Speech API)
+Any language the user's phone can speak, including `af-ZA` and `zu-ZA` on many Android builds.
+Free, offline, no API. Quality varies by device, so it is a bonus rather than a promise.
 
-### Tier 3 — text only, with on-device fallback
-The remaining official languages. Web Speech API speaks them if the device can; otherwise text.
+### Tier 3 — text
+Every other language. Always available, always in the user's own language.
 
-### Roadmap slide (honest, not vapour)
-*"ElevenLabs does not yet support South African languages. Our voice layer is provider-per-language,
-so the day they add isiZulu — or the day we can fund Lelapa AI's Vulavula, a South African company
-that already does isiZulu, Sesotho and Afrikaans — it is a config change, not a rewrite."*
+### Deferred, not cancelled
+- **Human recordings** for isiZulu, isiXhosa, Sesotho, Afrikaans (was Tier 2). Still the best
+  quality available to us at zero cost, and still the right thing to do. Moved to COULD — it needs
+  a native speaker and a microphone, which is a scheduling dependency we do not want in week three.
+  If the schedule allows, isiZulu alone is worth recording: it is the demo language.
+- **Swahili, Hausa, Lingala, Somali** via ElevenLabs. These were the honest evidence for the
+  pan-African claim. Now roadmap rather than demoed — see the wording below.
+
+### The roadmap line (adjusted for English-only v1)
+*"MoMo Kasi understands and replies in every South African language today — that runs on the LLM and
+costs nothing. Spoken voice is English in v1 because ElevenLabs does not yet support any South
+African language; we verified that. The voice layer is provider-per-language, so isiZulu speech is a
+config change the day ElevenLabs adds it, or the day we can fund Lelapa AI's MoMo Kasivula — a South
+African company that already does isiZulu, Sesotho and Afrikaans."*
+
+That still reads as research and engineering judgement rather than a gap. **Do not claim spoken
+isiZulu in the deck or the demo.** Claim understanding, which is real and demonstrable.
 
 That is a stronger pitch beat than pretending the problem does not exist. It shows we researched the
 market, found a real gap, and engineered for it.
@@ -127,8 +143,9 @@ So we **pre-generate once and cache forever**:
 ```
 
 **Cost after the first generation run: R0, forever.**
-~180 clips at ~40 characters each ≈ 7,200 characters ≈ well inside one month's free allowance, and
-it is a one-time spend. Regeneration only happens when a phrase changes, gated behind
+English only, so this is a single pass: ~180 clips at ~40 characters ≈ **7,200 characters, about 36%
+of one month's free allowance**, spent once. That leaves comfortable headroom for regeneration when
+phrasing changes, and for the capped live TTS below. Regeneration is gated behind
 `npm run voice:build` — never in CI, never at runtime.
 
 ```ts
@@ -166,28 +183,35 @@ plan is required.** That is documented in `docs/10-FREE-TIER-BUDGET.md` §4 as a
 
 | Option | Free? | Card? | Verdict |
 |---|---|---|---|
-| **Groq** | 30 RPM, 14,400 req/day, no per-token charge | **no card** | ✅ **chosen** |
-| Google Gemini | 10-30 RPM, 250-1,000 req/day on Flash | no card | ✅ fallback |
+| **Google Gemini Flash** | 10-30 RPM, 250-1,000 req/day | **no card** | ✅ **chosen — key in hand** |
+| Groq | 30 RPM, 14,400 req/day, no per-token charge | no card | ✅ fallback on rate-limit |
 | Claude / OpenAI | paid from the first call | yes | ❌ |
 
-**Groq** is chosen: no credit card, no credits system, sub-200ms time-to-first-token (which matters
-enormously for voice — latency is what makes an assistant feel dead), and it does not train on our
-data, which is the right posture for anything near a payments flow. Gemini Flash is configured as an
-automatic fallback when Groq rate-limits.
+**Gemini Flash is primary** — Tumo has a key, and a key that exists beats one that does not. Free,
+no credit card, and comfortably inside Vercel's 10s budget. **Groq is the automatic fallback** on
+rate-limit: also free, also card-free, and roughly seven times faster to first token.
+
+Two consequences we carry deliberately (ADR-0012 amendment):
+
+- **Latency.** ~1.5s to first token against Groq's ~200ms. Fine for text; noticeable in voice. The
+  phrase bank hides it — the most common replies play from cache in ~50ms and never reach the model.
+- **Data handling.** Google's free tier may use submitted data to improve its products. This makes
+  the POPIA prompt scrubber (`docs/14` §7) **load-bearing, not belt-and-braces**: no MSISDN, no name,
+  no identifier may leave in a prompt, and the test asserting that ships with the agent route.
 
 ### 4.2 Persona
 
 Not a bank. A knowledgeable friend at the rank who happens to be good with money.
 
 ```
-You are Vula — a warm, brief, practical money assistant for South Africans.
+You are MoMo Kasi — a warm, brief, practical money assistant for South Africans.
 
 VOICE
 - Speak like a friend, not a bank. Short sentences. No corporate hedging.
 - Match the user's language and register, including code-switching. If they mix
   isiZulu and English, you mix isiZulu and English.
 - Use the greeting that fits: "Sawubona", "Molo", "Dumela", "Howzit".
-- Never say "I am an AI language model". You are Vula.
+- Never say "I am an AI language model". You are MoMo Kasi.
 - Celebrate small wins. Getting paid R60 matters.
 
 MONEY — NON-NEGOTIABLE
@@ -232,9 +256,9 @@ Voice conversation dies above ~1.2s of perceived silence.
 | Stage | Budget | How |
 |---|---|---|
 | Speech to text | 400ms | Web Speech API on-device, streaming, free |
-| Agent turn | 500ms | Groq, streaming, sub-200ms TTFT |
+| Agent turn | 500-1500ms | Gemini Flash, streaming; Groq fallback is ~200ms TTFT |
 | First audio out | 300ms | Phrase bank clips are pre-generated — instant |
-| **Total to first sound** | **~1.2s** | |
+| **Total to first sound** | **~1.2s cached / ~2.2s live** | The phrase bank is what keeps the common path fast |
 
 The phrase bank is not only a cost decision. **A cached clip starts playing in ~50ms**, where live
 TTS takes 400-800ms. For the most common replies, the free approach is also the fastest one.
@@ -247,7 +271,7 @@ TTS takes 400-800ms. For the most common replies, the free approach is also the 
 `en-ZA`, `af-ZA` and `zu-ZA` on many builds; we detect and degrade gracefully.
 
 ElevenLabs Scribe is available as a paid upgrade path for accurate multilingual transcription, and
-Lelapa AI's Vulavula is the right choice specifically for South African code-switched speech. Both
+Lelapa AI's MoMo Kasivula is the right choice specifically for South African code-switched speech. Both
 are documented as paid exits, neither is a dependency.
 
 Every voice interaction has a text equivalent. **Voice is never the only way to do anything** —
@@ -274,15 +298,19 @@ Voice is **SHOULD**, not MUST. It is added after the money engine works, and it 
 
 | Item | Day | Depends on |
 |---|---|---|
-| V1 Agent + tools + persona (text only) | 17-18 | Ledger, read repositories |
+| V1 Agent + tools + persona, **multilingual text** | 17-18 | Ledger, read repositories |
 | V2 Generative UI artifacts (`docs/13`) | 18-19 | V1 |
-| V3 Phrase bank build script + storage | 19 | V1 |
+| V3 Phrase bank build script + storage, **English** | 19 | V1 |
 | V4 Speech input (Web Speech API) | 20 | V1 |
-| V5 isiZulu/isiXhosa/Sesotho/Afrikaans human recordings | 20 | V3 |
-| V6 ElevenLabs live TTS with budget cap | 21 | V3 |
+| V5 ElevenLabs live TTS with budget cap, **English** | 21 | V3 |
+| ~~V6~~ Human recordings for SA languages | **COULD** | V3 — deferred 2026-09-02 |
 
-**Cut order if behind:** V6, then V5, then V4. V1 and V2 stay — a text agent that renders live
+**Cut order if behind:** V5, then V4. V1 and V2 stay — a multilingual text agent that renders live
 dashboards is most of the value, and it works without any voice at all.
+
+Note the ordering consequence of English-only: **V1 already delivers the multilingual story**, since
+understanding and text replies need no voice provider. Voice is now purely additive polish rather
+than the thing carrying the language claim. That is a lower-risk shape than we had before.
 
 ---
 
@@ -292,7 +320,7 @@ dashboards is most of the value, and it works without any voice at all.
 - [ElevenLabs — models](https://elevenlabs.io/docs/overview/models)
 - [ElevenLabs pricing 2026 — plans, credits, commercial rights](https://bigvu.tv/blog/elevenlabs-pricing-2026-plans-credits-commercial-rights-api-costs/)
 - [ElevenLabs pricing — per-minute agent rates](https://pxlpeak.com/blog/ai-tools/elevenlabs-pricing-guide)
-- [Lelapa AI — Vulavula](https://lelapa.ai/products/vulavula/) · [pricing](https://lelapa.ai/pricing)
-- [Vulavula brings AI speech and text powers to South African languages](https://www.trendwatching.com/innovation-of-the-day/vulavula-brings-ai-speech-and-text-powers-to-south-african-languages)
+- [Lelapa AI — MoMo Kasivula](https://lelapa.ai/products/vulavula/) · [pricing](https://lelapa.ai/pricing)
+- [MoMo Kasivula brings AI speech and text powers to South African languages](https://www.trendwatching.com/innovation-of-the-day/vulavula-brings-ai-speech-and-text-powers-to-south-african-languages)
 - [Groq free tier limits 2026](https://tokenmix.ai/blog/groq-free-tier-limits-2026)
 - [Gemini API free tier 2026 — no card](https://tokenmix.ai/blog/gemini-api-free-tier-limits)
