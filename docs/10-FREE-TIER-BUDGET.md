@@ -112,8 +112,9 @@ plan. That is the single highest-value paid upgrade in this project — see §4.
 
 ### Language coverage caveat
 
-ElevenLabs supports **no South African language** (ADR-0011). Lelapa AI's Vulavula does, and has
-**no free tier** ($9.99/mo). Tier 2 languages therefore use human recordings — free, and better.
+ElevenLabs supports **no South African language** (ADR-0011), so v1 speaks **English only**. Lelapa AI
+does, but has **no free tier** ($9.99/mo). Every other language is still understood and answered in **text** —
+that runs on the LLM and costs nothing. Human recordings for isiZulu et al. are deferred to COULD.
 
 ### CopilotKit — MIT, self-hosted
 
@@ -133,7 +134,7 @@ keeps licence-disc images off our storage entirely. Lower accuracy, accepted —
 |---|---|---|---|
 | Groq (agent LLM) | Free | no | ✅ |
 | Google Gemini (fallback LLM) | Free | no | ✅ |
-| ElevenLabs (voice) | Free | no | ⚠️ no commercial rights; phrase bank keeps us inside it |
+| ElevenLabs (voice, English only) | Free | no | ⚠️ no commercial rights; phrase bank keeps us inside it |
 | CopilotKit | MIT, self-hosted | no | ✅ |
 | Web Speech API (STT + fallback TTS) | browser built-in | no | ✅ |
 | Lelapa AI Vulavula (SA languages) | **no free tier**, $9.99/mo | yes | ❌ documented paid exit |

@@ -46,7 +46,11 @@ Test column: `none` / `unit` / `+prop` (property-based) / `+int` (integration in
 |---|---|---|---|---|---|---|
 | F1 | Public GitHub repo created | `[x]` | n/a | n/a | — | `TUMO-MOGAME/MoMo-Hack`, made public 2026-09-02 |
 | F2 | Ruleset protecting `main` | `[x]` | verified | n/a | — | Ruleset 22084424. Direct push **tested and rejected**. Squash-only, linear history, no bypass actors. |
-| F3 | Next.js + TS + Tailwind scaffold | `[ ]` | none | unit | — | |
+| F3 | Next.js + TS + Tailwind scaffold | `[~]` | typecheck | unit | — | Next 15.1.6, React 19, Tailwind v4, strict TS + `noUncheckedIndexedAccess`. Dev server verified 200. |
+| F3a | Full directory structure + module boundaries | `[x]` | n/a | n/a | — | Matches `docs/01` §5 = the agent ownership map |
+| F3b | Design tokens (`src/design/tokens.ts` + `@theme`) | `[x]` | none | unit | — | Architecture from Social-Assembly; brand retuned to MTN gold |
+| F3c | Frozen contracts: `money`, `split`, `errors`, `artifacts/types` | `[x]` | **manual** | +prop | — | Split verified exact across 200,000 amounts. Needs the real fast-check suite (M1d). |
+| F3d | Starter chat + artifact UI (mock agent) | `[x]` | manual | +e2e | — | 7 artifact renderers, chip + panel + bottom sheet, zero keys needed |
 | F4 | Supabase staging + prod projects | `[ ]` | none | +int | — | Free tier allows exactly 2 |
 | F5 | Migration pipeline (local, CI, deploy) | `[ ]` | none | +int | — | |
 | F6 | CI quality gate workflow | `[ ]` | none | n/a | — | |
@@ -149,7 +153,10 @@ Format: one line per merged workstream, with the evidence.
 
 | Date | What | Test level reached | Evidence |
 |---|---|---|---|
-| — | — | — | — |
+| 2026-09-02 | Branch protection on `main` | verified | Direct push rejected: `GH013 — Changes must be made through a pull request` |
+| 2026-09-02 | Split engine invariant | **manual exhaustive** | 200,000 consecutive amounts × the 60/25/10/5 rule; every split summed exactly. Not yet the fast-check suite required by `docs/04` §3 — logged as debt below. |
+| 2026-09-02 | TypeScript strict build | typecheck | `tsc --noEmit` clean under `strict` + `noUncheckedIndexedAccess` |
+| 2026-09-02 | Starter UI renders | manual | Dev server `HTTP 200`; greeting, suggestions and composer all present in the response |
 
 ---
 
@@ -160,7 +167,10 @@ Nothing yet. Anything merged at a lower test level than
 
 | Item | Merged at | Needs | Due | Why deferred |
 |---|---|---|---|---|
-| — | — | — | — | — |
+| `src/domain/split.ts` | manual exhaustive check | **fast-check property suite** (`docs/04` §3, P1-P2) | Day 5 | Vitest not yet installed; the algorithm was needed to build the UI against |
+| `src/domain/money.ts` | typecheck only | unit tests for `parseMinor` / `formatZAR` edge cases | Day 5 | as above |
+| Artifact renderers | manual | fixture unit tests + axe | Day 22 | Skin will change when the template lands |
+| `src/lib/agent/mock.ts` | manual | becomes the UI test fixture source | Day 18 | Replaced by the real agent route (S7a) |
 
 ---
 

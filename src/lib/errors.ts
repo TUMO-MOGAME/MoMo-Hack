@@ -1,0 +1,88 @@
+/**
+ * One error shape across every boundary (docs/01 §10).
+ *
+ * Agents and humans both write more consistent code when there is exactly one
+ * way to fail. Never throw a bare Error from application code.
+ */
+
+export type VulaError =
+  | { kind: 'VALIDATION'; field: string; message: string }
+  | { kind: 'AUTHZ'; message: string }
+  | { kind: 'NOT_FOUND'; resource: string }
+  | { kind: 'CONFLICT'; message: string }
+  | { kind: 'INSUFFICIENT'; available: bigint; required: bigint }
+  | { kind: 'UPSTREAM'; provider: 'momo' | 'telegram' | 'groq' | 'elevenlabs'; retryable: boolean; status?: number }
+  | { kind: 'INTERNAL'; cause: unknown };
+
+export class VulaException extends Error {
+  constructor(readonly error: VulaError) {
+    super(describe(error));
+    this.name = 'VulaException';
+  }
+}
+
+export function describe(e: VulaError): string {
+  switch (e.kind) {
+    case 'VALIDATION':
+      return `${e.field}: ${e.message}`;
+    case 'AUTHZ':
+      return e.message;
+    case 'NOT_FOUND':
+      return `${e.resource} not found`;
+    case 'CONFLICT':
+      return e.message;
+    case 'INSUFFICIENT':
+      return `insufficient funds: have ${e.available}, need ${e.required}`;
+    case 'UPSTREAM':
+      return `${e.provider} failed${e.status ? ` (${e.status})` : ''}`;
+    case 'INTERNAL':
+      return 'internal error';
+  }
+}
+
+/** HTTP status for an error. Keeps route handlers free of mapping logic. */
+export function httpStatus(e: VulaError): number {
+  switch (e.kind) {
+    case 'VALIDATION':
+      return 400;
+    case 'AUTHZ':
+      return 403;
+    case 'NOT_FOUND':
+      return 404;
+    case 'CONFLICT':
+      return 409;
+    case 'INSUFFICIENT':
+      return 422;
+    case 'UPSTREAM':
+      return 502;
+    case 'INTERNAL':
+      return 500;
+  }
+}
+
+/**
+ * Safe for a user to read. Never leaks a key, a token, or a full MSISDN —
+ * POPIA s105/106 (docs/14 §5).
+ */
+export function userMessage(e: VulaError): string {
+  switch (e.kind) {
+    case 'VALIDATION':
+      return e.message;
+    case 'AUTHZ':
+      return 'You do not have access to that.';
+    case 'NOT_FOUND':
+      return 'We could not find that.';
+    case 'CONFLICT':
+      return 'That was already done.';
+    case 'INSUFFICIENT':
+      return 'There is not enough in your wallet for that.';
+    case 'UPSTREAM':
+      return 'The payment network is slow right now. We will keep trying.';
+    case 'INTERNAL':
+      return 'Something went wrong on our side.';
+  }
+}
+
+export const fail = (error: VulaError): never => {
+  throw new VulaException(error);
+};

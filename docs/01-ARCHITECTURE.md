@@ -135,9 +135,9 @@ This is the flow we demo, and the flow every architectural decision serves.
         - write the journal: 4 balanced postings
              debit  momo_settlement        +1250
              credit owner_wallet:Thabo      -750   (6000 bps)
-             credit driver_float:Sipho      -312   (2500 bps)
+             credit driver_float:Sipho      -313   (2500 bps, +1 remainder cent)
              credit fuel_pool:rank-42       -125   (1000 bps)
-             credit insurance_pool:rank-42   -63   ( 500 bps, +1 remainder cent)
+             credit insurance_pool:rank-42   -62   ( 500 bps)
         - INSERT outbox rows (notify commuter, notify driver, notify owner)
         - COMMIT
         |

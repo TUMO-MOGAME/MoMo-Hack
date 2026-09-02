@@ -24,7 +24,7 @@ Every external API call this system makes or receives, what triggers it, and wha
 | A9 | **GitHub Actions → our cron routes** | us | **inbound** | `CRON_SECRET` bearer | Free | Scheduling |
 | A10 | **Groq** (agent LLM) | Groq | outbound | API key | Free, no card | The conversational agent |
 | A11 | **Google Gemini Flash** (fallback LLM) | Google | outbound | API key | Free, no card | Used only when Groq rate-limits |
-| A12 | **ElevenLabs TTS** | ElevenLabs | outbound | API key | Free tier | Phrase-bank generation (build time) + capped live TTS |
+| A12 | **ElevenLabs TTS** | ElevenLabs | outbound | API key | Free tier | **English only (v1).** Phrase-bank generation at build time + capped live TTS |
 | A13 | **Web Speech API** | browser | on-device | none | Free | Speech input; TTS fallback |
 
 Not used, and why — so nobody adds them later without a decision:
@@ -238,8 +238,8 @@ best-effort and may fire late, early, or twice.
 | **Phrase-bank generation** | Build time, `npm run voice:build`, run manually | ~180 clips ≈ 7,200 chars, **once** | Output cached in Supabase Storage forever. **Never runs in CI or at runtime.** |
 | **Live TTS** | A genuinely novel agent reply | Capped at **500 chars/day** | On exhaustion: fall back to the phrase bank, then to text. Never fails, never bills. |
 
-Languages: English, Swahili, Hausa, Lingala, Somali only. isiZulu, isiXhosa, Sesotho and Afrikaans
-use human recordings; the rest use A13 or text (ADR-0011).
+**Languages: English only for v1** (ADR-0011 amendment). Every other language is understood and
+answered in **text**; spoken output falls back to the on-device Web Speech API (A13) or to text.
 
 **Web Speech API (A13)** — on-device, no network. `SpeechRecognition` for input,
 `speechSynthesis` as the Tier 3 voice fallback. **Raw audio never leaves the device**

@@ -60,6 +60,14 @@ the pitch.
 | National unemployment | 33.6% |
 | Youth (15-34) unemployment | 47.4% |
 | Unemployed youth, absolute | ~5 million (up 264,000 quarter on quarter) |
+| **NEET**, aged 15-34 (Q1 2026) | **45.6%** |
+| **NEET**, aged 15-24 (Q1 2026) | **37.6%** — 3.9 million of 10.3 million |
+| NEET, young women 15-24 | 39.2% (up 1.7pp year on year) |
+
+**NEET** — Not in Employment, Education or Training — is the sharper number. Unemployment counts
+people still *looking*. NEET counts people who have disengaged entirely. Nearly half of South
+Africans aged 15-34 are in that category, and it is the demographic Vula Gigs is built for: they do
+not need a better CV, they need a first transaction.
 
 Two of every five young South Africans in the labour force cannot find work, while a
 R90bn transport industry and 800,000 savings groups run on cash that nobody can see.
@@ -146,6 +154,24 @@ sustained engineering rather than a weekend build:
 8. **A MoMo emulator** built from recorded sandbox responses, so a live outage cannot kill the demo.
 9. **Offline-first fare capture**, demonstrated live in airplane mode.
 10. **Three channels, one core** — Telegram, PWA, USSD — proving the design is genuinely channel-agnostic.
+
+---
+
+## 6a. The connectivity constraint
+
+ICASA regulates data bundle expiry, rollover and out-of-bundle billing in South Africa. When a
+prepaid user hits their out-of-bundle limit they are **disconnected abruptly**, mid-session, with no
+warning inside the app. Data is also expensive relative to income for exactly the users we target.
+
+This is why offline-first is not a nice-to-have (S2) but a correctness requirement:
+
+- The PWA shell is service-worker cached, so the app opens with **zero** network.
+- Reads are persisted to IndexedDB, so losing a bundle degrades to read-only rather than an error screen.
+- Fare capture queues locally and syncs via Background Sync when connectivity returns.
+- Telegram and USSD exist precisely because they cost the user almost nothing.
+
+A payments app that assumes a live connection will be abandoned by the people it was built for. We
+demo this deliberately, in airplane mode (`docs/08` §3).
 
 ---
 
