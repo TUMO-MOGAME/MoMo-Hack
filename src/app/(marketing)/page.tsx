@@ -160,6 +160,10 @@ const FOOTER_COLUMNS: readonly FooterColumn[] = [
     links: [
       { label: 'Engineering', href: '#how' },
       { label: 'Open the demo', href: '/chat' },
+      // The one page on this site whose numbers are not illustrative. Everything
+      // else is driven by the mock agent; /ledger reads Postgres. It earns a
+      // link because "we keep a real ledger" is a claim, and this is the proof.
+      { label: 'The live ledger', href: '/ledger' },
       { label: 'Source and sources', href: SOURCES_URL },
     ],
   },
