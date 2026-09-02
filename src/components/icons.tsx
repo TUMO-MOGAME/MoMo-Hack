@@ -83,3 +83,57 @@ export function ShieldIcon(p: IconProps) {
     </Svg>
   );
 }
+
+export function WalletIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M19 7V5a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h14a1 1 0 0 1 1 1v4" />
+      <path d="M3 6v12a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-3" />
+      <path d="M18 12a2 2 0 0 0 0 4h3v-4z" />
+    </Svg>
+  );
+}
+
+export function CalendarIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M8 2v4" />
+      <path d="M16 2v4" />
+      <rect width="18" height="18" x="3" y="4" rx="2" />
+      <path d="M3 10h18" />
+    </Svg>
+  );
+}
+
+export function SignalIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M2 20h.01" />
+      <path d="M7 20v-4" />
+      <path d="M12 20v-8" />
+      <path d="M17 20V8" />
+      <path d="M22 4v16" />
+    </Svg>
+  );
+}
+
+export function SignalOffIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <path d="M2 20h.01" />
+      <path d="M7 20v-4" />
+      <path d="M12 20v-8" />
+      <path d="m2 2 20 20" />
+      <path d="M17 20v-5" />
+    </Svg>
+  );
+}
+
+export function PanelIcon(p: IconProps) {
+  return (
+    <Svg {...p}>
+      <rect width="18" height="18" x="3" y="3" rx="2" />
+      <path d="M9 3v18" />
+    </Svg>
+  );
+}

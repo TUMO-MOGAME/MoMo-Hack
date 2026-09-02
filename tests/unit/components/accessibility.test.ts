@@ -131,6 +131,10 @@ describe('globals.css', () => {
     expect(reducedMotion).toMatch(/\.animate-sheet[\s\S]*?animation: none !important/);
   });
 
+  test('and the context drawer with it', () => {
+    expect(reducedMotion).toContain('.animate-drawer');
+  });
+
   test('reduced motion actually switches the thinking dots off, at full opacity', () => {
     // Collapsing the duration alone parks the dots on their last keyframe,
     // which is 30% opacity — technically motionless, practically invisible.

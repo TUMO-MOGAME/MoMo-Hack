@@ -15,12 +15,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { ArtifactPanel, ArtifactSheet, EmptyPanel } from '@/components/artifact-panel';
+import { ContextDrawer } from '@/components/context/context-drawer';
+import { ContextPanel } from '@/components/context/context-panel';
+import { ContextStrip } from '@/components/context/context-strip';
 import { ChipSkeleton } from '@/components/artifacts/skeleton';
 import type { ArtifactStatus } from '@/components/artifacts/registry';
 import { ArtifactChip } from '@/components/chips/artifact-chip';
 import { MicIcon, SendIcon } from '@/components/icons';
 import type { Artifact } from '@/lib/artifacts/types';
-import { mockAgent, SUGGESTIONS } from '@/lib/agent/mock';
+import { contextSnapshot, mockAgent, SUGGESTIONS } from '@/lib/agent/mock';
 
 interface Message {
   readonly id: string;
@@ -47,6 +50,10 @@ export default function ChatPage() {
   const [thinking, setThinking] = useState(false);
   const [open, setOpen] = useState<Artifact | null>(null);
   const [panelStatus, setPanelStatus] = useState<ArtifactStatus>('complete');
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  // Built once. A snapshot that changed identity on every render would give the
+  // rail new artifact ids each keystroke, and reopening one would be a new view.
+  const [context] = useState(contextSnapshot);
   const endRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLInputElement>(null);
 
@@ -59,6 +66,7 @@ export default function ChatPage() {
   const openArtifact = useCallback((artifact: Artifact) => {
     setPanelStatus('complete');
     setOpen(artifact);
+    setDrawerOpen(false);
   }, []);
 
   const send = useCallback((raw: string) => {
@@ -92,6 +100,16 @@ export default function ChatPage() {
       <a href="#composer" className="skip-link">
         Skip to the message box
       </a>
+
+      {/* context rail: a third column only where there is genuinely room for
+          one. Below xl it becomes the strip above the composer and the drawer
+          behind it — never a cramped column stealing width from the chat. */}
+      <aside
+        aria-label="Your position"
+        className="hidden w-72 shrink-0 border-r border-border xl:block"
+      >
+        <ContextPanel context={context} onOpen={openArtifact} />
+      </aside>
 
       {/* conversation */}
       <section
@@ -161,9 +179,13 @@ export default function ChatPage() {
           <div ref={endRef} />
         </main>
 
-        <div className="border-t border-border px-5 py-4">
+        <div className="space-y-3 border-t border-border px-5 py-4">
+          <div className="xl:hidden">
+            <ContextStrip context={context} onOpen={() => setDrawerOpen(true)} />
+          </div>
+
           {messages.length <= 1 ? (
-            <div className="mb-3 flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-2">
               {SUGGESTIONS.map((s) => (
                 <button
                   key={s}
@@ -228,6 +250,15 @@ export default function ChatPage() {
 
       {/* artifact: modal bottom sheet below 1024px — the real case */}
       {open ? <ArtifactSheet artifact={open} status={panelStatus} onClose={close} /> : null}
+
+      {/* the rail, for everyone without a third column */}
+      {drawerOpen ? (
+        <ContextDrawer
+          context={context}
+          onOpen={openArtifact}
+          onClose={() => setDrawerOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }

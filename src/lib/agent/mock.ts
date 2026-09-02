@@ -16,7 +16,7 @@
 
 import { minor } from '@/domain/money';
 import { DEFAULT_FARE_SPLIT, split } from '@/domain/split';
-import type { Artifact } from '@/lib/artifacts/types';
+import type { Artifact, BalanceRow, SourcedMoney, TxnRow } from '@/lib/artifacts/types';
 
 export interface AgentTurn {
   readonly reply: string;
@@ -234,3 +234,107 @@ export const SUGGESTIONS: readonly string[] = [
   'Where did my fare go?',
   'How is the stokvel doing?',
 ];
+
+
+/* ── ambient context ─────────────────────────────────────────────────────────
+   What the context rail shows. The chat is still the spine of this app, so
+   nothing here navigates anywhere — every row opens an ARTIFACT, which is the
+   same vocabulary a chip in the conversation uses. It is a persistent answer to
+   "what do I have, what do I owe, what just happened", not a second menu.
+   ────────────────────────────────────────────────────────────────────────── */
+
+/** The next thing this person owes. The retention mechanic, made visible. */
+export interface NextObligation {
+  readonly label: string;
+  readonly detail: string;
+  readonly money: SourcedMoney;
+  /** Fixed, not computed from `Date.now()` — a clock in the render tree is a
+   *  hydration mismatch waiting to happen, and this is a mock. */
+  readonly dueInDays: number;
+  readonly artifact: Artifact;
+}
+
+export interface RecentEntry {
+  readonly id: string;
+  readonly label: string;
+  readonly at: string;
+  readonly direction: TxnRow['direction'];
+  readonly status: TxnRow['status'];
+  readonly money: SourcedMoney;
+  /** Tapping the row reopens the full artifact — no re-prompting, no LLM call. */
+  readonly artifact: Artifact;
+}
+
+export interface KasiContext {
+  readonly balances: readonly BalanceRow[];
+  /** The full wallet view the position block opens. */
+  readonly wallet: Artifact;
+  readonly next: NextObligation;
+  readonly recent: readonly RecentEntry[];
+  /** Fare captures waiting for signal (docs/00 §6a). Never a hidden failure. */
+  readonly queued: number;
+}
+
+/**
+ * Deterministic, like `mockAgent`. Every amount carries provenance, so the rail
+ * is held to the same rule as an artifact (CLAUDE.md #14, ADR-0013).
+ *
+ * Fresh artifacts per call so the ids differ, exactly as a real tool call would
+ * produce them.
+ */
+export function contextSnapshot(): KasiContext {
+  const wallet = walletArtifact();
+  const activity = transactionsArtifact();
+  const stokvel = stokvelArtifact();
+
+  return {
+    balances: wallet.type === 'wallet' ? wallet.balances : [],
+    wallet,
+    next: {
+      label: 'Masakhane stokvel',
+      detail: 'R300 every Monday',
+      money: { amount: minor(30000n), sourceAccountId: 'acc_s1' },
+      dueInDays: 3,
+      artifact: stokvel,
+    },
+    recent: [
+      {
+        id: 'r1',
+        label: 'Kombi wash',
+        at: 'Today 07:12',
+        direction: 'IN',
+        status: 'SUCCESSFUL',
+        money: { amount: minor(6000n), sourceTxnId: 't1' },
+        artifact: activity,
+      },
+      {
+        id: 'r2',
+        label: 'Taxi fare',
+        at: 'Today 07:40',
+        direction: 'OUT',
+        status: 'SUCCESSFUL',
+        money: { amount: minor(1250n), sourceTxnId: 't2' },
+        artifact: activity,
+      },
+      {
+        id: 'r3',
+        label: 'Tyre check ×3',
+        at: 'Mon',
+        direction: 'IN',
+        status: 'PENDING',
+        money: { amount: minor(9000n), sourceTxnId: 't6' },
+        artifact: activity,
+      },
+      {
+        id: 'r4',
+        label: 'Electricity',
+        at: 'Yesterday',
+        direction: 'OUT',
+        status: 'SUCCESSFUL',
+        money: { amount: minor(10000n), sourceTxnId: 't4' },
+        artifact: activity,
+      },
+    ],
+    queued: 0,
+  };
+}
