@@ -119,6 +119,38 @@ Full detail in `docs/00-PRODUCT-BRIEF.md`. Cut order in `docs/05-DELIVERY-PLAN.m
 | S7 | **Conversational agent** — a chat that renders live dashboards as typed artifacts |
 | S8 | **Voice** — speak and be spoken to, provider-per-language, phrase bank |
 
+### MUST — the demo runs on PRODUCTION, so these are now MUST, not SHOULD
+
+**Decided 2026-09-03.** Real money has moved on `mtnsouthafrica` three times, from both channels,
+with MTN receipt numbers (`STATUS.md` §REAL MONEY HAS MOVED). The demo runs there. That decision
+promotes three items out of SHOULD and makes one of them blocking.
+
+**M5d · A Telegram allowlist on the money commands. BLOCKING — nothing deploys before it.**
+`@momokasi_demo_bot` is public and is about to hold production credentials. Without an allowlist,
+any stranger who finds the bot can ring the owner's personal phone with payment requests, as often
+as they like. A `TELEGRAM_PAY_CHAT_IDS` env var checked in `handleUpdate` before `/pay` and
+`/status` reach their handlers; anyone else gets a polite "not for this account". Small, and the
+whole safety of a public production bot rests on it.
+
+**M3a · Disbursements — money must be able to leave.** Half the pitch is that youth get *paid*:
+escrow release, the 60/25/10/5 payouts, gig work settled the same day. Today money can only come
+in, which is why the agent has to refuse every "send money" request (`MISTAKES.md` M10).
+
+Measured 2026-09-03 and viable right now — `momoAPIs.md` §8:
+
+```
+POST /disbursement/token/                               → 200
+GET  /disbursement/v1_0/account/balance                 → 200 {"availableBalance":"35.83","currency":"ZAR"}
+GET  /disbursement/v1_0/accountholder/msisdn/{n}/active  → 200 {"result":true}
+```
+
+**R35.83 of real money is sitting in the disbursement account and the payee is reachable.** Nothing
+is blocked but the code. `transfer` itself is still `[P]` — verify the body before the first send,
+and treat it with more care than a collection: **a `requesttopay` that goes wrong annoys someone; a
+`transfer` that goes wrong is money gone, with no second human in the loop.**
+
+**M3b · The outbox drain**, so a payout notifies the person who received it.
+
 ### SHOULD — decided in ADR-0017, not yet built
 
 **Standing mandates.** *"Save R200 a month for my daughter's birthday and send it to her on the
