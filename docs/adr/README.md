@@ -1,0 +1,19 @@
+# Architecture Decision Records
+
+Append-only. A decision that turns out wrong gets a **new** ADR superseding the old one; the old one
+stays, marked superseded. The reasoning trail is part of what a technical judge is looking at.
+
+| # | Decision | Status |
+|---|---|---|
+| [0001](0001-single-nextjs-monolith.md) | Single Next.js + TypeScript monolith | Accepted |
+| [0002](0002-product-name-and-scope.md) | Product name **Vula**, four modules, one wallet | Accepted |
+| [0003](0003-double-entry-ledger.md) | Double-entry ledger as the source of truth | Accepted |
+| [0004](0004-integer-money.md) | Money as `bigint` minor units; integer basis-point splits | Accepted |
+| [0005](0005-public-repository.md) | Public repository | Accepted |
+| [0006](0006-github-actions-scheduler.md) | GitHub Actions as the scheduler | Accepted |
+| [0007](0007-telegram-over-whatsapp.md) | Telegram replaces WhatsApp | Accepted |
+| [0008](0008-sandbox-currency-shim.md) | ZAR ledger, EUR at the MoMo boundary | Accepted |
+| [0009](0009-momo-emulator.md) | Ship a MoMo emulator | Accepted |
+| [0010](0010-service-role-boundary.md) | The browser never touches the ledger | Accepted |
+
+Template in `docs/06-ENGINEERING-STANDARDS.md` §10.

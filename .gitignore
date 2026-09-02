@@ -1,0 +1,57 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+
+# production
+/build
+/dist
+
+# testing
+/coverage
+/playwright-report/
+/test-results/
+/blob-report/
+.playwright/
+
+# env — NEVER commit these. The repo is public.
+.env
+.env*.local
+.env.production
+!.env.example
+
+# supabase
+.branches
+.temp
+supabase/.temp/
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+
+# editors
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+
+# os
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# logs
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# local scratch
+/scratch/
+/tmp/
