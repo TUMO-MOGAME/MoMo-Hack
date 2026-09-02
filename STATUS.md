@@ -172,11 +172,34 @@ spend.** Both checks are free and instant.
 **Budget:** R0.50 spent of ~R10. Every failed attempt cost R0.00, because a `PAYER_NOT_FOUND`
 moves no money.
 
-**The deployed site is on SANDBOX, deliberately.** `@momokasi_demo_bot` is public, and a public
-bot armed with production credentials is a way for a stranger to ring the owner's phone with
-payment requests. Production stays a local, deliberate, armed-on-purpose exercise —
-`MOMO_TARGET_ENVIRONMENT` on Vercel is `sandbox` and `vercel-env.mjs` refuses to push anything
-else without `--allow-live`.
+### ▶ DECISION: PRODUCTION IS THE DEMO PATH. Sandbox is the fallback, not the plan.
+
+**Taken by Tumo, 2026-09-03.** The demo runs on `mtnsouthafrica` with real rands. This supersedes
+every earlier "demo on sandbox" line in this file, including the one in §Tomorrow 09:30.
+
+The reasoning is sound: *"money moved and the books cannot be wrong"* is the pitch, and a real MTN
+receipt number is the strongest possible evidence for it. Three payments already prove it works.
+
+**What that decision now REQUIRES, and none of it is optional:**
+
+| # | Requirement | Why it is not optional |
+|---|---|---|
+| 1 | **A Telegram chat-id allowlist on `/pay`** | `@momokasi_demo_bot` is PUBLIC. Deployed with production credentials and no allowlist, any stranger who finds the bot can ring Tumo's personal phone with payment requests, repeatedly. This is the single blocking item |
+| 2 | **A disbursement budget guard** | Paying OUT has no second human in the loop. A collection that goes wrong annoys someone; a transfer that goes wrong is money gone |
+| 3 | **Deliberate `--allow-live` on the env push** | `vercel-env.mjs` refuses production without it, and that refusal already caught a real mistake tonight. Keep the guard; pass the flag knowingly |
+
+**The two hard limits, stated as facts rather than advice:**
+
+- **R12.50 cannot be sent.** The wallet holds about R9.50 after tonight, and
+  `MOMO_LIVE_MAX_MINOR` caps a transaction at R1.00. Raising the cap does not create money.
+  **Demo the split as the pure function it is** — `split(1250n)` runs offline, instantly,
+  property-tested, and is *more* impressive beside a real R1.00 payment than a fabricated one.
+- **Production waits for a human.** 103s and 42s measured, versus ~25s automatic on sandbox.
+  Budget that pause into the run of show; it is dead air on stage unless it is narrated.
+
+**Sandbox remains wired and one flag away** (`npm run demo -- --emulator`, or
+`MOMO_TARGET_ENVIRONMENT=sandbox`) as the fallback if MTN or the venue wifi misbehaves at 09:30.
+That is what a fallback is for; it is not the plan.
 
 ### 💸 `/pay` — a payment a human can start, on both channels
 
@@ -638,6 +661,20 @@ newly-issued keys are parked in `.env.local` under `MTN_*` names that **nothing 
 so they cannot break the demo before it happens.
 
 ### The next three actions
+
+**SUPERSEDED AGAIN — see §DECISION: PRODUCTION IS THE DEMO PATH.** The queue is now:
+
+1. **Telegram chat-id allowlist on `/pay` and `/status`.** BLOCKING. The bot is public and about
+   to be deployed with production credentials. Nothing else ships before this.
+2. **Disbursements, M3a — `/send <amount>`.** The other half of the pitch: money can come in and
+   must be able to leave. Verified viable — `momoAPIs.md` §8 now carries a measured
+   `disbursement/account/balance` of **R35.83 ZAR** and an active payee. `transfer` itself is
+   still `[P]`; verify the body before the first send.
+3. **Deploy on production**, with `--allow-live` passed knowingly.
+4. Then the three remaining audit Highs (A5-04/A1-01 auth, A2-01 token gate).
+
+The older list below is kept because its items are still true and still owed; they are simply
+behind the three above now.
 
 **Superseded — the six audits are done.** What they found reorders the queue, and the top of it is
 now roughly two hours of work with a disproportionate return before 09:30:
