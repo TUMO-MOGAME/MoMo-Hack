@@ -15,5 +15,9 @@ stays, marked superseded. The reasoning trail is part of what a technical judge 
 | [0008](0008-sandbox-currency-shim.md) | ZAR ledger, EUR at the MoMo boundary | Accepted |
 | [0009](0009-momo-emulator.md) | Ship a MoMo emulator | Accepted |
 | [0010](0010-service-role-boundary.md) | The browser never touches the ledger | Accepted |
+| [0011](0011-voice-provider-per-language.md) | Provider-per-language voice with a pre-generated phrase bank | Accepted |
+| [0012](0012-groq-as-agent-llm.md) | Groq as the agent LLM | Accepted |
+| [0013](0013-typed-artifact-schema.md) | The agent emits typed data, never markup | Accepted |
+| [0014](0014-agent-cannot-move-money.md) | The agent cannot move money | Accepted |
 
 Template in `docs/06-ENGINEERING-STANDARDS.md` §10.

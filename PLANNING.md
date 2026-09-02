@@ -116,6 +116,8 @@ Full detail in `docs/00-PRODUCT-BRIEF.md`. Cut order in `docs/05-DELIVERY-PLAN.m
 | S4 | Ubuntu Trust Score (completed gigs unlock tool-lease eligibility) |
 | S5 | Live webhook console — money moving on screen, in front of the judges |
 | S6 | Split-a-bill / "chippa in" via a Telegram group link |
+| S7 | **Conversational agent** — a chat that renders live dashboards as typed artifacts |
+| S8 | **Voice** — speak and be spoken to, provider-per-language, phrase bank |
 
 ### COULD — only if we are ahead of schedule
 
@@ -182,6 +184,10 @@ Rationale and alternatives: `docs/01-ARCHITECTURE.md` and `docs/adr/`.
 | 0008 | Sandbox currency shim: store and present ZAR, transmit EUR to the MoMo sandbox. |
 | 0009 | Ship a local MoMo emulator so the demo survives a sandbox outage. |
 | 0010 | Service-role boundary: the browser can never write to ledger tables. |
+| 0011 | Voice is provider-per-language. ElevenLabs supports **no** SA language — see the doc. |
+| 0012 | Groq is the agent LLM; Gemini Flash is the fallback. Both free, no card. |
+| 0013 | The agent emits typed, zod-validated data — never markup. |
+| 0014 | **The agent cannot move money.** It proposes; a human thumb confirms. |
 
 ---
 

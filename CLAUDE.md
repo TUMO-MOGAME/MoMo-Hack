@@ -36,6 +36,13 @@ Target submission: **28 Sep 2026**. Code freeze: **27 Sep 2026**. Solo developer
    missing or rated `[P]`/`[U]`, confirm it at <https://momodeveloper.mtn.com/API-collections>
    first, then update `momoAPIs.md` **in the same PR** as the code.
 10. **No new external API call** without a row in `docs/11-API-USAGE-MAP.md`, added in the same PR.
+11. **The AI agent can never move money.** `propose_*` tools have no database write access. The
+    agent returns a server-signed proposal; a human tap confirms it. No auto-confirm, no voice
+    confirm, at any amount. See ADR-0014.
+12. **The agent never emits markup.** It emits zod-validated typed data rendered by a fixed
+    component registry. No `dangerouslySetInnerHTML` in the artifact path, ever. See ADR-0013.
+13. **Never put a number in an artifact that did not come from a tool call.** Every monetary value
+    carries a `sourceTxnId` or `sourceAccountId`. The model does not get to invent amounts.
 
 ## Where things live
 
@@ -52,6 +59,8 @@ Target submission: **28 Sep 2026**. Code freeze: **27 Sep 2026**. Solo developer
 | Day-by-day plan | `docs/05-DELIVERY-PLAN.md` |
 | Git, CI, PR, quality gate | `docs/06-ENGINEERING-STANDARDS.md` |
 | How to run parallel agents safely | `docs/07-AGENT-PLAYBOOK.md` |
+| Voice, languages, the agent persona | `docs/12-VOICE-AND-CONVERSATIONAL-AI.md` |
+| Chat, artifacts, generative UI | `docs/13-CHAT-ARTIFACTS-UI.md` |
 | Demo script + fallbacks | `docs/08-DEMO-RUNBOOK.md` |
 | Risks and mitigations | `docs/09-RISK-REGISTER.md` |
 | Free-tier limits and headroom | `docs/10-FREE-TIER-BUDGET.md` |

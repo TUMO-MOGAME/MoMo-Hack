@@ -82,6 +82,43 @@ demo does. No approval process, which is why it replaces WhatsApp (ADR-0007).
 
 Free USSD simulator. Not a dependency: our own simulator drives the same handler (`docs/11` §7).
 
+### Groq — Free (the agent LLM)
+
+30 requests/minute, 14,400 requests/day, no credit card, no credits system, no per-token charge.
+Open-source models only. Sub-200ms time-to-first-token, which is what keeps a chat turn inside
+Vercel's 10s budget. Does not train on API data. Gemini Flash (also free, also no card) is the
+automatic fallback when Groq rate-limits. See ADR-0012.
+
+**The one to watch:** 30 RPM is org-wide. Fine for a demo and development; it would not survive real
+traffic.
+
+### ElevenLabs — Free (voice) · **the only tier with a real catch**
+
+| Resource | Free tier |
+|---|---|
+| Credits | 10,000/month (~20,000 characters TTS, **or ~15 minutes** of conversational agent) |
+| Commercial rights | **none** |
+| Watermark / attribution | required |
+| Overage | not available — usage simply stops |
+
+Three demo rehearsals would consume the entire monthly allowance. **This is why the phrase bank
+exists** (`docs/12` §3): ~180 fragments and number clips are generated **once** (~7,200 characters,
+well inside one month), cached in Supabase Storage, and replayed forever at **zero** marginal cost.
+Live TTS is capped at 500 characters/day and degrades to the phrase bank, then to text.
+
+**Honest position:** free-tier use is appropriate for a hackathon prototype, and we credit
+ElevenLabs in the UI and the deck. A commercial deployment would require the **$6/month Starter**
+plan. That is the single highest-value paid upgrade in this project — see §4.
+
+### Language coverage caveat
+
+ElevenLabs supports **no South African language** (ADR-0011). Lelapa AI's Vulavula does, and has
+**no free tier** ($9.99/mo). Tier 2 languages therefore use human recordings — free, and better.
+
+### CopilotKit — MIT, self-hosted
+
+The runtime runs inside our own Next.js app. No CopilotKit Cloud account, no per-seat cost.
+
 ### OCR — `tesseract.js`
 
 **Deliberately not Google Cloud Vision or AWS Rekognition.** Both need a billing account with a card
@@ -94,6 +131,12 @@ keeps licence-disc images off our storage entirely. Lower accuracy, accepted —
 
 | Service | Plan | Card needed | Verdict |
 |---|---|---|---|
+| Groq (agent LLM) | Free | no | ✅ |
+| Google Gemini (fallback LLM) | Free | no | ✅ |
+| ElevenLabs (voice) | Free | no | ⚠️ no commercial rights; phrase bank keeps us inside it |
+| CopilotKit | MIT, self-hosted | no | ✅ |
+| Web Speech API (STT + fallback TTS) | browser built-in | no | ✅ |
+| Lelapa AI Vulavula (SA languages) | **no free tier**, $9.99/mo | yes | ❌ documented paid exit |
 | GitHub | Free, public | no | ✅ |
 | GitHub Actions | Free (unlimited, public) | no | ✅ |
 | Vercel | Hobby | no | ✅ |
@@ -134,14 +177,18 @@ surprise in week four.
 
 Useful to state, because a judge may ask what it takes to run this for real:
 
-1. **Supabase Pro ($25/mo)** — no pausing, daily backups, 8GB DB. The pause risk alone justifies it.
-2. **Vercel Pro ($20/mo)** — 60s functions and per-minute crons; the scheduler collapses back into
+1. **ElevenLabs Starter ($6/mo)** — commercial rights, no watermark, 30,000 credits. Cheapest
+   upgrade with the largest effect; removes the only licensing compromise in the stack.
+2. **Supabase Pro ($25/mo)** — no pausing, daily backups, 8GB DB. The pause risk alone justifies it.
+3. **Vercel Pro ($20/mo)** — 60s functions and per-minute crons; the scheduler collapses back into
    the platform and the architecture simplifies.
-3. **GitHub Team ($4/user/mo)** — branch protection on a private repo, if the code had to stay closed.
+4. **Lelapa AI Vulavula ($9.99/mo)** — real isiZulu, Sesotho and Afrikaans speech, from a South
+   African company. The right answer for the language goal, and a good story in itself.
+5. **GitHub Team ($4/user/mo)** — branch protection on a private repo, if the code had to stay closed.
 
-Total ≈ **$49/month** to remove every infrastructure compromise in this document. Worth saying out
-loud: none of the free-tier workarounds are load-bearing on the *product*; they are load-bearing on
-the *budget*, and each has a clean paid exit.
+Total ≈ **$65/month** to remove every compromise in this document. Worth saying out loud: none of
+the free-tier workarounds are load-bearing on the *product*; they are load-bearing on the *budget*,
+and each has a clean paid exit.
 
 ---
 
