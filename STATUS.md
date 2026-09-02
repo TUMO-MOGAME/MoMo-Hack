@@ -18,18 +18,55 @@ Every PR must update it. If you are a fresh session, read this before touching a
 | | |
 |---|---|
 | **Current phase** | Phase 3 — Money engine |
-| **Phase state** | Phases 0-1 substantially done. Money engine built and green, awaiting review. |
+| **Phase state** | Phases 0-1 substantially done. Money engine reviewed and merged (#10). |
 | **Audits owed at close** | Phase 3: A1 A2 A3 A4 A5 A6 — **none run yet** |
-| **Blocking findings** | none |
+| **Blocking findings** | none — the CI gate landed in #13 and all eight checks are green |
 | **Days to code freeze** | 25 (27 Sep 2026) |
-| **Open PRs** | **#10 backend money engine**, **#11 frontend shell + sidebar** — both green, both need review |
+| **Open PRs** | #11 frontend shell + sidebar (this one). #10 and #13 merged. |
+
+### The CI finding, kept because it changes how every merge before it was judged
+
+`STATUS.md` said #10 and #11 were both "green". **Neither was, and CI could not have told us
+either way.** All four causes are now fixed in #13, but the record matters more than the fix:
+
+1. **`Audits / A8` failed on every push since PR #2** — `npm ci` rejected a `package-lock.json`
+   out of sync with `package.json`. The real cause was the *platform*: npm resolves optional
+   dependencies for the OS it runs on, so a lockfile written on Windows omits the `@emnapi/*`
+   subtree Linux needs for the wasm bindings behind `sharp` and `@tailwindcss/oxide`.
+   Regenerating on Windows could never have fixed it. A `Lockfile` CI job now regenerates on
+   Linux and hands back the corrected file as an artifact.
+2. **CI ran no tests.** `audits.yml` was the only workflow. No typecheck, no test, no build and
+   no lint had ever run on a pull request, so "231 tests green" was an agent's local vitest run.
+3. **`npm run lint` could never have passed.** There was no ESLint config at all, so `next lint`
+   dropped into an interactive prompt — which also meant `npm run verify` could not complete.
+4. **9 vulnerabilities, 3 critical.** Now **0**.
+
+Two of our own guards were also wrong: `safe-merge.mjs` reported #10's successful merge as a
+failure, and the no-floating-point guard fired on its own prose in any Windows checkout. Both
+fixed, both written up in `MISTAKES.md` terms in #13.
+
+**And the toolchain bump hid 84 tests.** vitest 4 ships Vite 8, which honours `tsconfig.json`'s
+`jsx: "preserve"` — the setting Next.js requires — and so stopped transforming `.tsx` at all.
+All five component test files failed at import, and the summary still read **`Tests 231 passed`**
+because tests that never load cannot fail. The only tell was `Test Files 5 failed` on the line
+above. Fixed with an `oxc.jsx` override in `vitest.config.ts` (the key is `oxc`, not `esbuild` —
+an `esbuild` block is silently ignored under Vite 8). Two lessons worth keeping:
+
+- **A passing test count is not evidence.** Read the file count too. "231 passed" was true and
+  meaningless.
+- **This is the argument for the CI gate in one example.** A toolchain bump quietly disabled a
+  third of the suite, including the provenance guard that stops the agent inventing a balance
+  (CLAUDE.md #14). Nothing but running the whole suite would have found it.
 
 ### The next three actions
 
-1. **Review and merge #10 and #11.** Both are green (231 and 90 tests). Read the diffs —
-   with 0 required approvals, CI is the only other reviewer (`docs/06` §2).
-2. **Supabase.** The last required credential. Two projects, three values. Until it exists,
-   the ledger runs against the in-memory adapter and there are no integration or RLS tests.
+1. **Require the new checks on `main`.** The ruleset has **no required status checks**, so the
+   gate exists but nothing stops a merge past a red one. This is a five-minute settings change
+   and it is what makes everything above load-bearing.
+2. **Supabase — apply the migrations (F5).** The project is live and verified, but the two
+   migrations have never touched a real database, so the money engine still runs on the in-memory
+   adapter and there are still no integration or RLS tests. Settle Q6 (region) first: the project
+   is in `eu-west-2`, London, and it is free to recreate today and expensive later.
 3. **Wire the walking skeleton**: a real `requesttopay` from a deployed function writing
    balanced ledger rows. Every piece now exists; nothing has been joined end to end.
 
@@ -42,10 +79,10 @@ written up. Only the audits listed are run at that phase — see `PLANNING.md` �
 
 | # | Phase | State | Days | Audits |
 |---|---|---|---|---|
-| 0 | Foundation and walking skeleton | mostly done — skeleton not joined | 1-3 | A1 A8 ⚪ |
+| 0 | Foundation and walking skeleton | CI gate done (#13); skeleton not joined; Supabase not migrated | 1-3 | A1 A8 ⚪ |
 | 1 | Design system and app shell | built, in PR #11 | 4-5 | A1 A2 A3 ⚪ |
 | 2 | Narrative and content surfaces | landing page built, in PR #11 | 6 | A1 A6 ⚪ |
-| 3 | Money engine | **in progress** — ledger/client/state machine in PR #10 | 7-13 | A1 A2 A3 A4 A5 A6 ⚪ |
+| 3 | Money engine | **in progress** — ledger/client/state machine merged (#10); no integration tests yet | 7-13 | A1 A2 A3 A4 A5 A6 ⚪ |
 | 4 | Channels and products | not started | 14-19 | A1 A2 A3 A4 A5 A8 ⚪ |
 | 5 | Reach — offline, USSD, voice | not started | 20-23 | A1 A2 A3 A4 A7 ⚪ |
 | 6 | Hardening, demo and submission | not started | 24-28 | A1 A3 A4 A5 A6 A7 A8 S1 ⚪ |
@@ -190,11 +227,13 @@ Format: one line per merged workstream, with the evidence.
 | 2026-09-02 | Telegram bot | **integration** | `getMe` + `getWebhookInfo` on `@momokasi_demo_bot`. Live. |
 | 2026-09-02 | Money engine (PR #10) | unit + property + contract | **231 tests, 15 files.** Ledger balance, state transitions, MoMo response matrix, webhook/cron auth. Typecheck clean. |
 | 2026-09-02 | Frontend (PR #11) | unit | **90 tests, 6 files.** Every artifact renders from a fixture; the provenance guard is locked in. Typecheck clean. |
+| 2026-09-02 | **#10 + #11 combined** | unit + property + contract | **315 tests, 20 files** (321 less the 6 shared split tests counted once), typecheck clean, production build clean. The combination is what found the CRLF guard bug — neither PR failed alone. |
 | 2026-09-02 | Money engine reviewed and merged (#10) | read, not just run | Diff read in full. Verified by hand: the overdraft trigger follows each account's normal balance; `claimTransition` takes `for update` so concurrent resolvers serialise; the callback body can only trigger a lookup and never sets a status; cron uses a constant-time compare; ledger tables carry no RLS policies at all. |
 | 2026-09-02 | Supabase project 1 | **integration** | URL, anon and service_role keys all carry ref `edtduvwbejdfahkmfort`; GoTrue health 200; service_role authenticates against PostgREST 200. Region measured as `eu-west-2` (London) from the DB host's IPv6 against AWS's published ranges. |
 | 2026-09-02 | `npm run check:momo` | **integration** | Dead on main (`ReferenceError: resolve is not defined`). Fixed and re-run live: token issued, all six MSISDN cases match the `[V]` table in `momoAPIs.md` §10, idempotency `202` then `409`. |
 | 2026-09-02 | CI quality gate (#13) | **verified** | Typecheck, lint, full 231-test suite and production build all green locally on the bumped toolchain. Both content guards tested against a synthetic violation to prove they fire, and against this tree to prove they do not fire on prose. |
 | 2026-09-02 | Dependency health | **verified** | `npm audit` 9 vulnerabilities (3 critical) → **0**. `npm ci` restored — it had been failing since PR #2. |
+| 2026-09-02 | **#11 on the merged toolchain** | unit + property + contract | **315 tests, 20 files**, typecheck, lint and production build all clean. Caught vitest 4 silently not running the 84 component tests — see below. |
 
 ---
 

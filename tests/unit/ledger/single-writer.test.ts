@@ -152,7 +152,13 @@ describe('no floating-point money (ADR-0004, A1 §1)', () => {
 
     for (const { path, body } of sql) {
       const bad = body
-        .split('\n')
+        // Split on BOTH line endings. `core.autocrlf=true` hands a Windows
+        // checkout CRLF, and splitting on '\n' alone leaves a trailing '\r'
+        // that `/--.*$/` cannot cross — `.` excludes carriage returns and `$`
+        // anchors the string end. Every comment then survives the strip and the
+        // guard fires on its own prose. It passed on Linux CI and on the tree
+        // that authored the file, and failed on every fresh Windows clone.
+        .split(/\r?\n/)
         // Strip comments, INLINE ones included: a prose "never numeric" note
         // must not read as a numeric column.
         .map((l) => l.replace(/--.*$/, '').trim())

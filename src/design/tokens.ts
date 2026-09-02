@@ -53,6 +53,8 @@ export interface ColorScale {
   border: string;
   input: string;
   ring: string;
+  /** Modal scrim behind the bottom sheet. Dims the conversation, never hides it. */
+  overlay: string;
   /** Split / allocation visualisation. Four roles = the 60/25/10/5 fare split. */
   'chart-1': string;
   'chart-2': string;
@@ -92,6 +94,7 @@ export const colors: { light: ColorScale; dark: ColorScale } = {
     border: 'oklch(0.922 0 0)',
     input: 'oklch(0.922 0 0)',
     ring: 'oklch(0.708 0 0)',
+    overlay: 'oklch(0 0 0 / 55%)',
     'chart-1': 'oklch(0.842 0.166 89.5)',
     'chart-2': 'oklch(0.696 0.17 162.48)',
     'chart-3': 'oklch(0.707 0.165 254.624)',
@@ -130,6 +133,7 @@ export const colors: { light: ColorScale; dark: ColorScale } = {
     border: 'oklch(1 0 0 / 12%)',
     input: 'oklch(1 0 0 / 15%)',
     ring: 'oklch(1 0 0 / 35%)',
+    overlay: 'oklch(0 0 0 / 72%)',
     'chart-1': 'oklch(0.862 0.176 90.5)',
     'chart-2': 'oklch(0.765 0.177 163.223)',
     'chart-3': 'oklch(0.707 0.165 254.624)',

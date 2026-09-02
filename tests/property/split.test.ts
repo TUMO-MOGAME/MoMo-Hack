@@ -19,7 +19,8 @@ const arbRule = fc
       const total = weights.reduce((a, b) => a + b, 0);
       const bps = weights.map((w) => Math.floor((w * TOTAL_BPS) / total));
       // Push the rounding drift onto the first component so the rule is valid.
-      bps[0] = (bps[0] ?? 0) + TOTAL_BPS - bps.reduce((a, b) => a + b, 0);
+      // `?? 0` satisfies noUncheckedIndexedAccess; n >= 2 so index 0 exists.
+      bps[0] = (bps[0] ?? 0) + (TOTAL_BPS - bps.reduce((a, b) => a + b, 0));
       return bps.map((b, i) => ({ key: `K${i}`, bps: b }));
     }),
   )

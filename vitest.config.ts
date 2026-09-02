@@ -10,6 +10,22 @@ export default defineConfig({
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },
+  /**
+   * `tsconfig.json` sets `jsx: "preserve"`, which Next.js requires — Next does
+   * its own JSX transform. Vite reads that setting and therefore handed `.tsx`
+   * through untransformed, so under vitest 4 every component test died at import
+   * with "content contains invalid JS syntax" — 5 files, 84 tests, silently not
+   * running while the run still reported 231 passing. Under vitest 2 it happened
+   * to work; nothing about our code changed.
+   *
+   * So transform JSX for TESTS ONLY, leaving `tsconfig.json` exactly as Next
+   * wants it. The key is `oxc` and not `esbuild` because vitest 4 ships Vite 8,
+   * which transforms with oxc — an `esbuild` block here is silently ignored.
+   * `automatic` matches React 19, so no file has to import React to be testable.
+   */
+  oxc: {
+    jsx: { runtime: 'automatic', importSource: 'react' },
+  },
   test: {
     environment: 'node',
     include: ['tests/**/*.{test,spec}.ts'],
