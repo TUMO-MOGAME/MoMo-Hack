@@ -10,7 +10,7 @@
  * would tell an attacker how busy we are. Booleans and a mode, and that is all.
  */
 
-import { hasMoneyDb } from '@/server/db';
+import { moneyDbAvailable } from '@/server/db/bootstrap';
 import { readMomoMode } from '@/lib/momo';
 
 export const runtime = 'nodejs';
@@ -23,7 +23,12 @@ export async function GET(): Promise<Response> {
       // Read per-request, never captured at build time (docs/03 §5). During the
       // demo this is how we confirm which client is live before we present.
       momoMode: readMomoMode(),
-      database: hasMoneyDb() ? 'configured' : 'unconfigured',
+      // `moneyDbAvailable()` BINDS the adapter if DATABASE_URL is present, so
+      // this reports whether the app can actually reach Postgres. It used to
+      // call `hasMoneyDb()`, which asked "has anything been bound" — and since
+      // nothing in src/ ever called setMoneyDb, the honest answer was always
+      // "unconfigured", however correct the environment was.
+      database: moneyDbAvailable() ? 'configured' : 'unconfigured',
       at: new Date().toISOString(),
     },
     {
