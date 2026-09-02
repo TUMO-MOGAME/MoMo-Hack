@@ -1,0 +1,150 @@
+name: CI
+
+# The quality gate. F6 in STATUS.md, and it did not exist until now.
+#
+# Before this file, the only workflow was `audits.yml`: `npm audit`, plus a plan
+# step that skips itself without a secret. No typecheck, no lint, no test and no
+# build had ever run on a pull request. Two PRs carrying 7,500 lines of money
+# code were described as "green" on the strength of an agent running vitest on
+# its own laptop, and CI was in no position to agree or disagree.
+#
+# Each stage is a SEPARATE JOB on purpose. GitHub lists them by name on the PR,
+# so a red tick says which stage broke — "Tests" or "Build", not one opaque
+# "CI ✗" that has to be opened and read. They run in parallel; the slowest is
+# the wall clock.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Next telemetry phones home on every build. Off.
+  NEXT_TELEMETRY_DISABLED: '1'
+
+jobs:
+  typecheck:
+    name: Typecheck
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      # `npm ci` and not `npm install`: it installs exactly the lockfile and
+      # FAILS if the lockfile and package.json disagree. That is a feature — it
+      # is what caught the drift that had A8 red on every branch since PR #2.
+      - run: npm ci
+      - run: npm run typecheck
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # The WHOLE suite — unit, property and contract. `test:unit` deliberately
+      # omits tests/contract, so using it here would leave the MoMo response
+      # matrix and the webhook/cron auth tests unrun in CI, which is precisely
+      # the code where being wrong is most expensive.
+      - name: vitest (unit + property + contract)
+        run: npm test
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # A production build is the only thing that exercises the App Router's
+      # route collection and static generation. Typecheck does not.
+      - run: npm run build
+
+  # ── The invariants that are cheap to check and expensive to breach ─────────
+  #
+  # These are CLAUDE.md's non-negotiables 1 and 5, enforced on the diff rather
+  # than trusted to review. They are greppable facts, so they are checked here
+  # instead of being a line in a document nobody diffs against.
+  guards:
+    name: Money guards
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      # CLAUDE.md #1 — money is bigint minor units. A floating-point column in a
+      # migration is rejected on sight, so let CI do the sighting.
+      - name: No floating-point money in migrations
+        run: |
+          if [ -d supabase/migrations ]; then
+            hits=$(grep -rniE '\b(numeric|decimal|float4|float8|real|double precision|money)\b' \
+                     supabase/migrations --include='*.sql' \
+                   | sed -E 's/[[:space:]]*--.*$//' \
+                   | grep -niE '\b(numeric|decimal|float4|float8|real|double precision|money)\b' || true)
+            if [ -n "$hits" ]; then
+              echo "::error::Floating-point type in a migration. Money is bigint minor units (CLAUDE.md #1)."
+              echo "$hits"
+              exit 1
+            fi
+          fi
+          echo "No floating-point money types."
+
+      # CLAUDE.md #12 / ADR-0013 — the agent emits typed data, never markup.
+      - name: No dangerouslySetInnerHTML
+        run: |
+          # Comment lines are dropped and the identifier must be followed by
+          # `=`, `:` or `{` — an actual use, not a mention. The naive grep failed
+          # on src/lib/artifacts/types.ts, whose comment says the prop is
+          # banned. A guard that fires on the sentence forbidding the thing
+          # gets switched off within a week.
+          hits=$(grep -rn 'dangerouslySetInnerHTML' src --include='*.ts' --include='*.tsx' \
+                 | grep -vE ':[[:space:]]*(//|\*|/\*)' \
+                 | grep -E 'dangerouslySetInnerHTML[[:space:]]*[=:{]' || true)
+          if [ -n "$hits" ]; then
+            echo "::error::dangerouslySetInnerHTML is banned in the artifact path (CLAUDE.md #12, ADR-0013)."
+            echo "$hits"
+            exit 1
+          fi
+          echo "No dangerouslySetInnerHTML."
+
+      # A committed .env is the one mistake a public repo (ADR-0005) cannot take
+      # back — it is scraped within minutes and stays in the history forever.
+      - name: No committed secrets file
+        run: |
+          tracked=$(git ls-files | grep -E '(^|/)\.env($|\.)' | grep -v '\.env\.example$' || true)
+          if [ -n "$tracked" ]; then
+            echo "::error::An environment file is tracked in a PUBLIC repository."
+            echo "$tracked"
+            exit 1
+          fi
+          echo "No tracked .env files."
