@@ -114,9 +114,9 @@ straight out of the `[ ]`/`[~]`/`[x]` column. Recomputed whenever the board chan
 
 | Measure | | What it counts |
 |---|---|---|
-| **Done to the required test level** | **16%** | 11 items. The honest floor: `docs/04` says a feature is Done only at its named test level. |
-| **Weighted** (`[~]` counts half) | **24%** | The fairest single number. |
-| **Started or better** | **32%** | 22 items have real code. |
+| **Done to the required test level** | **17%** | 12 items. The honest floor: `docs/04` says a feature is Done only at its named test level. |
+| **Weighted** (`[~]` counts half) | **27%** | The fairest single number. |
+| **Started or better** | **36%** | 25 items have real code. |
 
 **Read these with three caveats, or they will mislead you.**
 
@@ -186,9 +186,9 @@ Test column: `none` / `unit` / `+prop` (property-based) / `+int` (integration in
 | F4 | Supabase staging + prod projects | `[~]` | none | +int | — | **Project 1 of 2 live and verified** — URL, anon and service_role all resolve to ref `edtduvwbejdfahkmfort`, service_role authenticates 200. **Region is `eu-west-2` (London)**, measured from the DB host's IPv6 against AWS's published ranges — not an African region. See Q6. |
 | F5 | Migration pipeline (local, CI, deploy) | `[~]` | unit | +int | #17 | **Pipeline built, not yet run against a database.** `npm run db:migrate` applies `supabase/migrations/*.sql` in order, once, and **refuses to continue if an applied file's checksum changed** (CLAUDE.md #4). `pg` is bound via `connection.ts`, and `bootstrap.ts` finally calls `setMoneyDb` — the link that did not exist. Blocked only on `DATABASE_URL`. |
 | F6 | CI quality gate workflow | `[x]` | **verified** | n/a | #13, #14 | Lockfile · Typecheck · Lint · Format · Tests · Build · Money guards, each a separate named job. Guards tested against synthetic violations to prove they fire. |
-| F7 | Vercel project + preview deploys | `[ ]` | none | +e2e | — | |
+| F7 | Vercel project + preview deploys | `[x]` | **verified live** | +e2e | — | **<https://mo-mo-hack.vercel.app> is public and serving.** Production deploys on every merge to `main`, previews on every PR. Verified 2026-09-02: `/` and `/chat` **200**, `/api/health` `ok:true`, and **`POST /api/momo/callback/collection` returns 200 from the public internet** — so MTN can reach our callback. Note the per-deployment URLs (`…-tumo-mogames-projects.vercel.app`) 302 to SSO; only the stable alias is public, and that is the one to give MTN and Telegram. |
 | F8 | GitHub Actions scheduler + keep-alive | `[ ]` | none | +int | — | ADR-0006 |
-| F9 | Secrets wired (MoMo, Supabase, Telegram) | `[~]` | n/a | n/a | — | All present in `.env.local` and verified live. **None are in GitHub Secrets yet**, so nothing deployed can use them. |
+| F9 | Secrets wired (MoMo, Supabase, Telegram) | `[~]` | n/a | n/a | — | All present in `.env.local` and verified live. **None are set on Vercel or in GitHub Secrets**, and the deployed app proves it: `/api/health` reports `momoMode: sandbox` (the default, because `MOMO_MODE` is unset) and `database: unconfigured`. The site is up but has no credentials. Needed on Vercel: the 5 MoMo values, `CRON_SECRET`, `DATABASE_URL`, and the 3 Supabase values. |
 
 ## 1. Money engine (MUST)
 
@@ -315,6 +315,7 @@ Format: one line per merged workstream, with the evidence.
 | 2026-09-02 | Required status checks on `main` | **verified** | 8 checks now required — Lockfile, Typecheck, Lint, Format, Tests, Build, Money guards, A8 — with **`strict` on**, so a branch must be up to date with `main` before it merges. Read back from the API, not assumed. That last setting is what would have caught the #10 + #11 interaction *before* the merge instead of after. |
 | 2026-09-02 | Telegram bot | **integration** | Re-checked live. Bot healthy; **no webhook set and 1 update queued**; `/api/telegram/webhook` does not exist (M5a). A sent message has nowhere to go. Not a fault — unbuilt, and gated on F7. |
 | 2026-09-02 | DB wiring (#17) | unit + skip-verified | `pg` bound, bootstrap calls `setMoneyDb`, migration runner with checksum enforcement. **35 integration + RLS tests written**; they skip cleanly and visibly without `DATABASE_URL` (315 passed, 29 skipped). Typecheck, lint, format and build all green. |
+| 2026-09-02 | **Deployed app is live** | **integration** | <https://mo-mo-hack.vercel.app> from the public internet: `/` and `/chat` 200, `/api/health` `ok:true`, and `POST /api/momo/callback/collection` **200** — MTN can reach our callback. Health also proves no env vars are set there yet. |
 | 2026-09-02 | Live spend guard (#18) | unit + **empirical** | 15 tests on the cap. Verified by pointing `.env.local` at `production` and running `npm run check:momo`: it **refused and exited before issuing a token**, then the env was restored. 331 tests pass overall. |
 
 ---
