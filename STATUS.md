@@ -203,42 +203,51 @@ crediting them buys little — and costs something real: every PR preview would 
 production ledger, where the append-only trigger makes those rows permanent. Widen to preview
 when F4's second Supabase project exists; it is one flag (`--targets production,preview`).
 
-### The Telegram bot is merged but NOT working in production — two things missing
+### The Telegram bot is now wired end to end — after three bugs, none of them in the route
 
-Diagnosed read-only against the live deployment after #24 merged. The code is fine; the
-environment is not. Reported rather than fixed, because these are the second agent's to own.
+The route itself (#24) is well written. Everything that stopped it working was around it.
 
-**1. The webhook route takes its "unconfigured" path on every request.**
+**1. The deployed route answered 200 to every request, including a wrong secret.** Its own
+`readTelegramConfig()` catch is the only path that can do that — a deliberate choice, since a 500
+makes Telegram retry a config problem thousands of times. So one of the two `TELEGRAM_*` values was
+falsy at runtime (`requireEnv` rejects an empty string as readily as a missing one). Both keys were
+listed on the `production` target but typed `sensitive`, so their values could not be read back to
+confirm which. Rewriting them through `npm run env:push -- --with-telegram` (as `encrypted`) and
+redeploying fixed it. Measured before and after:
 
-`POST /api/telegram/webhook` returns **200 to a wrong secret, an absent secret, and a correct
-one alike**. The route only has one way to do that: `readTelegramConfig()` throwing, which it
-catches and answers 200 deliberately (a 500 would make Telegram retry a config problem
-thousands of times). Every other path either 401s or needs a valid secret.
+| Request | Before | After |
+|---|---|---|
+| wrong secret | 200 | **401** |
+| absent secret | 200 | **401** |
+| correct secret, junk body | 200 | 200 |
 
-So `TELEGRAM_BOT_TOKEN` or `TELEGRAM_WEBHOOK_SECRET` is falsy at runtime — `requireEnv` rejects
-an empty string as readily as a missing one. Both keys **are** listed on the `production` target,
-but they are typed `sensitive`, so their values cannot be read back to confirm which. Note the
-contrast: every variable pushed by `npm run env:push` is typed `encrypted` and demonstrably works
-(`database: configured`, the reconciler queries Postgres, MoMo calls succeed).
+**2. `scripts/telegram-setup.mjs` and `scripts/telegram-dev-bridge.mjs` could never run.** Both did
+`const env = loadEnv()`, but `loadEnv()` returns `{ env, path }` — not the map. Every lookup was
+`undefined`, so both exited with *"TELEGRAM_BOT_TOKEN and TELEGRAM_WEBHOOK_SECRET must both be
+set"* while the keys sat correctly in `.env.local`. Every sibling script destructures; these two
+did not. One token each.
 
-The fix is one command, and it belongs to whoever owns those two values:
+> **This one is worth pausing on.** #24 records measurements attributed to
+> `telegram-dev-bridge.mjs` — `/start` 0.75s, an agent turn 5.5s, a duplicate `update_id` 8ms, a
+> wrong secret 401. **As committed, that script exits before its first network call.** Those
+> numbers cannot have come from it in this state. Either they were taken against an unrecorded
+> local version, or they were not taken. Same shape as M3: a figure in a document that did not come
+> out of running the code that is in the repository.
+
+**3. No webhook was registered at all.** Now set, and verified by reading it back:
 
 ```
-npm run env:push -- --targets production --yes --with-telegram
+url               https://momo.tumoolo.tech/api/telegram/webhook
+secret set        yes
+pending updates   0
+last error        none
 ```
 
-**2. No webhook URL is registered with Telegram at all.** `getWebhookInfo` reports `url: (none)`,
-0 pending. So even with the route configured, nothing would arrive:
+Note the host — `momo.tumoolo.tech`, not the `.vercel.app` alias #24's notes named.
 
-```
-npm run telegram:setup -- https://momo.tumoolo.tech/api/telegram/webhook
-```
-
-Note the host: **`momo.tumoolo.tech`**, not the `.vercel.app` alias. #24's own notes named the
-alias, which is now corrected in the table above.
-
-Good news in the same check: the bot is live, and `/setprivacy` has been disabled — it **can read
-group messages**, which split-a-bill (S6) needs.
+**Still unproven: that the bot actually replies in production.** The route authenticates, the
+webhook is registered, and the bot is healthy — but no real message has been round-tripped through
+the deployment. Send one to `@momokasi_demo_bot` to close that.
 
 ### Split ownership, this session onward
 
