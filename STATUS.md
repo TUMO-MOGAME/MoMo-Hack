@@ -333,6 +333,41 @@ rather than through it. Nobody in the room can tell the difference, and it is th
 The R12.50 tie-break is pinned by a regression test because we got it wrong in a document once
 (`MISTAKES.md` M3): driver **R3.13**, insurance **R0.62**. Quote those figures, not rounded ones.
 
+### 🔴 CORRECTED: production authenticates, and it CANNOT collect from a real wallet
+
+**Measured 2026-09-02, and it overturns the section below.** That section says the project "already
+has working production access and does not need the portal's Go Live application". **The first
+half is true and the second half is wrong.**
+
+A real MTN SA number, belonging to a consenting person who had loaded R10 onto that exact wallet,
+was asked for R0.20 on `mtnsouthafrica`. MTN accepted every request with **202** and then reported
+**`FAILED · PAYER_NOT_FOUND`** every time:
+
+| Tried | Result |
+|---|---|
+| `27767221345`, `0767221345`, `767221345`, `+27767221345` | all **202** → all `PAYER_NOT_FOUND` |
+| a second real MTN SA number | same |
+
+**Five attempts, two numbers, four formats, one answer.** That rules out the number, the format,
+the credentials (token `200`, requests `202`) and the callback binding (no `X-Callback-Url` was
+sent, which `momoAPIs.md` §4.1 measured as `202` under any binding — and it was). What remains is
+that **the API user is not provisioned to collect from live subscribers**, which is the Go Live
+business verification, measured in days.
+
+**Cost: R0.00.** A `PAYER_NOT_FOUND` moves no money, so the ~R10 budget is fully intact.
+
+**What this means for the presentation.** Sandbox is the demo path and there is no alternative —
+this cannot be fixed by trying harder in the morning. The honest and still-strong claim is
+*"production credentials are integrated and authenticating against MTN South Africa"*, which is
+true, provable in about a second, and stops short of implying a payment ever succeeded there.
+
+Full measurement in **`momoAPIs.md` §9a**.
+
+> **The general lesson, and it is the second time in this project.** A `202` accepted the
+> *request*, not the payment. `MISTAKES.md` M8 — *verify an effect, not a response* — was written
+> about one of our own routes returning 200 unconditionally. It applies identically to a third
+> party's API, and this time the misleading success came from MTN.
+
 ### MTN's production credentials are real, and verified — but parked
 
 `MTN_*` in `.env.local`, read by nothing. Measured, not assumed:

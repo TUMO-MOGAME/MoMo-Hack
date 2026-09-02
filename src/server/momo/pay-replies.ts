@@ -22,11 +22,26 @@
 
 import { formatZAR, type Minor } from '@/domain/money';
 import { log } from '@/server/log';
-import { demoStatus, parsePayAmount, requestDemoPayment } from './demo-collect';
+import { demoStatus, hasExtraArguments, parsePayAmount, requestDemoPayment } from './demo-collect';
 
 /** `/pay 0.20` → the sentence to send back. Never throws; a chat must answer. */
 export async function payReply(text: string, channel: string): Promise<string> {
-  const amount = parsePayAmount(text.replace(/^\/pay(?:@\S+)?/i, ''));
+  const args = text.replace(/^\/pay(?:@\S+)?/i, '');
+
+  // A second argument is almost always a payee, and answering it at all would
+  // be misleading — this build cannot pay an arbitrary number, by design.
+  // Saying so plainly beats parsing one of the two numbers and hoping.
+  if (hasExtraArguments(args)) {
+    return [
+      'Just the amount, please — like /pay 0.20.',
+      '',
+      "I can't send money to a number you type. This asks the one phone that's",
+      'set up for this demo to approve a payment, and that number lives in the',
+      'server config, not in the message.',
+    ].join('\n');
+  }
+
+  const amount = parsePayAmount(args);
   if (amount === null) {
     return 'Tell me how much — like /pay 0.20 — and I will ask your phone to approve it.';
   }
@@ -67,11 +82,51 @@ export async function payReply(text: string, channel: string): Promise<string> {
   }
 }
 
+/**
+ * MTN's failure reasons, in words a person can act on.
+ *
+ * Only the ones we have actually observed or that are documented in
+ * `momoAPIs.md` — inventing an explanation for a code we have never seen is how
+ * a support message becomes a lie.
+ */
+const REASONS: Record<string, string> = {
+  PAYER_NOT_FOUND:
+    "That number has no MoMo wallet in this environment, so MTN had nobody to ask. Check the number is registered for MTN MoMo, and that it's the same market these API credentials belong to.",
+  PAYER_LIMIT_REACHED: 'That wallet has hit a transaction limit at MTN.',
+  NOT_ENOUGH_FUNDS: 'There was not enough in the wallet to cover it.',
+  PAYER_REJECTED: 'The payment was declined on the phone.',
+  EXPIRED: 'The request sat unapproved for too long and MTN expired it.',
+  INTERNAL_PROCESSING_ERROR: 'MTN had an internal error. Nothing was charged; it can be retried.',
+};
+
 /** `/status` → resolve anything pending, then report what the ledger says. */
 export async function statusReply(): Promise<string> {
   try {
     const s = await demoStatus();
     if (!s) return 'Nothing has been requested yet. Send /pay 0.20 to start one.';
+
+    // ── TERMINAL FAILURE IS NOT "STILL PENDING" ──────────────────────────────
+    //
+    // The first version of this said *"That R0.20 is still failed. If your phone
+    // has not asked you yet, give it a moment"* — which told a user to wait for
+    // a prompt that was never coming. FAILED, REJECTED and TIMEOUT are terminal
+    // (CLAUDE.md's vocabulary section says so in as many words); nothing about
+    // them changes by waiting, and inviting someone to keep checking is the
+    // opposite of the honesty the rest of this file is careful about.
+    //
+    // It reads the REASON out of MTN's own response rather than guessing.
+    // `PAYER_NOT_FOUND` in particular means something specific and actionable:
+    // the number has no MoMo wallet in this environment.
+    if (s.terminal && !s.settled) {
+      const because = s.reason ? REASONS[s.reason] : undefined;
+      return [
+        `That ${formatZAR(s.amountMinor)} did not go through — MTN returned ${s.status}.`,
+        '',
+        because ?? 'MTN did not say why.',
+        '',
+        'No money moved, and nothing is waiting on your phone.',
+      ].join('\n');
+    }
 
     if (!s.settled) {
       return [

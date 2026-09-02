@@ -17,7 +17,13 @@
  */
 
 import { describe, expect, test, vi } from 'vitest';
-import { DEMO_MAX_MINOR, parsePayAmount, requestDemoPayment } from '@/server/momo/demo-collect';
+import {
+  DEMO_MAX_MINOR,
+  hasExtraArguments,
+  parsePayAmount,
+  requestDemoPayment,
+} from '@/server/momo/demo-collect';
+import { payReply } from '@/server/momo/pay-replies';
 import { handleUpdate, parseCommand } from '@/server/telegram/handle';
 import { minor } from '@/domain/money';
 
@@ -34,6 +40,36 @@ describe('parsing the amount', () => {
 
   test.each(['/pay', '/pay abc', '/pay -1', '/pay 0.001'])('%j has no amount', (text) => {
     expect(parsePayAmount(text.replace(/^\/pay/i, ''))).toBeNull();
+  });
+
+  describe('a phone number is never mistaken for an amount', () => {
+    // A REAL user typed `/pay 0.2 0767221345` — "pay this much to this number",
+    // the obvious thing to type. The first parser anchored to the END of the
+    // string and matched the PHONE NUMBER, reporting
+    // "R7 672 213.45 is over the R5.00 demo ceiling".
+    //
+    // The ceiling caught it. That was LUCK. `/pay 0.20 300` would have parsed as
+    // R3.00 and charged it — someone who typed an amount and a reference would
+    // be billed the reference.
+    test.each(['/pay 0.2 0767221345', '/pay 0.20 300', '/pay 0.20 to 0761234567', '/pay 5 5'])(
+      '%j is refused outright, not resolved to one of its numbers',
+      (text) => {
+        const args = text.replace(/^\/pay/i, '');
+        expect(hasExtraArguments(args)).toBe(true);
+        expect(parsePayAmount(args)).toBeNull();
+      },
+    );
+
+    test('the refusal explains that the payee is configuration', async () => {
+      const reply = await payReply('/pay 0.20 0767221345', 'test');
+      expect(reply).toMatch(/just the amount/i);
+      expect(reply).toMatch(/server config|number you type/i);
+      // And it must not read as though a payment were attempted. "approve"
+      // appears legitimately in the explanation of what /pay does, so the
+      // assertion is on the claims that would mislead — a request having been
+      // sent, or a ceiling having been hit by a number that was never an amount.
+      expect(reply).not.toMatch(/request sent|ceiling|check your phone/i);
+    });
   });
 });
 

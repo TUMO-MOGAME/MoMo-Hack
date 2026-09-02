@@ -315,6 +315,50 @@ Used for: diaspora funding of a purpose-locked family sub-wallet (S3).
 
 ---
 
+## 9a. MTN South Africa PRODUCTION cannot collect from a real wallet — **[V] MEASURED 2026-09-02**
+
+**The production credentials authenticate, accept requests, and cannot reach a single real
+subscriber.** This corrects an optimistic reading recorded elsewhere in the project, which held
+that working production access made the portal's "Go Live" application unnecessary.
+
+Measured against `https://proxy.momoapi.mtn.com`, `X-Target-Environment: mtnsouthafrica`, with a
+real MTN SA number belonging to a consenting person who had loaded R10 onto that exact wallet:
+
+| MSISDN format sent | `POST /collection/v1_0/requesttopay` | Then `GET .../requesttopay/{ref}` |
+|---|---|---|
+| `27767221345` (international, no `+`) | **202** | `FAILED` · `PAYER_NOT_FOUND` |
+| `0767221345` (local, leading zero) | **202** | `FAILED` · `PAYER_NOT_FOUND` |
+| `767221345` (no country code) | **202** | `FAILED` · `PAYER_NOT_FOUND` |
+| `+27767221345` (with `+`) | **202** | `FAILED` · `PAYER_NOT_FOUND` |
+
+A second real MTN SA number gave the same result. **Five attempts, two numbers, four formats, one
+answer.**
+
+**What this rules out, and it is worth being precise:** not the number (two of them), not the
+format (four of them), not the credentials (the token issues `200` and every request is accepted
+`202`), and not the callback binding (no `X-Callback-Url` was sent, which §4.1 measured as `202`
+under any binding — and it was).
+
+**What it leaves:** the API user is not provisioned to collect from live MTN South Africa
+subscribers. That is the **"Go Live" business-verification process**, measured in days, not an
+integration problem anyone can code around.
+
+**The operational consequence.** `mtnsouthafrica` is not a demo path and cannot be made into one
+by trying harder on the night. Sandbox is the only environment in which money moves, and the
+honest claim about production is *"credentials are integrated and authenticating"* — which is
+true, verifiable in seconds, and stops well short of implying a payment has ever succeeded there.
+
+> **A `202` is not an acceptance of the payment.** It is an acceptance of the *request*, and this
+> is the second time in this file that a success-shaped response has meant less than it looked
+> (see §4.1, where the interesting answer was the `500`). The status must always be fetched.
+> `MISTAKES.md` M8 — verify an effect, not a response — applies to third-party APIs exactly as it
+> applies to our own routes.
+
+**Cost of establishing this: R0.00.** A `PAYER_NOT_FOUND` moves no money, so all five attempts
+were free, and the ~R10 live budget is untouched.
+
+---
+
 ## 10. Sandbox test MSISDNs — **[V] VERIFIED 2026-09-02, and the docs were wrong**
 
 Measured against the live sandbox with `node scripts/momo-smoke.mjs`, then polled for 40 seconds
