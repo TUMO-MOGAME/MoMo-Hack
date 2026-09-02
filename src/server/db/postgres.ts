@@ -54,7 +54,8 @@ function toBigInt(value: unknown): bigint {
     // float, which is exactly the bug ADR-0004 exists to prevent. Refuse it.
     throw new AppException({
       kind: 'INTERNAL',
-      cause: 'money column arrived as a number; configure the driver to return bigint columns as text',
+      cause:
+        'money column arrived as a number; configure the driver to return bigint columns as text',
     });
   }
   return BigInt(String(value));
@@ -78,11 +79,13 @@ function mapTransaction(row: SqlRow): MomoTransactionRow {
     counterparty: String(row.counterparty),
     externalId: String(row.external_id),
     purpose: String(row.purpose),
-    subjectId: row.subject_id === null || row.subject_id === undefined ? null : String(row.subject_id),
+    subjectId:
+      row.subject_id === null || row.subject_id === undefined ? null : String(row.subject_id),
     initiatedBy:
       row.initiated_by === null || row.initiated_by === undefined ? null : String(row.initiated_by),
     attemptCount: Number(row.attempt_count),
-    journalId: row.journal_id === null || row.journal_id === undefined ? null : String(row.journal_id),
+    journalId:
+      row.journal_id === null || row.journal_id === undefined ? null : String(row.journal_id),
     createdAt: toDate(row.created_at),
     updatedAt: toDate(row.updated_at),
     resolvedAt: toNullableDate(row.resolved_at),
@@ -133,7 +136,10 @@ export function createMoneyTx(sql: SqlExecutor): MoneyTx {
       );
       const row = one(found);
       if (!row) {
-        throw new AppException({ kind: 'INTERNAL', cause: `cannot resolve account ${accountKey(ref)}` });
+        throw new AppException({
+          kind: 'INTERNAL',
+          cause: `cannot resolve account ${accountKey(ref)}`,
+        });
       }
       return row.id;
     },
@@ -146,7 +152,8 @@ export function createMoneyTx(sql: SqlExecutor): MoneyTx {
         [input.kind, input.referenceId ?? null, input.memo ?? null],
       );
       const row = one(rows);
-      if (!row) throw new AppException({ kind: 'INTERNAL', cause: 'journal insert returned no row' });
+      if (!row)
+        throw new AppException({ kind: 'INTERNAL', cause: 'journal insert returned no row' });
       return row.id;
     },
 
@@ -212,7 +219,10 @@ export function createMoneyTx(sql: SqlExecutor): MoneyTx {
 
       const row = one(rows);
       if (!row) return null;
-      return { row: mapTransaction(row), previousStatus: String(row.previous_status) as MomoStatus };
+      return {
+        row: mapTransaction(row),
+        previousStatus: String(row.previous_status) as MomoStatus,
+      };
     },
 
     /**
@@ -240,7 +250,8 @@ export function createMoneyTx(sql: SqlExecutor): MoneyTx {
         [draft.channel, draft.recipient, JSON.stringify(draft.payload)],
       );
       const row = one(rows);
-      if (!row) throw new AppException({ kind: 'INTERNAL', cause: 'outbox insert returned no row' });
+      if (!row)
+        throw new AppException({ kind: 'INTERNAL', cause: 'outbox insert returned no row' });
       return row.id;
     },
 
@@ -271,7 +282,10 @@ export function createMoneyTx(sql: SqlExecutor): MoneyTx {
       );
       const row = one(rows);
       if (!row) {
-        throw new AppException({ kind: 'INTERNAL', cause: 'momo_transaction insert returned no row' });
+        throw new AppException({
+          kind: 'INTERNAL',
+          cause: 'momo_transaction insert returned no row',
+        });
       }
       return mapTransaction(row);
     },

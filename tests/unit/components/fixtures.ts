@@ -16,7 +16,11 @@ export const walletFixture: Extract<Artifact, { type: 'wallet' }> = {
   title: 'Your money',
   type: 'wallet',
   balances: [
-    { label: 'Available', kind: 'WALLET', money: { amount: minor(34000n), sourceAccountId: 'acc_w1' } },
+    {
+      label: 'Available',
+      kind: 'WALLET',
+      money: { amount: minor(34000n), sourceAccountId: 'acc_w1' },
+    },
     {
       label: 'Held in escrow',
       kind: 'ESCROW',
@@ -81,7 +85,12 @@ export const splitFixture: Extract<Artifact, { type: 'split-breakdown' }> = {
   route: 'Katlehong → Germiston',
   fare: { amount: minor(1250n), sourceTxnId: 'txn_8842' },
   parts: [
-    { key: 'OWNER', label: 'Taxi owner', bps: 6000, money: { amount: minor(750n), sourceTxnId: 'txn_8842' } },
+    {
+      key: 'OWNER',
+      label: 'Taxi owner',
+      bps: 6000,
+      money: { amount: minor(750n), sourceTxnId: 'txn_8842' },
+    },
     {
       key: 'DRIVER_FLOAT',
       label: 'Driver float',
@@ -186,7 +195,11 @@ export const unsourcedWalletFixture: Extract<Artifact, { type: 'wallet' }> = {
   title: 'Your money',
   type: 'wallet',
   balances: [
-    { label: 'Available', kind: 'WALLET', money: { amount: minor(34000n), sourceAccountId: 'acc_w1' } },
+    {
+      label: 'Available',
+      kind: 'WALLET',
+      money: { amount: minor(34000n), sourceAccountId: 'acc_w1' },
+    },
     { label: 'Held in escrow', kind: 'ESCROW', money: { amount: minor(6000n) } },
   ],
 };

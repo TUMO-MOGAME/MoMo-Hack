@@ -11,6 +11,7 @@
 import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FlatCompat } from '@eslint/eslintrc';
+import prettier from 'eslint-config-prettier';
 
 const compat = new FlatCompat({
   baseDirectory: dirname(fileURLToPath(import.meta.url)),
@@ -19,14 +20,7 @@ const compat = new FlatCompat({
 const config = [
   {
     // Build output and vendored code are not ours to lint.
-    ignores: [
-      '.next/**',
-      'out/**',
-      'build/**',
-      'coverage/**',
-      'node_modules/**',
-      'next-env.d.ts',
-    ],
+    ignores: ['.next/**', 'out/**', 'build/**', 'coverage/**', 'node_modules/**', 'next-env.d.ts'],
   },
 
   ...compat.extends('next/core-web-vitals', 'next/typescript'),
@@ -61,6 +55,13 @@ const config = [
       '@typescript-eslint/no-require-imports': 'off',
     },
   },
+
+  // LAST, and it must stay last. This switches OFF every ESLint rule that
+  // overlaps with Prettier, so the two cannot disagree about the same line —
+  // otherwise you get files that `npm run lint` and `npm run format:check` both
+  // fail, each demanding the other's output. Anything added after this would
+  // re-enable the rules it just turned off.
+  prettier,
 ];
 
 export default config;

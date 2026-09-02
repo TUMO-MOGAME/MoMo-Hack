@@ -130,7 +130,11 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section id={id} aria-labelledby={`${id}-h`} className="border-t border-border px-5 py-14 sm:px-8">
+    <section
+      id={id}
+      aria-labelledby={`${id}-h`}
+      className="border-t border-border px-5 py-14 sm:px-8"
+    >
       <div className="mx-auto max-w-4xl">
         <p className="text-xs uppercase tracking-widest text-muted-foreground">{kicker}</p>
         <h2 id={`${id}-h`} className="mt-2 font-display text-3xl leading-tight text-foreground">
@@ -174,15 +178,15 @@ export default function LandingPage() {
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-relaxed text-foreground">
               MTN does not have a distribution problem in South Africa. It has a{' '}
-              <em className="text-brand not-italic">frequency</em> problem. MoMo Kasi is built around
-              the one question that fixes it: what makes someone open this again tomorrow?
+              <em className="text-brand not-italic">frequency</em> problem. MoMo Kasi is built
+              around the one question that fixes it: what makes someone open this again tomorrow?
             </p>
             <p className="mt-4 max-w-2xl text-base leading-relaxed text-muted-foreground">
               Three money behaviours already happen every day in cash — you{' '}
               <strong className="text-foreground">earn</strong>, you{' '}
               <strong className="text-foreground">share</strong>, you{' '}
-              <strong className="text-foreground">spend</strong>. Digitise all three on one ledger and
-              the wallet stops being a destination and becomes a habit.
+              <strong className="text-foreground">spend</strong>. Digitise all three on one ledger
+              and the wallet stops being a destination and becomes a habit.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">
@@ -214,11 +218,7 @@ export default function LandingPage() {
         </section>
 
         {/* the two facts that make the case */}
-        <Section
-          id="why"
-          kicker="Why now"
-          title="Two facts, one product sitting between them."
-        >
+        <Section id="why" kicker="Why now" title="Two facts, one product sitting between them.">
           <dl className="grid gap-4 sm:grid-cols-2">
             {STATS.map((s) => (
               <div key={s.label} className="rounded-lg border border-border bg-card p-5">
@@ -286,10 +286,17 @@ export default function LandingPage() {
         </Section>
 
         {/* how it is built */}
-        <Section id="how" kicker="Engineering" title="The parts a judge on the panel will look for.">
+        <Section
+          id="how"
+          kicker="Engineering"
+          title="The parts a judge on the panel will look for."
+        >
           <ul className="space-y-3">
             {ENGINEERING.map((line) => (
-              <li key={line} className="flex items-start gap-3 text-base leading-relaxed text-foreground">
+              <li
+                key={line}
+                className="flex items-start gap-3 text-base leading-relaxed text-foreground"
+              >
                 <span className="mt-2 size-1.5 shrink-0 rounded-full bg-brand" aria-hidden="true" />
                 <span>{line}</span>
               </li>
@@ -334,8 +341,8 @@ export default function LandingPage() {
         <div className="mx-auto max-w-4xl space-y-2">
           <p>
             Figures verified 2026-09-02. Unemployment and NEET: Stats SA QLFS Q2 2026. Stokvel
-            membership: NASASA. Taxi industry sizing: TopAuto and Kuba. MoMo scale and the quotation:
-            MTN Group, reported by TechCabal, 1 September 2026. Full source list in{' '}
+            membership: NASASA. Taxi industry sizing: TopAuto and Kuba. MoMo scale and the
+            quotation: MTN Group, reported by TechCabal, 1 September 2026. Full source list in{' '}
             <span className="text-foreground">docs/00-PRODUCT-BRIEF.md</span> in the repository.
           </p>
           <p>

@@ -27,7 +27,8 @@ const sh = (cmd, args) => execFileSync(cmd, args, { encoding: 'utf8' }).trim();
 // Same, but silent on failure — for probes where "it does not exist" is the answer
 // we want, not an error worth showing. A scary `fatal:` on a success path teaches
 // people to distrust the guard, and a distrusted guard gets bypassed.
-const probe = (cmd, args) => execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+const probe = (cmd, args) =>
+  execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 const die = (msg) => {
   console.error(`\n  ${r('✖')} ${msg}\n`);
   process.exit(1);
@@ -168,7 +169,9 @@ const remotes = sh('git', ['branch', '-r'])
   .map((s) => s.trim())
   .filter((s) => s && !s.includes('->') && s !== 'origin/main');
 
-console.log(`\n  ${g('✓')} PR #${pr} merged.  ${d(sh('git', ['log', '--oneline', '-1', 'origin/main']))}`);
+console.log(
+  `\n  ${g('✓')} PR #${pr} merged.  ${d(sh('git', ['log', '--oneline', '-1', 'origin/main']))}`,
+);
 if (remotes.length) {
   console.log(`\n  ${d('remaining remote branches:')}`);
   remotes.forEach((b) => console.log(`    ${b}`));

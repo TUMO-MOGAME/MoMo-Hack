@@ -91,7 +91,10 @@ export function Confirm({ a, onConfirm, onCancel }: ConfirmProps) {
           className="w-full rounded-lg bg-brand px-4 py-4 text-base font-semibold text-brand-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
         >
           Confirm — pay <span className="tabular">{formatZAR(action.money.amount as Minor)}</span>
-          <span className="sr-only"> to {action.payeeLabel}. This moves {spokenAmount}.</span>
+          <span className="sr-only">
+            {' '}
+            to {action.payeeLabel}. This moves {spokenAmount}.
+          </span>
         </button>
         <button
           type="button"
@@ -107,9 +110,9 @@ export function Confirm({ a, onConfirm, onCancel }: ConfirmProps) {
           <WarningIcon />
         </span>
         <span>
-          The assistant prepared this. It cannot move money on its own — this card is rendered from a
-          server-signed proposal, your tap is the only thing that settles it, and the proposal stops
-          being valid two minutes after it was made.
+          The assistant prepared this. It cannot move money on its own — this card is rendered from
+          a server-signed proposal, your tap is the only thing that settles it, and the proposal
+          stops being valid two minutes after it was made.
         </span>
       </p>
     </div>

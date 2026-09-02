@@ -125,13 +125,9 @@ describe('the machine is total and closed', () => {
 
   test('nothing ever returns to INITIATED — a request cannot be un-sent', () => {
     fc.assert(
-      fc.property(
-        fc.constantFrom<MomoStatus>('CREATED', 'PENDING'),
-        arbEvents,
-        (start, events) => {
-          expect(reduce(start, events)).not.toBe('INITIATED');
-        },
-      ),
+      fc.property(fc.constantFrom<MomoStatus>('CREATED', 'PENDING'), arbEvents, (start, events) => {
+        expect(reduce(start, events)).not.toBe('INITIATED');
+      }),
       { numRuns: 5000 },
     );
   });

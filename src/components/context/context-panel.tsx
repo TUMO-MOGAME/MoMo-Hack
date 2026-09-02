@@ -28,7 +28,13 @@ import type { Artifact } from '@/lib/artifacts/types';
 import type { KasiContext } from '@/lib/agent/mock';
 import { moneyLabel } from '@/components/artifacts/summary';
 import { ClockIcon, Kicker, Money, Pill } from '@/components/artifacts/shared';
-import { CalendarIcon, ChevronIcon, SignalIcon, SignalOffIcon, WalletIcon } from '@/components/icons';
+import {
+  CalendarIcon,
+  ChevronIcon,
+  SignalIcon,
+  SignalOffIcon,
+  WalletIcon,
+} from '@/components/icons';
 import type { Minor } from '@/domain/money';
 
 export interface ContextPanelProps {
@@ -240,7 +246,10 @@ export function ContextPanel({ context, onOpen }: ContextPanelProps) {
           role="status"
           className="mt-2 flex items-start gap-2 rounded-md border border-border bg-card px-3 py-2.5 text-xs leading-relaxed text-muted-foreground"
         >
-          <span className={online ? 'mt-0.5 text-success' : 'mt-0.5 text-warning'} aria-hidden="true">
+          <span
+            className={online ? 'mt-0.5 text-success' : 'mt-0.5 text-warning'}
+            aria-hidden="true"
+          >
             {online ? <SignalIcon size={14} /> : <SignalOffIcon size={14} />}
           </span>
           <span>
@@ -266,7 +275,6 @@ export function ContextPanel({ context, onOpen }: ContextPanelProps) {
           </span>
         </p>
       </section>
-
     </div>
   );
 }

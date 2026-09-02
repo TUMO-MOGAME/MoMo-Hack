@@ -72,9 +72,12 @@ describe('split', () => {
 
   test('an invalid rule is rejected, never silently normalised', () => {
     expect(() => split(minor(100n), [{ key: 'A', bps: 5000 }])).toThrow(SplitRuleError);
-    expect(() => split(minor(100n), [{ key: 'A', bps: 6000 }, { key: 'A', bps: 4000 }])).toThrow(
-      SplitRuleError,
-    );
+    expect(() =>
+      split(minor(100n), [
+        { key: 'A', bps: 6000 },
+        { key: 'A', bps: 4000 },
+      ]),
+    ).toThrow(SplitRuleError);
     expect(() => split(minor(100n), [])).toThrow(SplitRuleError);
   });
 

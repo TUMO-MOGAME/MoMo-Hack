@@ -139,7 +139,9 @@ for (const [label, msisdn, expected] of CASES) {
   });
 
   if (!st.ok) {
-    console.log(`  ${label.padEnd(28)} ${msisdn.padEnd(14)} ${show.padEnd(22)} ${r(`GET ${st.status}`)}`);
+    console.log(
+      `  ${label.padEnd(28)} ${msisdn.padEnd(14)} ${show.padEnd(22)} ${r(`GET ${st.status}`)}`,
+    );
     hardFail = true;
     continue;
   }
@@ -172,8 +174,16 @@ const headers = {
   'X-Reference-Id': dupeRef,
   'Content-Type': 'application/json',
 };
-const first = await fetch(`${BASE}/collection/v1_0/requesttopay`, { method: 'POST', headers, body });
-const second = await fetch(`${BASE}/collection/v1_0/requesttopay`, { method: 'POST', headers, body });
+const first = await fetch(`${BASE}/collection/v1_0/requesttopay`, {
+  method: 'POST',
+  headers,
+  body,
+});
+const second = await fetch(`${BASE}/collection/v1_0/requesttopay`, {
+  method: 'POST',
+  headers,
+  body,
+});
 const dupeOk = first.status === 202 && second.status === 409;
 console.log(
   `  ${'idempotency (same ref)'.padEnd(22)} ${''.padEnd(14)} ${'202 then 409'.padEnd(12)} ` +
@@ -183,7 +193,9 @@ console.log(
 // ── verdict ──────────────────────────────────────────────────────────────────
 console.log();
 if (hardFail) {
-  console.log(`  ${r('✖')} The sandbox rejected at least one request. Credentials or sandbox are unhealthy.\n`);
+  console.log(
+    `  ${r('✖')} The sandbox rejected at least one request. Credentials or sandbox are unhealthy.\n`,
+  );
   process.exit(1);
 }
 if (mismatches) {

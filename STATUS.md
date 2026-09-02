@@ -117,8 +117,8 @@ Test column: `none` / `unit` / `+prop` (property-based) / `+int` (integration in
 | F3c | Frozen contracts: `money`, `split`, `errors`, `artifacts/types` | `[x]` | **manual** | +prop | — | Split verified exact across 200,000 amounts. Needs the real fast-check suite (M1d). |
 | F3d | Starter chat + artifact UI (mock agent) | `[x]` | manual | +e2e | — | 7 artifact renderers, chip + panel + bottom sheet, zero keys needed |
 | F4 | Supabase staging + prod projects | `[~]` | none | +int | — | **Project 1 of 2 live and verified** — URL, anon and service_role all resolve to ref `edtduvwbejdfahkmfort`, service_role authenticates 200. **Region is `eu-west-2` (London)**, measured from the DB host's IPv6 against AWS's published ranges — not an African region. See Q6. |
-| F5 | Migration pipeline (local, CI, deploy) | `[ ]` | none | +int | — | Two migrations exist and have never been applied to a real database |
-| F6 | CI quality gate workflow | `[x]` | **verified** | n/a | #13 | Typecheck · Lint · Tests · Build · Money guards, each a separate named job. Guards tested against synthetic violations to prove they fire. |
+| F5 | Migration pipeline (local, CI, deploy) | `[ ]` | none | +int | — | Two migrations exist and have never been applied to a real database. **And nothing in `src/` calls `setMoneyDb`** — the Postgres adapter is written and tested but never bound, so the app has no code path to Supabase whatever the env holds. `/api/health` reports `database: unconfigured` for that reason, not a missing key. This is the walking skeleton, exactly. |
+| F6 | CI quality gate workflow | `[x]` | **verified** | n/a | #13, #14 | Lockfile · Typecheck · Lint · Format · Tests · Build · Money guards, each a separate named job. Guards tested against synthetic violations to prove they fire. |
 | F7 | Vercel project + preview deploys | `[ ]` | none | +e2e | — | |
 | F8 | GitHub Actions scheduler + keep-alive | `[ ]` | none | +int | — | ADR-0006 |
 | F9 | Secrets wired (MoMo, Supabase, Telegram) | `[~]` | n/a | n/a | — | All present in `.env.local` and verified live. **None are in GitHub Secrets yet**, so nothing deployed can use them. |
@@ -234,6 +234,8 @@ Format: one line per merged workstream, with the evidence.
 | 2026-09-02 | CI quality gate (#13) | **verified** | Typecheck, lint, full 231-test suite and production build all green locally on the bumped toolchain. Both content guards tested against a synthetic violation to prove they fire, and against this tree to prove they do not fire on prose. |
 | 2026-09-02 | Dependency health | **verified** | `npm audit` 9 vulnerabilities (3 critical) → **0**. `npm ci` restored — it had been failing since PR #2. |
 | 2026-09-02 | **#11 on the merged toolchain** | unit + property + contract | **315 tests, 20 files**, typecheck, lint and production build all clean. Caught vitest 4 silently not running the 84 component tests — see below. |
+| 2026-09-02 | Prettier + reformat (#14) | **verified** | 41 code files reformatted. 315 tests, typecheck, lint and build all still clean afterwards. Markdown deliberately excluded — see `.prettierignore`. |
+| 2026-09-02 | App runs on the merged tree | manual | `next dev` on the fully merged tree: `/` and `/chat` both **200**, `/api/health` `ok:true`. `database: unconfigured` is correct and expected — nothing binds the adapter yet (F5). |
 
 ---
 

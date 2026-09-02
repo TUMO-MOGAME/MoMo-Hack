@@ -1,0 +1,27 @@
+# Build output and dependencies.
+.next/
+out/
+build/
+coverage/
+node_modules/
+
+# Generated, and not ours to reformat.
+package-lock.json
+next-env.d.ts
+
+# SQL migrations are FORWARD-ONLY and immutable once merged (CLAUDE.md #4).
+# Prettier does not format .sql anyway, but making the intent explicit means
+# nobody later adds a plugin that quietly rewrites a merged migration.
+supabase/migrations/
+
+# Markdown is hand-wrapped here, and deliberately.
+#
+# Running Prettier over the docs rewrote 37 files and ~1,300 lines — reflowing
+# paragraphs and turning every *emphasis* into _emphasis_ — for no readability
+# gain, while burying any real edit in churn. `momoAPIs.md` alone moved 133
+# lines, and that is the file CLAUDE.md #9 forbids coding against from memory;
+# the last thing it needs is a diff nobody can read.
+#
+# Prose is reviewed by people. Code is reviewed by people and by machines, and
+# only the code half gets anything from a formatter.
+*.md

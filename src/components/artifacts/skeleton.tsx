@@ -51,7 +51,9 @@ function BigAmount() {
 export function ArtifactSkeleton({ type }: { type: ArtifactType | string }) {
   return (
     <div role="status" aria-busy="true" aria-live="polite" className="animate-rise">
-      <span className="sr-only">Loading this view. The numbers are still coming from the ledger.</span>
+      <span className="sr-only">
+        Loading this view. The numbers are still coming from the ledger.
+      </span>
       <div aria-hidden="true">
         {type === 'confirm' ? (
           <div className="space-y-4">
