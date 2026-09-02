@@ -348,7 +348,15 @@ export interface KasiContext {
   readonly balances: readonly BalanceRow[];
   /** The full wallet view the position block opens. */
   readonly wallet: Artifact;
-  readonly next: NextObligation;
+  /**
+   * OPTIONAL, because it is often not knowable.
+   *
+   * The rail is now fed from the real ledger (`/api/context`), and the ledger
+   * has no stokvel schedules or bills in it yet — so there is frequently no
+   * true 'next obligation' to state. Omitting the block is honest; inventing a
+   * plausible one beside real balances is the contradiction a judge notices.
+   */
+  readonly next?: NextObligation;
   readonly recent: readonly RecentEntry[];
   /** Fare captures waiting for signal (docs/00 §6a). Never a hidden failure. */
   readonly queued: number;

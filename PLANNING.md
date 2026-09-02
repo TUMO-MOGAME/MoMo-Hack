@@ -119,6 +119,32 @@ Full detail in `docs/00-PRODUCT-BRIEF.md`. Cut order in `docs/05-DELIVERY-PLAN.m
 | S7 | **Conversational agent** — a chat that renders live dashboards as typed artifacts |
 | S8 | **Voice** — speak and be spoken to, provider-per-language, phrase bank |
 
+### SHOULD — decided in ADR-0017, not yet built
+
+**Standing mandates.** *"Save R200 a month for my daughter's birthday and send it to her on the
+day."* *"Every month end, buy my grandmother electricity — but ask her how much is left first."*
+
+These are the features that turn a wallet into something people keep using, and they required
+amending the project's own safety rule to allow them (ADR-0017). The resolution: a mandate is a
+**debit order, not an agent decision** — signed once, bounded in rands, stated before signing,
+mandatory expiry, executed by deterministic server code with no model in the call path.
+
+Five sub-parts, in dependency order:
+
+1. **PIN + a confirmation surface outside the chat.** A PIN typed into a Telegram message is in the
+   chat history, the lock-screen preview and the bot's logs. One-time token → Telegram Mini App or
+   web page → PIN posts straight to the confirm endpoint. `scrypt` from `node:crypto`.
+2. **The mandate object** — signed, capped, expiring; drafted by the agent, created only by a human.
+3. **The scheduler executing them** — idempotent under retry, notify-the-day-before, frictionless
+   STOP.
+4. **The pre-execution question** — ask a third party, parse strictly, clamp to the signed cap. The
+   answer can only ever *lower* the amount.
+5. **Receipts** — an immutable receipt page at a stable URL. Not a generated PDF: that needs either
+   a headless browser (will not fit Vercel Hobby) or a new dependency, and "print to PDF" from a
+   real page is free.
+
+Blocked on auth (M9a), disbursements (M3a), the outbox drain (M3b) and the scheduler (F8).
+
 ### COULD — only if we are ahead of schedule
 
 | ID | Item |

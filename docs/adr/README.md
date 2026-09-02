@@ -21,5 +21,6 @@ stays, marked superseded. The reasoning trail is part of what a technical judge 
 | [0014](0014-agent-cannot-move-money.md) | The agent cannot move money | Accepted |
 | [0015](0015-popia-by-design.md) | POPIA compliance by design | Accepted |
 | [0016](0016-shared-audit-suite.md) | Phase gates run the shared audit suite | Accepted |
+| [0017](0017-mandates-and-pin-authority.md) | Standing mandates, and a PIN the agent cannot see | Accepted |
 
 Template in `docs/06-ENGINEERING-STANDARDS.md` §10.

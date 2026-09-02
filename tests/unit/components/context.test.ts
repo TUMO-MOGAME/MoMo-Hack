@@ -91,9 +91,11 @@ describe('the rail obeys the provenance rule', () => {
   test('the mock snapshot carries provenance on every amount', () => {
     expect(panel()).not.toContain('data-unsourced');
 
+    // `next` is optional now — the rail omits the block when the ledger holds
+    // no real obligation, rather than inventing a due date beside real money.
     const everything = [
       ...context.balances.map((b) => b.money),
-      context.next.money,
+      ...(context.next ? [context.next.money] : []),
       ...context.recent.map((r) => r.money),
     ];
     for (const m of everything) {
