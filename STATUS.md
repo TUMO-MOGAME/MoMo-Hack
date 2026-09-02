@@ -3,17 +3,19 @@
 **This file is the single source of truth for "where are we".**
 Every PR must update it. If you are a fresh session, read this before touching anything.
 
-- **Last updated:** 2026-09-02 (session 2 close)
+- **Last updated:** 2026-09-02 (session 4)
 - **Phase:** Phase 3 — money engine. **Exit criterion met**; its six audits are still owed.
 - **Local path:** `C:\MoMo-Hack`
 - **Repo:** <https://github.com/TUMO-MOGAME/MoMo-Hack> — **public**, `main` **protected**, and as of
   this session **8 required status checks with `strict` on**, so a branch must be up to date with
   `main` before it merges.
-- **Deployed:** <https://mo-mo-hack.vercel.app> — live and public. Production deploys on every
+- **Deployed:** <https://momo.tumoolo.tech> — live, public, and now the canonical host. The
+  `mo-mo-hack.vercel.app` alias still serves the same deployment. Production deploys on every
   merge, previews on every PR.
 - **Database:** live. 3 migrations applied to Supabase `edtduvwbejdfahkmfort` (`eu-west-2`).
-- **Tree state:** 360 tests green (23 files), 0 vulnerabilities, CI enforcing all of it.
-- **Blocked on:** nothing external. The next steps are work, not credentials.
+- **Tree state:** 361 tests green (23 files), 0 vulnerabilities, CI enforcing all of it.
+- **Blocked on:** nothing external. **F9 is done** — the deployed function has credentials, and
+  `/api/health` reports `database: configured`.
 
 ---
 
@@ -64,17 +66,93 @@ an `esbuild` block is silently ignored under Vite 8). Two lessons worth keeping:
 
 ### The next three actions
 
-1. **Set the environment variables on Vercel (F9).** The site is live and has **no
-   credentials** — `/api/health` says `database: unconfigured` and `momoMode: sandbox` (the
-   default, because `MOMO_MODE` is unset). Needed there: the 5 MoMo values, `CRON_SECRET`,
-   `DATABASE_URL`, and the 3 Supabase values. **Nothing else can be joined end to end until this
-   is done**, because the deployed function is the only thing MTN can call back.
-2. **Close the walking skeleton (Phase 0).** With step 1 done, this is the last piece: a real
-   `requesttopay` from the deployed function, resolved by the reconciler, writing balanced ledger
-   rows. Demo MSISDN `46733123454` — the only number that exercises a real ~25s async resolution.
-   Every part exists and is tested; nothing has been joined.
-3. **Telegram handler (M5a).** `/api/telegram/webhook` does not exist. Now unblocked — the public
-   HTTPS URL it needs is live. See the note below.
+1. **Close the walking skeleton (Phase 0).** F9 is done, so this is now the front of the queue:
+   a real `requesttopay` from the deployed function, resolved by the reconciler, writing balanced
+   ledger rows. Demo MSISDN `46733123454` — the only number that exercises a real ~25s async
+   resolution. Every part exists and is tested; nothing has been joined.
+2. **Phase 3's six audits (A1 A2 A3 A4 A5 A6).** `npm run audit:plan`. None have been run, and
+   the phase cannot close without them (CLAUDE.md #13).
+3. **Telegram handler (M5a).** Owned by a second agent, in its own worktree. This session did not
+   touch it and deliberately left `TELEGRAM_BOT_TOKEN` / `TELEGRAM_WEBHOOK_SECRET` alone — see
+   the note on split ownership below.
+
+### F9 is done, and the reason it looked undone was not the reason anyone assumed
+
+The variables **had already been set on Vercel**. They were set on the **preview** target only,
+and production had none — which is exactly why `momo.tumoolo.tech` reported
+`database: unconfigured` while the dashboard looked populated. Not a missing step; a misfiled one.
+That is worth remembering the next time an environment looks configured and behaves as though it
+is not: **check the target, not just the key list**.
+
+Now set on **production** (15 variables, read back from the API rather than trusted to a 200):
+the 5 MoMo values, `DATABASE_URL`, the 3 Supabase values, `CRON_SECRET`, and 5 pinned by policy.
+
+Three of those five are pinned deliberately rather than copied from `.env.local`, because the
+local developer environment is *wrong* for production in ways that fail silently:
+
+| Pinned | Value | Why not copied |
+|---|---|---|
+| `MOMO_MODE` | `sandbox` | `.env.local` says `emulator`. Correct locally, a lie in production — the deployed function would report success while touching no MoMo API at all. |
+| `MOMO_CALLBACK_HOST` | `momo.tumoolo.tech` | `.env.local` says `momo-kasi.vercel.app`, which **404s `DEPLOYMENT_NOT_FOUND`**. Measured. Every `X-Callback-Url` we handed MTN would have gone nowhere, and the reconciler would have quietly covered for it. |
+| `MOMO_TARGET_ENVIRONMENT` | `sandbox` | Anything else is real money against a ~R10 budget (CLAUDE.md #15). `MOMO_LIVE_MAX_MINOR=100` is pinned beside it so the R1.00 brake is present in the deployed environment rather than relying on a default. |
+
+Repeatable as `npm run env:push` (`scripts/vercel-env.mjs`) — plan-by-default, `--yes` to apply,
+`upsert` so a re-run is a rotation rather than an error. It **refuses** to set a non-sandbox
+target environment without `--allow-live`, and refuses `MOMO_MODE=emulator` outright.
+
+**Production only, not preview.** Preview URLs 302 to SSO and cannot receive a MoMo callback, so
+crediting them buys little — and costs something real: every PR preview would write to the single
+production ledger, where the append-only trigger makes those rows permanent. Widen to preview
+when F4's second Supabase project exists; it is one flag (`--targets production,preview`).
+
+### Split ownership, this session onward
+
+A second agent owns **Telegram (M5a)** in its own worktree. This session stayed out of
+`src/app/api/telegram/**` entirely.
+
+It also stayed out of the two Telegram **environment variables**, which matters more than it
+looks: a Vercel project's environment is shared mutable state with no merge step. If both owners
+set `TELEGRAM_WEBHOOK_SECRET` to different values, every update Telegram delivers 401s — and the
+failure is indistinguishable from a bug in the handler, in a file neither owner is looking at.
+So `scripts/vercel-env.mjs` puts them behind an opt-in `--with-telegram` flag, and their one
+owner is whoever builds M5a. Both were **already** on production and preview and were not touched.
+
+### HIGH — neither money route bound the database, and one of them hid it behind a 200
+
+Found within minutes of F9 landing, by calling the cron route with a correct bearer instead of
+assuming it worked. Auth passed (401 without a bearer, 401 with a wrong one, through with the
+right one) and the handler then returned **500**.
+
+`setMoneyDb` writes a **module-scoped singleton**, and in serverless every route is its own
+isolated instance. `ensureMoneyDb()` had exactly one caller in the entire codebase —
+`/api/health`, indirectly through `moneyDbAvailable()`. The two routes that actually touch money
+both called `getMoneyDb()` with nothing having bound it:
+
+| Route | Behaviour before the fix |
+|---|---|
+| `POST /api/cron/reconcile` | **500 on every tick.** Reconciliation could never have run in production. |
+| `POST /api/momo/callback/[kind]` | **200, always.** Its catch returns 200 unconditionally, and the comment on that catch names "no database adapter configured" as one of the cases it swallows. |
+
+The second row is the dangerous one. `POST /api/momo/callback/collection → 200` has been recorded
+as **verified from the public internet** since F7, and it was — the route was reachable, returned
+200, and never once reached the database. **A 200 from a route that swallows its own errors is
+not evidence that the route worked.**
+
+Why nothing caught it earlier:
+
+- **`next dev` is one process.** Hitting `/api/health` first binds the singleton for every other
+  route in the same process, so the bug does not reproduce locally at all.
+- **No test touches the global binding.** The integration suite connects through its own
+  `tests/integration/_db.ts` helper, so it exercises the adapter without ever exercising the
+  wiring that production depends on.
+- **`database: configured` does not mean the database answers.** `moneyDbAvailable()` checks that
+  `DATABASE_URL` is present and binds the adapter; it never opens a socket. The health route was
+  telling the truth about a narrower question than it appeared to answer.
+
+**Fixed** — `ensureMoneyDb()` at the top of both routes. **Guarded** — a static test in
+`tests/unit/ledger/single-writer.test.ts` reads every `src/app/api/**/route.ts` and fails when one
+calls `getMoneyDb` without `ensureMoneyDb`. **Proved the guard fires**: commenting the call out
+makes it fail with `expected [ 'app/api/cron/reconcile/route.ts' ] to deeply equal []`.
 
 ### Why the Telegram bot does not reply
 
@@ -172,8 +250,8 @@ straight out of the `[ ]`/`[~]`/`[x]` column. Recomputed whenever the board chan
 
 | Measure | | What it counts |
 |---|---|---|
-| **Done to the required test level** | **22%** | 15 items. The honest floor: `docs/04` says a feature is Done only at its named test level. |
-| **Weighted** (`[~]` counts half) | **29%** | The fairest single number. |
+| **Done to the required test level** | **23%** | 16 items. The honest floor: `docs/04` says a feature is Done only at its named test level. |
+| **Weighted** (`[~]` counts half) | **30%** | The fairest single number. |
 | **Started or better** | **36%** | 25 items have real code. |
 
 **Read these with three caveats, or they will mislead you.**
@@ -243,9 +321,9 @@ Test column: `none` / `unit` / `+prop` (property-based) / `+int` (integration in
 | F4 | Supabase staging + prod projects | `[~]` | none | +int | — | **Project 1 of 2 live and verified** — URL, anon and service_role all resolve to ref `edtduvwbejdfahkmfort`, service_role authenticates 200. **Region is `eu-west-2` (London)**, measured from the DB host's IPv6 against AWS's published ranges — not an African region. See Q6. |
 | F5 | Migration pipeline (local, CI, deploy) | `[x]` | **+int** | +int | #20 | `npm run db:migrate` — ordered, once, each file in a transaction, and it **refuses if an applied file's checksum changed** (CLAUDE.md #4). **Three migrations applied to the live Supabase project.** |
 | F6 | CI quality gate workflow | `[x]` | **verified** | n/a | #13, #14 | Lockfile · Typecheck · Lint · Format · Tests · Build · Money guards, each a separate named job. Guards tested against synthetic violations to prove they fire. |
-| F7 | Vercel project + preview deploys | `[x]` | **verified live** | +e2e | — | **<https://mo-mo-hack.vercel.app> is public and serving.** Production deploys on every merge to `main`, previews on every PR. Verified 2026-09-02: `/` and `/chat` **200**, `/api/health` `ok:true`, and **`POST /api/momo/callback/collection` returns 200 from the public internet** — so MTN can reach our callback. Note the per-deployment URLs (`…-tumo-mogames-projects.vercel.app`) 302 to SSO; only the stable alias is public, and that is the one to give MTN and Telegram. |
+| F7 | Vercel project + preview deploys | `[x]` | **verified live** | +e2e | — | **<https://momo.tumoolo.tech> is the canonical host** — a custom domain on the same project, verified from the public internet: `/` 200, `/api/health` 200, `POST /api/momo/callback/collection` 200. `mo-mo-hack.vercel.app` still serves the same deployment. Production deploys on every merge to `main`, previews on every PR. Note the per-deployment URLs (`…-tumo-mogames-projects.vercel.app`) 302 to SSO; only the stable aliases are public, and `momo.tumoolo.tech` is the one to give MTN and Telegram. **Caveat, now measured:** that callback 200 never proved the route worked — it returns 200 even when it fails. See the HIGH finding above. |
 | F8 | GitHub Actions scheduler + keep-alive | `[ ]` | none | +int | — | ADR-0006 |
-| F9 | Secrets wired (MoMo, Supabase, Telegram) | `[~]` | n/a | n/a | — | All present in `.env.local` and verified live. **None are set on Vercel or in GitHub Secrets**, and the deployed app proves it: `/api/health` reports `momoMode: sandbox` (the default, because `MOMO_MODE` is unset) and `database: unconfigured`. The site is up but has no credentials. Needed on Vercel: the 5 MoMo values, `CRON_SECRET`, `DATABASE_URL`, and the 3 Supabase values. |
+| F9 | Secrets wired (MoMo, Supabase, Telegram) | `[x]` | **verified live** | n/a | — | **15 variables on the Vercel `production` target**, read back from the API rather than trusted to a 200, and proved by behaviour: `/api/health` moved `database: unconfigured` → **`configured`**, and `POST /api/cron/reconcile` moved 401 → past auth, so `CRON_SECRET` is right. The vars had been set on **preview** only, which is why the deployment looked configured and behaved as though it were not. Repeatable as `npm run env:push`. Telegram's two are deliberately not ours — see split ownership above. **GitHub Secrets are still unset** (F8 needs `CRON_SECRET` there). |
 
 ## 1. Money engine (MUST)
 
@@ -379,6 +457,10 @@ Format: one line per merged workstream, with the evidence.
 | 2026-09-02 | **Concurrency — Phase 3 exit criterion** | **integration** | Two connections racing one account: one spend committed, one refused, **global ledger sum exactly 0**, wallet never positive. |
 | 2026-09-02 | Live spend guard (#18) | unit + **empirical** | 15 tests on the cap. Verified by pointing `.env.local` at `production` and running `npm run check:momo`: it **refused and exited before issuing a token**, then the env was restored. 331 tests pass overall. |
 | 2026-09-02 | Footer rebuild + attribution | manual + build | Footer replaced: nav columns, the MTN MoMo mark and the TUMO OLO wordmark. Both logos are the owners' own assets, not traced — MoMo is MTN's `mtnmomoLogo.svg` payload (**`#FFCB05` / `#003A58`** sampled from the file), TUMO OLO is the outline served at tumoolo.tech, checked side by side against their own nav render. Screenshotted from the **production** build at 1280px and 390px. Caught a real overflow at 390px: the old small-print row pushed the copyright past the viewport edge, now stacked. Re-verified after merging `main`: **331 passed, 29 skipped**, typecheck, lint, format and build green. `/` still prerendered **static** at 6.3 kB / 112 kB First Load JS — the footer is a server component and ships no client JavaScript, though no pre-change baseline was measured to quote a delta. |
+| 2026-09-02 | **Custom domain live** | **integration** | <https://momo.tumoolo.tech> from the public internet before any credentials existed: `/` **200**, `/api/health` **200**, `POST /api/momo/callback/collection` **200**. Same deployment as the `.vercel.app` alias. Also measured: the `MOMO_CALLBACK_HOST` in `.env.local` (`momo-kasi.vercel.app`) **404s `DEPLOYMENT_NOT_FOUND`** — a dead callback host, caught before it was pushed anywhere. |
+| 2026-09-02 | **F9 — env vars on Vercel** | **integration** | 15 variables written to the `production` target and **read back from the API**, not trusted to a 200. Root cause of the apparent gap: they were already set on **preview** only. Verified by behaviour after a redeploy of the same commit (`11569c6`): `/api/health` `database: unconfigured` → **`configured`** on both aliases. |
+| 2026-09-02 | **Cron auth, live** | **integration** | Three-way probe against the deployed function: no bearer → **401**, wrong bearer → **401**, correct `CRON_SECRET` → **through to the handler**. Proves the secret landed correctly and the constant-time compare behaves. |
+| 2026-09-02 | **HIGH — money routes never bound the database** | **integration + static guard** | The same correct-bearer call returned **500**. Cause: `ensureMoneyDb()` had one caller in the codebase (`/api/health`), and `setMoneyDb` is a module-scoped singleton that serverless isolation does not share. `/api/cron/reconcile` 500'd on every tick; `/api/momo/callback/[kind]` returned **200 while never reaching the database**, because its catch swallows exactly that error. Fixed in both. Guarded by a static test over `src/app/api/**/route.ts`, and **the guard was proved to fire** against a synthetic violation. |
 
 ---
 
