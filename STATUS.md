@@ -236,6 +236,7 @@ Format: one line per merged workstream, with the evidence.
 | 2026-09-02 | **#11 on the merged toolchain** | unit + property + contract | **315 tests, 20 files**, typecheck, lint and production build all clean. Caught vitest 4 silently not running the 84 component tests — see below. |
 | 2026-09-02 | Prettier + reformat (#14) | **verified** | 41 code files reformatted. 315 tests, typecheck, lint and build all still clean afterwards. Markdown deliberately excluded — see `.prettierignore`. |
 | 2026-09-02 | App runs on the merged tree | manual | `next dev` on the fully merged tree: `/` and `/chat` both **200**, `/api/health` `ok:true`. `database: unconfigured` is correct and expected — nothing binds the adapter yet (F5). |
+| 2026-09-02 | Landing page photography (#15) | manual + build | Five WebP, **52MB of source JPEGs → 908KB**. Verified against the production build: `/` 200, all five `alt` texts present, `next/image` srcset emitting 8 widths, optimised variant serves 200, `aspect-ratio:4/5` generated. Originals moved to a gitignored `assets-src/` and regenerable with `npm run images`. |
 
 ---
 
