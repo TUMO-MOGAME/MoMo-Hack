@@ -72,6 +72,38 @@ an `esbuild` block is silently ignored under Vite 8). Two lessons worth keeping:
 
 ---
 
+## Progress
+
+Counted from the tables below by a script, not estimated — 69 tracked items, states read
+straight out of the `[ ]`/`[~]`/`[x]` column. Recomputed whenever the board changes.
+
+| Measure | | What it counts |
+|---|---|---|
+| **Done to the required test level** | **16%** | 11 items. The honest floor: `docs/04` says a feature is Done only at its named test level. |
+| **Weighted** (`[~]` counts half) | **24%** | The fairest single number. |
+| **Started or better** | **32%** | 22 items have real code. |
+
+**Read these with three caveats, or they will mislead you.**
+
+1. **Items are not equal.** The money engine is one row per concept but 7,500 lines and 231
+   tests; "Pitch deck" is one row and an afternoon. By item count the ledger is worth the same
+   as a checkbox.
+2. **The gap between 16% and 32% is almost entirely one missing thing.** Eight items sit at
+   `[~]` purely because their required level is `+int` and **there is no database to integrate
+   against**. The code is written and green. Applying the migrations (F5) moves more of this
+   board than any other single action available.
+3. **The hard part is disproportionately done.** The double-entry ledger, the integer split
+   engine, the state machine and the idempotency model are the parts that are expensive to get
+   right and unforgiving when wrong, and they are built and property-tested. What remains is
+   mostly breadth — more surfaces over the same engine — not depth.
+
+**Phase 3 exit criterion is not met.** It reads "the ledger always balances, under concurrency,
+with property tests to prove it". Property tests: yes. **Under concurrency against a real
+Postgres: not demonstrated**, because that needs F5. The in-memory adapter cannot prove the
+`DEFERRABLE` triggers fire, and those triggers are the whole safety argument.
+
+---
+
 ## Phase board
 
 The 5th column is what each phase owes the audit suite. White circle = owed, green tick = run and
@@ -111,7 +143,7 @@ Test column: `none` / `unit` / `+prop` (property-based) / `+int` (integration in
 |---|---|---|---|---|---|---|
 | F1 | Public GitHub repo created | `[x]` | n/a | n/a | — | `TUMO-MOGAME/MoMo-Hack`, made public 2026-09-02 |
 | F2 | Ruleset protecting `main` | `[x]` | verified | n/a | — | Ruleset 22084424. Direct push **tested and rejected**. Squash-only, linear history, no bypass actors. |
-| F3 | Next.js + TS + Tailwind scaffold | `[~]` | typecheck | unit | — | Next 15.1.6, React 19, Tailwind v4, strict TS + `noUncheckedIndexedAccess`. Dev server verified 200. |
+| F3 | Next.js + TS + Tailwind scaffold | `[x]` | typecheck + build in CI | unit | #13, #14 | **Next 15.5.25** (bumped off 15.1.6 for 30+ advisories), React 19, Tailwind v4, strict TS + `noUncheckedIndexedAccess`. Production build green in CI on every PR. |
 | F3a | Full directory structure + module boundaries | `[x]` | n/a | n/a | — | Matches `docs/01` §5 = the agent ownership map |
 | F3b | Design tokens (`src/design/tokens.ts` + `@theme`) | `[x]` | none | unit | — | Architecture from Social-Assembly; brand retuned to MTN gold |
 | F3c | Frozen contracts: `money`, `split`, `errors`, `artifacts/types` | `[x]` | **manual** | +prop | — | Split verified exact across 200,000 amounts. Needs the real fast-check suite (M1d). |
@@ -127,18 +159,26 @@ Test column: `none` / `unit` / `+prop` (property-based) / `+int` (integration in
 
 | ID | Item | State | Tests | Required tests | PR | Notes |
 |---|---|---|---|---|---|---|
-| M1a | Chart of accounts + ledger schema | `[ ]` | none | +int | — | `docs/02` |
-| M1b | Journal writer (atomic, balanced) | `[ ]` | none | +prop | — | Invariant: sum = 0 |
-| M1c | Balance projection + hold logic | `[ ]` | none | +prop | — | |
-| M1d | Split engine (basis points, remainder) | `[ ]` | none | +prop | — | Invariant: parts = total |
-| M2a | MoMo client (auth, token cache, retry) | `[ ]` | none | +int | — | `docs/03` |
-| M2b | Collections `requesttopay` + status | `[ ]` | none | +int | — | |
-| M2c | Transaction state machine | `[ ]` | none | +prop | — | Terminal states immutable |
-| M2d | Callback webhook handler | `[ ]` | none | +int | — | Must be replay-safe |
-| M2e | Reconciliation poller | `[ ]` | none | +int | — | Runs on GH Actions cron |
-| M3a | Disbursements `transfer` | `[ ]` | none | +int | — | |
-| M3b | Payout orchestration + outbox | `[ ]` | none | +int | — | |
-| M4a | Escrow hold / release / refund | `[ ]` | none | +prop | — | |
+**Reconciled against the code on 2026-09-02.** These rows all said `[ ]` after #10 merged,
+which was wrong — #10 shipped nine of them. `[~]` here does not mean "half-written": for most of
+these it means the code is complete and green, and the row cannot reach `[x]` because the
+**required test level is `+int` and no database exists to integrate against**. That distinction
+is the honest one, and it is why the percentage in §Progress counts both ways.
+
+| ID | Item | State | Tests | Required tests | PR | Notes |
+|---|---|---|---|---|---|---|
+| M1a | Chart of accounts + ledger schema | `[~]` | unit +prop | +int | #10 | Written and enforced by DB triggers (I1-I4). **Never applied to a real database** — blocked on F5. |
+| M1b | Journal writer (atomic, balanced) | `[x]` | unit **+prop** | +prop | #10 | Single writer, guarded by `single-writer.test.ts`. Required level met. |
+| M1c | Balance projection + hold logic | `[~]` | unit +prop | +prop | #10 | Projection done (`accountBalance`, no cached balance anywhere). **Hold logic exists only as posting builders** — the escrow service is M4a. |
+| M1d | Split engine (basis points, remainder) | `[x]` | **+prop** | +prop | #3 | 6 properties, 5,000+ cases. R12.50 tie-break pinned (M3 in `MISTAKES.md`). |
+| M2a | MoMo client (auth, token cache, retry) | `[~]` | unit + contract | +int | #10 | Contract tests across the response matrix, **plus live sandbox verification**. Not `+int` in the CI sense. |
+| M2b | Collections `requesttopay` + status | `[~]` | contract | +int | #10 | Live-verified: `202` then `409` on a repeated `X-Reference-Id`. |
+| M2c | Transaction state machine | `[x]` | **+prop** | +prop | #10 | Terminal states absorbing, machine total and closed. Accepts the undocumented `CREATED`. |
+| M2d | Callback webhook handler | `[~]` | contract | +int | #10 | Replay-safe by construction — the body can only trigger a lookup, never set a status. |
+| M2e | Reconciliation poller | `[~]` | unit + contract | +int | #10 | Route and poller built. **The GitHub Actions cron that calls it does not exist** (F8). |
+| M3a | Disbursements `transfer` | `[ ]` | none | +int | — | Not started. Nothing pays anybody out yet. |
+| M3b | Payout orchestration + outbox | `[ ]` | none | +int | — | The `outbox` table and writes exist; **nothing drains it**. |
+| M4a | Escrow hold / release / refund | `[ ]` | none | +prop | — | Posting builders exist; the service and state machine do not. |
 | M4b | Photo proof upload + approval | `[ ]` | none | +e2e | — | Supabase Storage |
 
 ## 2. Channels (MUST)
@@ -148,7 +188,7 @@ Test column: `none` / `unit` / `+prop` (property-based) / `+int` (integration in
 | M5a | Telegram webhook + secret verification | `[ ]` | none | +int | — | ADR-0007 |
 | M5b | Bot conversation state machine | `[ ]` | none | +prop | — | |
 | M5c | Bot flows: pay, earn, stokvel, balance | `[ ]` | none | +e2e | — | |
-| M9a | Web shell + auth | `[ ]` | none | +e2e | — | |
+| M9a | Web shell + auth | `[~]` | unit | +e2e | #11 | Shell, landing page, chat surface and context sidebar shipped and serving 200. **There is no auth of any kind** — no sign-in, no session, no `auth.uid()`, so the one RLS policy we wrote cannot yet be exercised. |
 | M9b | Commuter view | `[ ]` | none | +e2e | — | |
 | M9c | Worker view | `[ ]` | none | +e2e | — | |
 | M9d | Rank-admin view | `[ ]` | none | +e2e | — | |
@@ -182,9 +222,9 @@ Test column: `none` / `unit` / `+prop` (property-based) / `+int` (integration in
 |---|---|---|---|---|---|---|
 | S7a | Agent route (Edge, streaming, Groq) | `[ ]` | none | +int | — | Gemini Flash fallback on 429 |
 | S7b | Agent tools — read-only set | `[ ]` | none | +int | — | Numbers come from the ledger, always |
-| S7c | Artifact schema (zod discriminated union) | `[ ]` | none | +prop | — | ADR-0013 |
-| S7d | Artifact registry + panel + bottom sheet | `[ ]` | none | +e2e | — | Phone-first; **template pending from Tumo** |
-| S7e | In-chat chips + re-open from history | `[ ]` | none | +e2e | — | Pattern from Social-Assembly |
+| S7c | Artifact schema (zod discriminated union) | `[ ]` | none | +prop | — | **Still genuinely not done.** `src/lib/artifacts/types.ts` carries a TypeScript union and an explicit `TODO(S7c)`; **zod is not a dependency**, so there is no *runtime* validation. Harmless today because no agent produces artifacts yet — a hard blocker for S7a/S7b, which is where untrusted model output first arrives. ADR-0013. |
+| S7d | Artifact registry + panel + bottom sheet | `[~]` | unit | +e2e | #11 | 11 renderers + registry, panel, drawer and skeletons. 90 unit tests from fixtures. **The provenance guard is real and tested**: an amount with no `sourceTxnId`/`sourceAccountId` renders struck-through and "unverified", and disables the confirm control (CLAUDE.md #14). Owes `+e2e` and an axe sweep. |
+| S7e | In-chat chips + re-open from history | `[~]` | unit | +e2e | #11 | Chip component and artifact context shipped; re-open from history not verified end to end. |
 | S7f | `propose_*` + signed confirmation card | `[ ]` | none | **+int +sec** | — | **ADR-0014 — the safety-critical one** |
 | S8a | Phrase bank build script | `[ ]` | none | unit | — | Run manually, never in CI |
 | S8b | ElevenLabs live TTS with a daily cap | `[ ]` | none | +int | — | Degrades to phrase bank, then text |
