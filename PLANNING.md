@@ -219,11 +219,15 @@ Rationale and alternatives: `docs/01-ARCHITECTURE.md` and `docs/adr/`.
 
 | # | Question | Blocks | Owner | Needed by |
 |---|---|---|---|---|
-| Q1 | Confirmed hackathon submission deadline and portal? | Freeze date | Tumo | Day 2 |
-| Q2 | GitHub repo URL (to be supplied) | Ruleset setup | Tumo | Day 1 |
-| Q3 | Is a public repo acceptable under the competition rules? | ADR-0005 | Tumo | Day 1 |
-| Q4 | Any hackathon-mandated stack, region or template? | Scope | Tumo | Day 2 |
+| Q1 | **Confirmed hackathon submission deadline and portal?** | Freeze date, and the whole cut list | Tumo | **overdue — asked twice** |
+| ~~Q2~~ | ~~GitHub repo URL~~ | — | — | ✅ `TUMO-MOGAME/MoMo-Hack` |
+| ~~Q3~~ | ~~Public repo acceptable?~~ | — | — | ✅ decided, ADR-0005 |
+| Q4 | Any hackathon-mandated stack, region or template? | Scope | Tumo | Day 4 |
 | Q5 | Team name / entry registration required first? | Submission | Tumo | Day 5 |
+| Q6 | Supabase region — closest to SA, for POPIA s72 (`docs/14` §7) | Phase 3 integration tests | Tumo | **next session** |
+
+**Q1 is the one that matters.** Every date in §7 and §10 assumes 28 Sep. If the real deadline is
+earlier, the cut list in `docs/05` §7 starts applying immediately rather than as a contingency.
 
 ---
 

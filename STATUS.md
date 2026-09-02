@@ -17,21 +17,21 @@ Every PR must update it. If you are a fresh session, read this before touching a
 
 | | |
 |---|---|
-| **Current phase** | Phase 0 — Foundation and walking skeleton |
-| **Phase state** | In progress. Repo, structure, contracts and starter UI done; walking skeleton not yet built. |
-| **Audits owed at close** | A1 A8 |
+| **Current phase** | Phase 3 — Money engine |
+| **Phase state** | Phases 0-1 substantially done. Money engine built and green, awaiting review. |
+| **Audits owed at close** | Phase 3: A1 A2 A3 A4 A5 A6 — **none run yet** |
 | **Blocking findings** | none |
 | **Days to code freeze** | 25 (27 Sep 2026) |
+| **Open PRs** | **#10 backend money engine**, **#11 frontend shell + sidebar** — both green, both need review |
 
 ### The next three actions
 
-
-1. **MoMo portal verification pass** — sign in at <https://momodeveloper.mtn.com/API-collections>
-   and work through the `momoAPIs.md` §14 checklist. Promote the `[P]` ratings to `[V]`.
-   Highest-value first task: Disbursements and Remittances are both unverified (R6).
-2. Subscribe to Collections + Disbursements + Remittances; put the three
-   `Ocp-Apim-Subscription-Key` values, `MOMO_API_USER` and `MOMO_API_KEY` into GitHub Secrets.
-3. Scaffold Next.js + Supabase + CI and land it through a PR. Then the walking skeleton (M1).
+1. **Review and merge #10 and #11.** Both are green (231 and 90 tests). Read the diffs —
+   with 0 required approvals, CI is the only other reviewer (`docs/06` §2).
+2. **Supabase.** The last required credential. Two projects, three values. Until it exists,
+   the ledger runs against the in-memory adapter and there are no integration or RLS tests.
+3. **Wire the walking skeleton**: a real `requesttopay` from a deployed function writing
+   balanced ledger rows. Every piece now exists; nothing has been joined end to end.
 
 ---
 
@@ -42,10 +42,10 @@ written up. Only the audits listed are run at that phase — see `PLANNING.md` �
 
 | # | Phase | State | Days | Audits |
 |---|---|---|---|---|
-| 0 | Foundation and walking skeleton | in progress | 1-3 | A1 A8 ⚪ |
-| 1 | Design system and app shell | not started | 4-5 | A1 A2 A3 ⚪ |
-| 2 | Narrative and content surfaces | not started | 6 | A1 A6 ⚪ |
-| 3 | Money engine | not started | 7-13 | A1 A2 A3 A4 A5 A6 ⚪ |
+| 0 | Foundation and walking skeleton | mostly done — skeleton not joined | 1-3 | A1 A8 ⚪ |
+| 1 | Design system and app shell | built, in PR #11 | 4-5 | A1 A2 A3 ⚪ |
+| 2 | Narrative and content surfaces | landing page built, in PR #11 | 6 | A1 A6 ⚪ |
+| 3 | Money engine | **in progress** — ledger/client/state machine in PR #10 | 7-13 | A1 A2 A3 A4 A5 A6 ⚪ |
 | 4 | Channels and products | not started | 14-19 | A1 A2 A3 A4 A5 A8 ⚪ |
 | 5 | Reach — offline, USSD, voice | not started | 20-23 | A1 A2 A3 A4 A7 ⚪ |
 | 6 | Hardening, demo and submission | not started | 24-28 | A1 A3 A4 A5 A6 A7 A8 S1 ⚪ |
@@ -185,6 +185,11 @@ Format: one line per merged workstream, with the evidence.
 | 2026-09-02 | Split engine invariant | **manual exhaustive** | 200,000 consecutive amounts × the 60/25/10/5 rule; every split summed exactly. Not yet the fast-check suite required by `docs/04` §3 — logged as debt below. |
 | 2026-09-02 | TypeScript strict build | typecheck | `tsc --noEmit` clean under `strict` + `noUncheckedIndexedAccess` |
 | 2026-09-02 | Starter UI renders | manual | Dev server `HTTP 200`; greeting, suggestions and composer all present in the response |
+| 2026-09-02 | MoMo credentials, live | **integration** | All three products issue tokens. Idempotency confirmed against the real API: same `X-Reference-Id` twice → `202` then `409`. |
+| 2026-09-02 | Sandbox test MSISDNs | **integration** | 40s poll per number. Four of six documented outcomes were wrong. `momoAPIs.md` §10 promoted `[P]` → `[V]`. Discovered the undocumented `CREATED` status. |
+| 2026-09-02 | Telegram bot | **integration** | `getMe` + `getWebhookInfo` on `@momokasi_demo_bot`. Live. |
+| 2026-09-02 | Money engine (PR #10) | unit + property + contract | **231 tests, 15 files.** Ledger balance, state transitions, MoMo response matrix, webhook/cron auth. Typecheck clean. |
+| 2026-09-02 | Frontend (PR #11) | unit | **90 tests, 6 files.** Every artifact renders from a fixture; the provenance guard is locked in. Typecheck clean. |
 
 ---
 
@@ -197,7 +202,10 @@ Nothing yet. Anything merged at a lower test level than
 |---|---|---|---|---|
 | ~~`src/domain/split.ts`~~ | — | ~~fast-check property suite~~ | **PAID 2026-09-02** | 6 properties green, 5,000+ generated cases |
 | `src/domain/money.ts` | typecheck only | unit tests for `parseMinor` / `formatZAR` edge cases | Day 5 | as above |
-| Artifact renderers | manual | fixture unit tests + axe | Day 22 | Skin will change when the template lands |
+| ~~Artifact renderers~~ | — | ~~fixture unit tests~~ | **PAID** | 90 tests in PR #11. axe sweep still owed. |
+| Money engine (PR #10) | unit/property/contract | **integration against real Postgres** | Day 9 | Supabase does not exist yet — runs on the in-memory adapter |
+| RLS policies | none | **one allow + one deny test per policy** | Day 9 | Same — needs a real database |
+| Context sidebar | unit | drawer focus trap verified at 320px | Day 5 | Agent stopped mid-verification |
 | `src/lib/agent/mock.ts` | manual | becomes the UI test fixture source | Day 18 | Replaced by the real agent route (S7a) |
 
 ---
@@ -249,6 +257,32 @@ Deferring is legitimate; deferring silently is not.
 ---
 
 ## Session log
+
+### 2026-09-02 (session 1 close) — credentials verified, money engine built, agents stopped
+
+**Landed on main:** PRs #1-#5 and #7-#9. Planning set, code structure, frozen contracts, starter
+UI, the audit suite, vitest + the split property suite, MoMo provisioning + smoke scripts, the
+Telegram health check, `MISTAKES.md` with a guard per entry.
+
+**Awaiting review:** #10 (money engine, 231 tests) and #11 (frontend shell, landing page, context
+sidebar, 90 tests). Both green. Both stopped mid-task, not mid-thought — see each PR's "not
+finished" section.
+
+**Credentials:** MoMo (5 values, all three products verified live), Gemini, ElevenLabs, Telegram,
+and two generated secrets. **Supabase is the only required one missing.**
+
+**The finding that mattered:** the sandbox test MSISDN table was wrong in four of six cases, and the
+sandbox emits an undocumented `CREATED` status. Caught because `momoAPIs.md` rated those facts `[P]`
+and forbade coding against them. `46733123454` is the demo number — the only one that exercises a
+real async resolution, ~25s.
+
+**Mistakes recorded:** M1-M7 in `MISTAKES.md`, each with a guard. Two are now scripts
+(`pr:merge`, `agent:worktree`) that make the mistake structurally hard rather than merely
+remembered.
+
+**Not started:** escrow, disbursements, outbox drain, stokvel, bills, Telegram bot handlers, the
+agent route, voice, USSD, offline. No audit has been run yet.
+
 
 Newest first. One short entry per working session so a fresh thread can catch up fast.
 
