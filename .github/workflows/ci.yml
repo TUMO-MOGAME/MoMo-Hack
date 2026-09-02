@@ -28,6 +28,50 @@ env:
   NEXT_TELEMETRY_DISABLED: '1'
 
 jobs:
+  # ── The lockfile has to be generated on Linux, and this is why ─────────────
+  #
+  # This project is developed on Windows and CI runs on Linux. npm resolves
+  # OPTIONAL dependencies for the platform it is run on, and some of ours are
+  # platform-specific native/wasm bindings (sharp, @tailwindcss/oxide,
+  # lightningcss). A lockfile written on Windows omits the `@emnapi/*` subtree
+  # that those packages need on Linux, so `npm ci` refuses it with
+  # "Missing: @emnapi/runtime from lock file" — which is exactly what had A8 red
+  # on every branch since PR #2. It is not corruption and not a bad merge; it is
+  # the platform the file was written on.
+  #
+  # So: regenerate here, and fail if the committed file differs. The corrected
+  # lockfile is uploaded as an artifact — download it, commit it, done. That
+  # turns a confusing EUSAGE deep in another job into one job that says what is
+  # wrong and hands you the fix.
+  lockfile:
+    name: Lockfile
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Regenerate the lockfile on Linux
+        run: |
+          cp package-lock.json committed-lock.json
+          npm install --package-lock-only --no-audit --no-fund
+      - name: Upload the Linux-complete lockfile
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-lock-linux
+          path: package-lock.json
+          retention-days: 7
+      - name: It must match what is committed
+        run: |
+          if ! diff -q committed-lock.json package-lock.json >/dev/null; then
+            echo "::error::package-lock.json is not Linux-complete. Download the 'package-lock-linux' artifact from this run and commit it."
+            diff committed-lock.json package-lock.json | head -40 || true
+            exit 1
+          fi
+          echo "Lockfile is Linux-complete."
+
   typecheck:
     name: Typecheck
     runs-on: ubuntu-latest
