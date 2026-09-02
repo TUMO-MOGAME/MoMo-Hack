@@ -333,6 +333,85 @@ rather than through it. Nobody in the room can tell the difference, and it is th
 The R12.50 tie-break is pinned by a regression test because we got it wrong in a document once
 (`MISTAKES.md` M3): driver **R3.13**, insurance **R0.62**. Quote those figures, not rounded ones.
 
+### 🔵 Production is LIVE. The payer's wallet is not. — measured 2026-09-02
+
+**Our MTN South Africa merchant account is fully provisioned and holds a real balance:**
+
+```
+GET /collection/v1_0/account/balance
+→ 200 {"availableBalance":"32.39","currency":"ZAR"}
+```
+
+**The payer numbers are not active MoMo account holders:**
+
+```
+GET /collection/v1_0/accountholder/msisdn/27767221345/active → 200 {"result": false}
+GET /collection/v1_0/accountholder/msisdn/0767221345/active  → 200 {"result": false}
+GET /collection/v1_0/accountholder/msisdn/27761346606/active → 200 {"result": false}
+```
+
+That is what `PAYER_NOT_FOUND` was saying literally, and it is **not** a problem with our access.
+A blocked API user returns `401`/`403`; ours returns `200` and `202` to everything.
+
+**A wallet can hold money and still not be an active account holder.** In South Africa the usual
+causes are incomplete FICA/RICA verification, or money loaded as *airtime* rather than into the
+MoMo wallet. Both are on the payer's side and neither needs anything from us.
+
+**Diagnose in this order, and never spend to find out.** `active` is free, instant and sends
+nothing to anyone's handset:
+
+1. `account/balance` — if that fails, the problem is ours.
+2. `accountholder/msisdn/{n}/active` — if `false`, stop. A `requesttopay` there can only ever
+   return `PAYER_NOT_FOUND`.
+3. Only then send a payment request.
+
+> **⚠️ THE CORRECTION, AND IT IS THE USEFUL PART.** The first version of this section — written an
+> hour earlier and committed — concluded that production "cannot reach a single real subscriber"
+> and blamed the Go Live business verification. **That was inference from four failures, not
+> measurement, and it was wrong.** One extra read-only call disproved it.
+>
+> Four identical failures make a story feel obvious. It felt obvious. `MISTAKES.md` M5 says verify
+> before reporting a fault — including a fault you are attributing to a third party. **When an API
+> tells you *which* thing it could not find, check that thing before theorising about a different
+> one.**
+
+---
+
+### The superseded reading, kept because the record matters
+
+The section below says the project "already has working production access and does not need the
+portal's Go Live application". **Both halves are true after all** — the account is live, as the
+balance call proves. What it could not have known is that a live merchant account is useless
+without a payer whose wallet MTN can see.
+
+A real MTN SA number, belonging to a consenting person who had loaded R10 onto that exact wallet,
+was asked for R0.20 on `mtnsouthafrica`. MTN accepted every request with **202** and then reported
+**`FAILED · PAYER_NOT_FOUND`** every time:
+
+| Tried | Result |
+|---|---|
+| `27767221345`, `0767221345`, `767221345`, `+27767221345` | all **202** → all `PAYER_NOT_FOUND` |
+| a second real MTN SA number | same |
+
+**Five attempts, two numbers, four formats, one answer.** That ruled out the MSISDN format and the
+callback binding — and it did **not** rule out what I claimed it did. The conclusion drawn here at
+the time ("the API user is not provisioned") was inference from repetition, and the `active` check
+above disproved it in one call.
+
+**Cost: R0.00.** A `PAYER_NOT_FOUND` moves no money, so the ~R10 budget is fully intact.
+
+**What this means for the presentation.** Sandbox is the demo path, because no payer we can reach
+has an active wallet tonight. The honest and now *stronger* claim is **"our MTN South Africa
+merchant account is live, provisioned and holding a real ZAR balance"** — provable in about a
+second with one read-only call, and it stops short of implying a payment ever succeeded there.
+
+Full measurement in **`momoAPIs.md` §9a**.
+
+> **The general lesson, and it is the second time in this project.** A `202` accepted the
+> *request*, not the payment. `MISTAKES.md` M8 — *verify an effect, not a response* — was written
+> about one of our own routes returning 200 unconditionally. It applies identically to a third
+> party's API, and this time the misleading success came from MTN.
+
 ### MTN's production credentials are real, and verified — but parked
 
 `MTN_*` in `.env.local`, read by nothing. Measured, not assumed:

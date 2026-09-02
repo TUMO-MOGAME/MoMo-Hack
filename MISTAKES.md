@@ -358,6 +358,62 @@ that produced M10. Both were proved to fire before being trusted.
 
 ---
 
+## M13 · Blamed a third party's provisioning for a failure that named its own cause
+
+**What happened.** Five `requesttopay` calls to MTN South Africa production, across two real
+numbers and four MSISDN formats, all returned `202` and then `FAILED · PAYER_NOT_FOUND`. I
+concluded the API user was not provisioned to collect from live subscribers, wrote that into
+`momoAPIs.md` §9a and `STATUS.md` as a measured finding, committed it, and told the user their
+demo could not use real money because they were stuck behind MTN's "Go Live" business
+verification — a process measured in days, with a presentation nine hours away.
+
+**It was wrong.** One read-only call disproved it:
+
+```
+GET /collection/v1_0/account/balance
+→ 200 {"availableBalance":"32.39","currency":"ZAR"}
+```
+
+The merchant account was live, provisioned, and holding a real balance the whole time. A second
+call named the actual cause exactly:
+
+```
+GET /collection/v1_0/accountholder/msisdn/27767221345/active
+→ 200 {"result": false}
+```
+
+**Why.** Two causes, and the second is the general one.
+
+The specific cause: I read `PAYER_NOT_FOUND` as "the API cannot find payers" when it says "this
+payer was not found". The error named the thing it could not find, and I theorised about a
+different thing.
+
+The general cause: **repetition felt like evidence.** Five failures across two numbers and four
+formats produced a strong sense of having eliminated everything, and "their provisioning" was the
+only hypothesis left standing *among the ones I had thought of*. But eliminating four guesses does
+not promote the fifth guess to a finding — and the cost of checking was one free, read-only,
+instantaneous call I had not looked for, because I was busy being sure.
+
+It is worse than an ordinary wrong answer because of who it was about. Telling someone their own
+account is blocked by a third party's bureaucracy is unfalsifiable from where they sit, arrives
+with an implied "nothing you can do", and sends them to the wrong place — MTN's support queue
+instead of their own app's registration screen.
+
+**The rule.** **When an API names what it could not find, check that thing before theorising about
+anything else.** And before concluding that a remote system is misconfigured, find the read-only
+call that asks it directly — most payment APIs have one for exactly this (`account/balance` for
+"are we live", `accountholder/.../active` for "can you see them"). **A diagnosis that costs
+nothing to verify must be verified, not reasoned about.**
+
+**The guard.** `momoAPIs.md` §9a now opens with the diagnostic ORDER, not the conclusion:
+`account/balance` first, then `accountholder/{n}/active`, and only then a `requesttopay` — with a
+note that a `false` from the second means a payment attempt can only ever return
+`PAYER_NOT_FOUND`. The failure table is kept beneath it, labelled as the superseded reading, so the
+next person meets the cheap check before they meet the expensive story. `STATUS.md` carries the
+same correction where the wrong conclusion was published.
+
+---
+
 ## What has gone right, and why
 
 Worth recording, because these are the patterns to keep:

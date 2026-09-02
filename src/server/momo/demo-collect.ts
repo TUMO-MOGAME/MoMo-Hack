@@ -75,15 +75,48 @@ export type DemoPayResult =
     }
   | { readonly ok: false; readonly reason: string };
 
-/** Parse "/pay 0.20", "/pay R0.20", "pay 12.50" → minor units. */
+/**
+ * Parse the amount from "/pay 0.20", "/pay R0.20".
+ *
+ * ── EXACTLY ONE TOKEN, AND THAT IS THE POINT ─────────────────────────────────
+ *
+ * The first version anchored to the END of the string — `(\d+...)\s*$` — so
+ * `/pay 0.20 0767221345` matched the **phone number** and cheerfully reported
+ * *"R7 672 213.45 is over the R5.00 demo ceiling."* A real user typed exactly
+ * that, because "pay this amount to this number" is the obvious thing to type.
+ *
+ * The ceiling caught it. **That was luck, not design.** `/pay 0.20 300` would
+ * have parsed as R3.00 and charged it — a user who wrote an amount and a
+ * reference would be billed the reference. Any parser that silently picks one
+ * number out of several is a parser that will eventually pick the wrong one.
+ *
+ * So: one token, nothing after it. A second token is a REFUSAL, not something
+ * to interpret — and the refusal explains why, because the user is trying to do
+ * something reasonable that this build does not support (the payee is
+ * configuration, never input; see the header).
+ *
+ * Returns `null` for "no usable amount"; the caller turns that into a sentence.
+ */
 export function parsePayAmount(text: string): Minor | null {
-  const m = /(?:^|\s)r?\s*(\d+(?:\.\d{1,2})?)\s*$/i.exec(text.trim());
+  const trimmed = text.trim();
+  if (trimmed === '') return null;
+
+  // The whole remainder must be ONE amount. `^…$` with no room for a second
+  // token is what makes "0.20 0767221345" fail instead of resolving to one of
+  // the two numbers.
+  const m = /^r?\s*(\d{1,6}(?:\.\d{1,2})?)$/i.exec(trimmed);
   if (!m?.[1]) return null;
+
   try {
     return parseMinor(m[1]);
   } catch {
     return null;
   }
+}
+
+/** True when the user supplied something beyond the amount — usually a payee. */
+export function hasExtraArguments(text: string): boolean {
+  return text.trim().split(/\s+/).filter(Boolean).length > 1;
 }
 
 /**
@@ -196,6 +229,10 @@ export interface DemoStatus {
   readonly status: string;
   readonly amountMinor: Minor;
   readonly settled: boolean;
+  /** A terminal state never changes again — waiting for it is pointless. */
+  readonly terminal: boolean;
+  /** MTN's own `reason` from the last response, when it gave one. */
+  readonly reason: string | null;
   readonly journalId: string | null;
   /** The split of THIS amount, for the reply. Pure function, no database. */
   readonly parts: readonly { readonly label: string; readonly amountMinor: Minor }[];
@@ -232,12 +269,12 @@ export async function demoStatus(transactionId?: string): Promise<DemoStatus | n
   // `MoneyDb` exposes only `transaction()` — every read lives on `MoneyTx`,
   // inside a write transaction. Opening one to answer "what happened?" would
   // take row locks for a status message. This is a read, so it reads.
+  const COLUMNS = `id, status::text as status, amount_minor::text as amount_minor,
+                   journal_id, last_response`;
   const { rows } = await getPool().query(
     transactionId
-      ? `select id, status::text as status, amount_minor::text as amount_minor, journal_id
-           from momo_transaction where id = $1::uuid`
-      : `select id, status::text as status, amount_minor::text as amount_minor, journal_id
-           from momo_transaction order by created_at desc limit 1`,
+      ? `select ${COLUMNS} from momo_transaction where id = $1::uuid`
+      : `select ${COLUMNS} from momo_transaction order by created_at desc limit 1`,
     transactionId ? [transactionId] : [],
   );
 
@@ -249,6 +286,12 @@ export async function demoStatus(transactionId?: string): Promise<DemoStatus | n
     status: String(r.status),
     journalId: r.journal_id ? String(r.journal_id) : null,
   };
+
+  // MTN puts the failure cause in `reason` on the body it returns for a
+  // resolved-but-failed collection. It is the difference between "it did not
+  // work" and "that number has no wallet", and only one of those is useful.
+  const response = r.last_response as { reason?: unknown } | null;
+  const reason = typeof response?.reason === 'string' ? response.reason : null;
   const parts = split(amountMinor, DEFAULT_FARE_SPLIT).map((p) => ({
     label: SPLIT_LABEL[p.key] ?? p.key,
     amountMinor: p.amount as Minor,
@@ -258,6 +301,10 @@ export async function demoStatus(transactionId?: string): Promise<DemoStatus | n
     status: row.status,
     amountMinor,
     settled: row.status === 'SUCCESSFUL',
+    // CLAUDE.md's vocabulary: SUCCESSFUL, FAILED, REJECTED and TIMEOUT are
+    // terminal and immutable once set. Anything else can still change.
+    terminal: ['SUCCESSFUL', 'FAILED', 'REJECTED', 'TIMEOUT'].includes(row.status),
+    reason,
     journalId: row.journalId ?? null,
     parts,
   };
