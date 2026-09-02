@@ -135,6 +135,49 @@ browser that retracts its toolbar those differ, and the difference is exactly th
 the message log's own `scrollTop` is set — which cannot touch an ancestor — and the shell carries
 `overflow-hidden`.
 
+### 🟢 REAL MONEY HAS MOVED ON MTN SOUTH AFRICA PRODUCTION — three times, both channels
+
+**2026-09-02, ~22:00 UTC. Real rands, a real handset, a real PIN, and MTN's own receipt numbers.**
+
+| | Amount | Channel | MTN `financialTransactionId` |
+|---|---|---|---|
+| 1 | R0.20 ZAR | web chat | `7451945787` |
+| 2 | R0.20 ZAR | **Telegram** | `7451955089` |
+| 3 | R0.10 ZAR | web chat | `7451969842` |
+
+**R0.50 collected. 28 ledger postings, summing to 0.** Every one resolved through the reconciler
+into a balanced double-entry journal — `MOMO_SETTLEMENT +x / SUSPENSE −x`.
+
+Resolution took **103s** and **42s** — the payer had to find their PIN, which is the honest
+latency of a real payment and not something the sandbox can teach you.
+
+**This is the pitch, end to end, with real money:** a chat command → MTN's production network → a
+prompt on a real phone → a PIN we never see → the reconciler → a journal the database will not
+let be unbalanced.
+
+**The cause of the two hours before it worked was a transposed digit.** `…1345` instead of
+`…3145`. Not the credentials, not the format, not Go Live. See `MISTAKES.md` M13 for how a
+confident wrong diagnosis got published in the meantime, and `momoAPIs.md` §9a for the
+diagnostic order that prevents it: **`account/balance`, then `accountholder/{n}/active`, then
+spend.** Both checks are free and instant.
+
+**Two facts worth having on stage:**
+
+- **Only the international format works.** `27767223145` → `{"result": true}`;
+  `0767223145` and `767223145` → `{"result": false}`. Country code, no `+`.
+- **Demo the split at R12.50, not at small amounts.** R0.10 splits correctly to
+  6c/3c/1c/0c — exact, nothing invented or lost — but a `R0.00` line on the insurance row reads
+  as a bug on a projector even though it is right.
+
+**Budget:** R0.50 spent of ~R10. Every failed attempt cost R0.00, because a `PAYER_NOT_FOUND`
+moves no money.
+
+**The deployed site is on SANDBOX, deliberately.** `@momokasi_demo_bot` is public, and a public
+bot armed with production credentials is a way for a stranger to ring the owner's phone with
+payment requests. Production stays a local, deliberate, armed-on-purpose exercise —
+`MOMO_TARGET_ENVIRONMENT` on Vercel is `sandbox` and `vercel-env.mjs` refuses to push anything
+else without `--allow-live`.
+
 ### 💸 `/pay` — a payment a human can start, on both channels
 
 **The first production code path in this project that can move money.** Until now
