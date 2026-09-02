@@ -254,6 +254,61 @@ only meaningful as a module's first statement, so the guard now matches a real
 directive line, which is strictly **more** accurate. Re-proved to fire against a
 synthetic violation before being trusted.
 
+### The chat is real now — and the sidebar stopped contradicting it
+
+`/chat` was driven by `mockAgent`: *"no keys, no network, no database"*. It now calls
+`POST /api/agent`, which reads Postgres and answers from it. Measured against a production build:
+
+| Asked | Tool | Answer |
+|---|---|---|
+| "how much do I have?" | `read_wallet` | *"you have R2.00 spendable cash. You also have R32.00 held at MTN and R30.00 awaiting delivery."* |
+| "transactions from 3 months ago" | `read_transactions` | listed what exists, and **said plainly that it only has today's data** |
+| "where did my taxi fare go?" | `read_fare_split` | *"R7.50 to the taxi owner, R3.13 to the driver float, R1.25 to fuel, R0.62 to insurance."* |
+| "what is the weather" | none | declined, offered what it can do |
+
+**The design that makes this safe: the server builds the artifact, the model writes the prose.**
+The model is called *after* the ledger has been read and the card assembled, so there is no code
+path from a generated token to a rand value. CLAUDE.md #14 stops being a rule the prompt asks for
+and becomes a shape the program has. Intent routing is a regex, not a model choice — a mis-route
+shows the wrong card, where a model choosing its own tools could be talked into a dangerous one.
+
+**It answers even when the model does not.** Every intent has a deterministic sentence built from
+the same real data. Gemini slow, rate-limited, unconfigured or refusing all degrade to a correct
+answer with the correct card. Silence is the one outcome not allowed on a stage.
+
+**One core, both channels.** `src/server/agent/respond.ts` is what the web route calls and what the
+Telegram handler will call — so "they should both respond the same" is a property of the code
+rather than two handlers promising it separately. *Telegram is not cut over yet.*
+
+**The rail is real too, and that mattered more than it looks.** It was `contextSnapshot()` — a mock.
+A sidebar stating R2,300 beside a reply stating R12.50, from the same database, is the
+contradiction a judge notices before you finish the sentence. It now reads `/api/context`, groups
+balances by account type (ungrouped it rendered "Held at MTN" three times, which reads as a bug),
+and **`next` became optional** — there are no bills or stokvel schedules in the ledger, so the
+block is omitted rather than inventing a due date next to real money.
+
+### Mandates — planned, decided, not built (ADR-0017)
+
+The next major feature, and it collided head-on with CLAUDE.md #11. *"Save R200 a month for my
+daughter"* and *"every month end buy Gogo electricity"* both move money with nobody present, which
+ADR-0014 forbids in as many words.
+
+**Resolved by moving the authorisation earlier, not by weakening it.** A standing mandate is a
+debit order: signed once, bounded in rands, stated before signing, mandatory expiry, and executed
+by deterministic server code with **no model in the call path**. Stricter than today, where a model
+drafts every payment.
+
+Also decided, and it is the part most likely to be got wrong later: **a PIN typed into a chat is
+not a secret.** It lives in the chat history, the lock-screen preview, the bot process and any log
+of the update — and deleting the message afterwards fixes none of that. The PIN is therefore never
+entered in the conversation on either channel; a one-time token opens a Telegram Mini App or a web
+page, and the value posts straight to the confirm endpoint. `scrypt` from `node:crypto`, so no new
+dependency and no lockfile risk.
+
+Full reasoning in **ADR-0017**. Nothing is built. It sits on six unbuilt foundations — auth (M9a),
+disbursements (M3a), the outbox drain (M3b), the scheduler (F8), zod validation (S7c) and the agent
+write path — and auth blocks the most.
+
 ### What the frontend still owes, in honest order
 
 | | |
@@ -768,8 +823,8 @@ is the honest one, and it is why the percentage in §Progress counts both ways.
 
 | ID | Item | State | Tests | Required tests | PR | Notes |
 |---|---|---|---|---|---|---|
-| S7a | Agent route (Edge, streaming, Groq) | `[ ]` | none | +int | — | Gemini Flash fallback on 429 |
-| S7b | Agent tools — read-only set | `[ ]` | none | +int | — | Numbers come from the ledger, always |
+| S7a | Agent route + shared core | `[~]` | **live-verified** | +int | #32 | `POST /api/agent` over `src/server/agent/respond.ts` — **one core, both channels**. Gemini for prose, deterministic fallback when it is slow, unconfigured or wrong, so silence is impossible. Node runtime, not Edge (the `pg` pool). Owes automated tests and a Telegram cut-over. |
+| S7b | Agent tools — read-only set | `[~]` | **live-verified** | +int | #32 | `read_wallet`, `read_transactions`, `read_fare_split`, all against real Postgres, every amount carrying `sourceTxnId`/`sourceAccountId`. **The server builds the artifact; the model only writes prose** — so rule #14 is a shape of the program, not a prompt. Three of the eleven tools in `docs/11` §9a. |
 | S7c | Artifact schema (zod discriminated union) | `[ ]` | none | +prop | — | **Still genuinely not done.** `src/lib/artifacts/types.ts` carries a TypeScript union and an explicit `TODO(S7c)`; **zod is not a dependency**, so there is no *runtime* validation. Harmless today because no agent produces artifacts yet — a hard blocker for S7a/S7b, which is where untrusted model output first arrives. ADR-0013. |
 | S7d | Artifact registry + panel + bottom sheet | `[~]` | unit | +e2e | #11 | 11 renderers + registry, panel, drawer and skeletons. 90 unit tests from fixtures. **The provenance guard is real and tested**: an amount with no `sourceTxnId`/`sourceAccountId` renders struck-through and "unverified", and disables the confirm control (CLAUDE.md #14). Owes `+e2e` and an axe sweep. |
 | S7e | In-chat chips + re-open from history | `[~]` | unit | +e2e | #11 | Chip component and artifact context shipped; re-open from history not verified end to end. |

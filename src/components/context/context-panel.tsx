@@ -116,6 +116,9 @@ const KIND_WORD: Record<string, string> = {
 export function ContextPanel({ context, onOpen }: ContextPanelProps) {
   const online = useOnline();
   const available = context.balances.find((b) => b.kind === 'WALLET');
+  // Hoisted, not read inline: TypeScript cannot narrow `context.next` inside the
+  // `onClick` closure below, so the optional property is resolved once here.
+  const next = context.next;
 
   return (
     <div className="flex h-full flex-col gap-6 overflow-y-auto px-4 py-5">
@@ -167,40 +170,42 @@ export function ContextPanel({ context, onOpen }: ContextPanelProps) {
         </ul>
       </section>
 
-      {/* 2. the next obligation */}
-      <section aria-labelledby="ctx-next">
-        <SectionHeading icon={<CalendarIcon size={14} />}>
-          <span id="ctx-next">Next due</span>
-        </SectionHeading>
-        <div className="mt-2 rounded-lg border border-border bg-card p-1">
-          <OpenRow
-            label={`${context.next.label}, ${moneyLabel(context.next.money.amount as Minor)} due in ${
-              context.next.dueInDays
-            } days. Open the stokvel.`}
-            onClick={() => onOpen(context.next.artifact)}
-          >
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium text-foreground">
-                {context.next.label}
+      {/* 2. the next obligation — only when there IS one. No real bills or
+          stokvel schedules exist in the ledger yet, and a fabricated due
+          date next to a real balance is worse than a shorter rail. */}
+      {next ? (
+        <section aria-labelledby="ctx-next">
+          <SectionHeading icon={<CalendarIcon size={14} />}>
+            <span id="ctx-next">Next due</span>
+          </SectionHeading>
+          <div className="mt-2 rounded-lg border border-border bg-card p-1">
+            <OpenRow
+              label={`${next.label}, ${moneyLabel(next.money.amount as Minor)} due in ${
+                next.dueInDays
+              } days. Open the stokvel.`}
+              onClick={() => onOpen(next.artifact)}
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-foreground">
+                  {next.label}
+                </span>
+                <span className="block truncate text-xs text-muted-foreground">{next.detail}</span>
               </span>
-              <span className="block truncate text-xs text-muted-foreground">
-                {context.next.detail}
+              <span className="flex shrink-0 flex-col items-end gap-1">
+                <Money money={next.money} className="text-sm text-foreground" />
+                {/* Days remaining is a word as well as a colour. */}
+                <Pill tone={next.dueInDays <= 1 ? 'warning' : 'muted'} icon={<ClockIcon />}>
+                  {next.dueInDays === 0
+                    ? 'Today'
+                    : next.dueInDays === 1
+                      ? 'Tomorrow'
+                      : `${next.dueInDays} days`}
+                </Pill>
               </span>
-            </span>
-            <span className="flex shrink-0 flex-col items-end gap-1">
-              <Money money={context.next.money} className="text-sm text-foreground" />
-              {/* Days remaining is a word as well as a colour. */}
-              <Pill tone={context.next.dueInDays <= 1 ? 'warning' : 'muted'} icon={<ClockIcon />}>
-                {context.next.dueInDays === 0
-                  ? 'Today'
-                  : context.next.dueInDays === 1
-                    ? 'Tomorrow'
-                    : `${context.next.dueInDays} days`}
-              </Pill>
-            </span>
-          </OpenRow>
-        </div>
-      </section>
+            </OpenRow>
+          </div>
+        </section>
+      ) : null}
 
       {/* 3. what just happened */}
       <section aria-labelledby="ctx-recent">

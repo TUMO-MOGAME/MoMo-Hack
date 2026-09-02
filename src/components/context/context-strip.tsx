@@ -29,8 +29,13 @@ export function ContextStrip({
   onOpen: () => void;
 }) {
   const available = context.balances.find((b) => b.kind === 'WALLET');
-  const days = context.next.dueInDays;
-  const dueWord = days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `${days} days`;
+  // `next` is optional now — the ledger has no bills or stokvel schedules in it
+  // yet, so there is often nothing true to put here. The pill disappears rather
+  // than counting down to an invented date.
+  const next = context.next;
+  const days = next?.dueInDays;
+  const dueWord =
+    days === undefined ? null : days === 0 ? 'Today' : days === 1 ? 'Tomorrow' : `${days} days`;
 
   return (
     <button
@@ -38,7 +43,9 @@ export function ContextStrip({
       onClick={onOpen}
       aria-label={`Your position: ${
         available ? `${moneyLabel(available.money.amount as Minor)} available` : 'no wallet yet'
-      }. ${context.next.label} due in ${dueWord.toLowerCase()}. Open for the full picture.`}
+      }.${
+        next && dueWord ? ` ${next.label} due in ${dueWord.toLowerCase()}.` : ''
+      } Open for the full picture.`}
       className="flex min-h-11 w-full items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-left transition-colors hover:border-brand"
     >
       <span className="shrink-0 text-brand" aria-hidden="true">
@@ -56,11 +63,13 @@ export function ContextStrip({
         </span>
       </span>
 
-      <span className="shrink-0" aria-hidden="true">
-        <Pill tone={days <= 1 ? 'warning' : 'muted'} icon={<ClockIcon />}>
-          {dueWord}
-        </Pill>
-      </span>
+      {dueWord !== null && days !== undefined ? (
+        <span className="shrink-0" aria-hidden="true">
+          <Pill tone={days <= 1 ? 'warning' : 'muted'} icon={<ClockIcon />}>
+            {dueWord}
+          </Pill>
+        </span>
+      ) : null}
     </button>
   );
 }
