@@ -26,7 +26,7 @@ src/lib/momo/
 
 Hard rules for this tree:
 - It **never touches the database.** It returns values; callers persist them.
-- It **never throws raw**. Every failure becomes a `VulaError` (`docs/01` §10).
+- It **never throws raw**. Every failure becomes a `AppError` (`docs/01` §10).
 - Every function takes an explicit `referenceId` — the client never generates one, because the
   caller must have persisted it first.
 
@@ -176,7 +176,7 @@ asks "what if someone POSTs to your webhook?"
 The gig flow, which is where three APIs meet.
 
 ```
-  CLIENT                    VULA                       WORKER
+  CLIENT                  MOMO KASI                     WORKER
     |                        |                            |
     |-- post job ----------->|                            |
     |                        |-- job OPEN --------------->|

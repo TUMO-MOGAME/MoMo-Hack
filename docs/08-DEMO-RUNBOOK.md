@@ -68,11 +68,11 @@ unemployment. Do not linger. The demo is the argument.
 2. Scan the QR taped to the laptop screen (vehicle dashboard).
 3. Confirm R12.50.
 4. **Switch to the console and stay there.** One collection lands, and immediately splits into four
-   postings: owner R7.50, driver R3.12, fuel pool R1.25, insurance R0.63.
+   postings: owner R7.50, driver R3.13, fuel pool R1.25, insurance R0.62.
 5. Show the split rule screen — the bps, publicly visible.
 
 > *"The owner did not have to trust the driver to hand over cash, because the cash never existed.
-> And notice the sixty-third cent — the remainder is distributed deterministically, so the ledger
+> And notice the driver's extra cent — the remainder is distributed deterministically, so the ledger
 > balances to zero on every single fare. We test that with five thousand generated cases."*
 
 That sentence is aimed squarely at the engineers on the panel.
@@ -106,7 +106,7 @@ One slide. The container diagram from `docs/01`. Then:
 > double-pay. Two independent paths to resolution: the callback, and a reconciler that is the
 > authority. Five hundred concurrent fares in our load test, and the ledger still balances to zero.*
 >
-> *Zaka moved money that already existed. Vula creates income for people who have none, and gives
+> *Zaka moved money that already existed. MoMo Kasi creates income for people who have none, and gives
 > it somewhere to go — sixteen times a week."*
 
 Stop talking. Take questions.

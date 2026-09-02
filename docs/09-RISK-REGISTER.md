@@ -129,7 +129,7 @@ Test screen mirroring in the actual venue. Hotspot ready. Backup video local. Re
 |---|---|---|---|
 | R17 | Vercel Hobby bandwidth exceeded | 3 | 100GB. We will use a fraction. Monitored. |
 | R18 | npm dependency vulnerability blocks CI | 4 | `npm audit` gates on high+. Pin versions. |
-| R19 | Name collision ("Vula Mobile" is an existing SA health app) | 4 | Different category. Renaming is one constant (ADR-0002). |
+| R19 | Name collision ("MoMo Kasi Mobile" is an existing SA health app) | 4 | Different category. Renaming is one constant (ADR-0002). |
 | R20 | Judges ask for a live production deployment | 2 | Explicitly out of scope; stated in `docs/00` §7. |
 
 ---

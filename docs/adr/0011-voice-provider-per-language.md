@@ -17,7 +17,7 @@ Verified against ElevenLabs' language documentation on 2026-09-02:
 Separately, the ElevenLabs free tier is 10,000 credits/month (~15 minutes of conversational agent
 time), carries no commercial rights, and watermarks output. Three demo rehearsals would exhaust it.
 
-Lelapa AI's **Vulavula** — a South African company — does support isiZulu, Afrikaans, Sesotho and
+Lelapa AI's **MoMo Kasivula** — a South African company — does support isiZulu, Afrikaans, Sesotho and
 English, but has **no free tier** ($9.99/month minimum).
 
 ## Options
@@ -28,7 +28,7 @@ for Africans*. Rejected on quality and on principle.
 
 **B. English only.** Safe, and abandons the language goal entirely.
 
-**C. Pay for Lelapa AI Vulavula.** The right long-term partner, and it breaks the R0 constraint.
+**C. Pay for Lelapa AI MoMo Kasivula.** The right long-term partner, and it breaks the R0 constraint.
 
 **D. Provider-per-language, with a pre-generated phrase bank.**
 
@@ -62,3 +62,33 @@ Someone has to record ~60 phrases per Tier 2 language.
 **The honest pitch line, which is stronger than pretending:** *"ElevenLabs does not yet support South
 African languages. We found that, and built a provider-per-language voice layer around it. Today
 isiZulu is a human voice; the day ElevenLabs or Lelapa AI covers it, it is a config change."*
+
+---
+
+## Amendment — 2026-09-02 (same day, before implementation)
+
+**ElevenLabs is English only for v1.** Decided by Tumo.
+
+The decision above is unchanged: voice remains provider-per-language, assembled from a
+pre-generated phrase bank. What narrows is the initial roster.
+
+| | Before | After |
+|---|---|---|
+| ElevenLabs | en, sw, ha, ln, so | **en only** |
+| Human recordings (zu, xh, st, af) | SHOULD, Tier 2 | **COULD, deferred** |
+| Web Speech API | Tier 3 fallback | **Tier 2** — any language the device has |
+| Understand + reply in text | all SA languages | **unchanged, all SA languages** |
+
+**Why this is a good trade.** The multilingual claim never depended on ElevenLabs. Understanding and
+text replies in isiZulu, isiXhosa, Sepedi and the rest run on the LLM at zero marginal cost, and
+that is the part a South African panel actually cares about. Voice was carrying reputational risk
+(mangled pronunciation) and a scheduling dependency (finding native speakers in week three) for a
+capability that was never the differentiator.
+
+Narrowing to English makes voice **purely additive polish** rather than load-bearing on the language
+story. It also halves the phrase-bank work and removes a people-dependency from the critical path.
+
+**The constraint this creates:** we must not claim spoken isiZulu in the deck, the demo or the
+README. We claim *understanding*, which is real. The roadmap wording is in `docs/12` §2.
+
+Superseding this amendment requires a new ADR, per `docs/06` §10.

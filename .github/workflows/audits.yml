@@ -1,0 +1,100 @@
+name: Audits
+
+# The TUMO OLO audit pipeline, adapted for this project's real constraints.
+#
+# Two deliberate differences from templates/workflows/audits.yml in the suite:
+#
+#   1. npm, not pnpm. This project uses npm and has no .nvmrc.
+#   2. The suite repo is PRIVATE and this repo is PUBLIC, so `github.token` cannot read it.
+#      Every suite-dependent step is gated on an AUDIT_SUITE_TOKEN secret and skips cleanly
+#      with a warning when it is absent — a skipped job that says so, never a green tick
+#      over an audit that did not run.
+#
+# The deterministic half (npm audit = A8's command half) needs no suite and always runs.
+# Prompt audits A1–A7 run LOCALLY at a phase close: `npm run audit:plan`, then
+# `npm run audit:brief -- A5` in a Claude Code session. See PLANNING.md §11.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      only:
+        description: 'Limit to these audits, comma-separated (e.g. A1,A8)'
+        type: string
+        default: ''
+  schedule:
+    - cron: '0 3 * * 1'
+
+concurrency:
+  group: audits-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  deterministic:
+    name: A8 — dependency scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # A8's deterministic half, straight from registry.json. A real vulnerability blocks.
+      - name: npm audit
+        run: npm audit --audit-level=high
+
+  plan:
+    name: Run plan & gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Suite token present?
+        id: tok
+        run: echo "set=${{ secrets.AUDIT_SUITE_TOKEN != '' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Warn if the suite is unreachable
+        if: steps.tok.outputs.set != 'true'
+        run: |
+          echo "::warning::AUDIT_SUITE_TOKEN is not set — the run plan was NOT computed. This is a gap, not a pass."
+          {
+            echo '## Audit run plan'
+            echo
+            echo 'Not computed. `AUDIT_SUITE_TOKEN` is unset, so the private audit suite could'
+            echo 'not be checked out. Run it locally with `npm run audit:plan`.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Check out the audit suite
+        if: steps.tok.outputs.set == 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: TUMO-MOGAME/tumoOLO_Audits
+          ref: main
+          path: .audit-suite
+          token: ${{ secrets.AUDIT_SUITE_TOKEN }}
+
+      - uses: actions/setup-node@v4
+        if: steps.tok.outputs.set == 'true'
+        with:
+          node-version: 22
+
+      - name: Compute the plan
+        if: steps.tok.outputs.set == 'true'
+        run: |
+          TIER="${{ github.event_name == 'pull_request' && 'pr' || 'push' }}"
+          ARGS="--tier $TIER"
+          if [ -n "${{ inputs.only }}" ]; then ARGS="$ARGS --only ${{ inputs.only }}"; fi
+          node scripts/audit.mjs plan $ARGS --verbose | tee plan.txt
+          { echo '## Audit run plan'; echo; echo '```'; cat plan.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      # Reads status.md. Fails while a Critical or High is still open.
+      - name: Gate on open findings
+        if: steps.tok.outputs.set == 'true'
+        run: node scripts/audit.mjs gate

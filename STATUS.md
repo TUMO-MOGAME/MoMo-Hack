@@ -1,4 +1,4 @@
-# Vula — Status Board
+# MoMo Kasi — Status Board
 
 **This file is the single source of truth for "where are we".**
 Every PR must update it. If you are a fresh session, read this before touching anything.
@@ -13,7 +13,18 @@ Every PR must update it. If you are a fresh session, read this before touching a
 
 ---
 
-## Right now — the next three actions
+## Right now
+
+| | |
+|---|---|
+| **Current phase** | Phase 0 — Foundation and walking skeleton |
+| **Phase state** | In progress. Repo, structure, contracts and starter UI done; walking skeleton not yet built. |
+| **Audits owed at close** | A1 A8 |
+| **Blocking findings** | none |
+| **Days to code freeze** | 25 (27 Sep 2026) |
+
+### The next three actions
+
 
 1. **MoMo portal verification pass** — sign in at <https://momodeveloper.mtn.com/API-collections>
    and work through the `momoAPIs.md` §14 checklist. Promote the `[P]` ratings to `[V]`.
@@ -21,6 +32,23 @@ Every PR must update it. If you are a fresh session, read this before touching a
 2. Subscribe to Collections + Disbursements + Remittances; put the three
    `Ocp-Apim-Subscription-Key` values, `MOMO_API_USER` and `MOMO_API_KEY` into GitHub Secrets.
 3. Scaffold Next.js + Supabase + CI and land it through a PR. Then the walking skeleton (M1).
+
+---
+
+## Phase board
+
+The 5th column is what each phase owes the audit suite. White circle = owed, green tick = run and
+written up. Only the audits listed are run at that phase — see `PLANNING.md` §11.
+
+| # | Phase | State | Days | Audits |
+|---|---|---|---|---|
+| 0 | Foundation and walking skeleton | in progress | 1-3 | A1 A8 ⚪ |
+| 1 | Design system and app shell | not started | 4-5 | A1 A2 A3 ⚪ |
+| 2 | Narrative and content surfaces | not started | 6 | A1 A6 ⚪ |
+| 3 | Money engine | not started | 7-13 | A1 A2 A3 A4 A5 A6 ⚪ |
+| 4 | Channels and products | not started | 14-19 | A1 A2 A3 A4 A5 A8 ⚪ |
+| 5 | Reach — offline, USSD, voice | not started | 20-23 | A1 A2 A3 A4 A7 ⚪ |
+| 6 | Hardening, demo and submission | not started | 24-28 | A1 A3 A4 A5 A6 A7 A8 S1 ⚪ |
 
 ---
 
@@ -46,7 +74,11 @@ Test column: `none` / `unit` / `+prop` (property-based) / `+int` (integration in
 |---|---|---|---|---|---|---|
 | F1 | Public GitHub repo created | `[x]` | n/a | n/a | — | `TUMO-MOGAME/MoMo-Hack`, made public 2026-09-02 |
 | F2 | Ruleset protecting `main` | `[x]` | verified | n/a | — | Ruleset 22084424. Direct push **tested and rejected**. Squash-only, linear history, no bypass actors. |
-| F3 | Next.js + TS + Tailwind scaffold | `[ ]` | none | unit | — | |
+| F3 | Next.js + TS + Tailwind scaffold | `[~]` | typecheck | unit | — | Next 15.1.6, React 19, Tailwind v4, strict TS + `noUncheckedIndexedAccess`. Dev server verified 200. |
+| F3a | Full directory structure + module boundaries | `[x]` | n/a | n/a | — | Matches `docs/01` §5 = the agent ownership map |
+| F3b | Design tokens (`src/design/tokens.ts` + `@theme`) | `[x]` | none | unit | — | Architecture from Social-Assembly; brand retuned to MTN gold |
+| F3c | Frozen contracts: `money`, `split`, `errors`, `artifacts/types` | `[x]` | **manual** | +prop | — | Split verified exact across 200,000 amounts. Needs the real fast-check suite (M1d). |
+| F3d | Starter chat + artifact UI (mock agent) | `[x]` | manual | +e2e | — | 7 artifact renderers, chip + panel + bottom sheet, zero keys needed |
 | F4 | Supabase staging + prod projects | `[ ]` | none | +int | — | Free tier allows exactly 2 |
 | F5 | Migration pipeline (local, CI, deploy) | `[ ]` | none | +int | — | |
 | F6 | CI quality gate workflow | `[ ]` | none | n/a | — | |
@@ -149,7 +181,10 @@ Format: one line per merged workstream, with the evidence.
 
 | Date | What | Test level reached | Evidence |
 |---|---|---|---|
-| — | — | — | — |
+| 2026-09-02 | Branch protection on `main` | verified | Direct push rejected: `GH013 — Changes must be made through a pull request` |
+| 2026-09-02 | Split engine invariant | **manual exhaustive** | 200,000 consecutive amounts × the 60/25/10/5 rule; every split summed exactly. Not yet the fast-check suite required by `docs/04` §3 — logged as debt below. |
+| 2026-09-02 | TypeScript strict build | typecheck | `tsc --noEmit` clean under `strict` + `noUncheckedIndexedAccess` |
+| 2026-09-02 | Starter UI renders | manual | Dev server `HTTP 200`; greeting, suggestions and composer all present in the response |
 
 ---
 
@@ -160,7 +195,10 @@ Nothing yet. Anything merged at a lower test level than
 
 | Item | Merged at | Needs | Due | Why deferred |
 |---|---|---|---|---|
-| — | — | — | — | — |
+| `src/domain/split.ts` | manual exhaustive check | **fast-check property suite** (`docs/04` §3, P1-P2) | Day 5 | Vitest not yet installed; the algorithm was needed to build the UI against |
+| `src/domain/money.ts` | typecheck only | unit tests for `parseMinor` / `formatZAR` edge cases | Day 5 | as above |
+| Artifact renderers | manual | fixture unit tests + axe | Day 22 | Skin will change when the template lands |
+| `src/lib/agent/mock.ts` | manual | becomes the UI test fixture source | Day 18 | Replaced by the real agent route (S7a) |
 
 ---
 
@@ -177,6 +215,39 @@ Full register in `docs/09-RISK-REGISTER.md`. The ones actually biting right now:
 
 ---
 
+## Audit ledger
+
+One row per audit run. `runner/audit.mjs` reads this to know what has already happened, so a
+finding is never re-reported as new. **An audit not written here did not happen.**
+
+| Phase | Audit | Crit | High | Med | Low | Status | Date |
+|---|---|---|---|---|---|---|---|
+| — | — | — | — | — | — | nothing run yet | — |
+
+---
+
+## Open findings
+
+Critical and High block the phase gate. `runner/audit.mjs gate` fails while any row here is
+unresolved — where resolved means fixed, or accepted with a written reason.
+
+| ID | Audit | Severity | Location | Summary | Status |
+|---|---|---|---|---|---|
+| — | — | — | — | — | — |
+
+---
+
+## Deferred debt
+
+Findings we consciously chose not to fix now, each with the reason and the date it comes due.
+Deferring is legitimate; deferring silently is not.
+
+| ID | Audit | Severity | Summary | Why deferred | Due |
+|---|---|---|---|---|---|
+| — | — | — | — | — | — |
+
+---
+
 ## Session log
 
 Newest first. One short entry per working session so a fresh thread can catch up fast.
@@ -187,7 +258,7 @@ Newest first. One short entry per working session so a fresh thread can catch up
 - Project moved to `C:\MoMo-Hack`.
 - **Key finding: ElevenLabs supports no South African language** — not isiZulu, isiXhosa,
   Afrikaans, Sesotho or any other. Its African coverage is Swahili, Hausa, Lingala and Somali
-  (Eleven v3 only). Lelapa AI's Vulavula does cover SA languages but has no free tier ($9.99/mo).
+  (Eleven v3 only). Lelapa AI's MoMo Kasivula does cover SA languages but has no free tier ($9.99/mo).
   Resolved with ADR-0011: provider-per-language voice plus a pre-generated phrase bank, which also
   brings ongoing voice cost to R0 and makes cached replies faster than live TTS.
 - Studied `C:\Social-Assembly-Main` for the chat/artifact pattern. Adopted: CopilotKit generative

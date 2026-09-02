@@ -1,4 +1,4 @@
-# Vula — Master Plan
+# MoMo Kasi — Master Plan
 
 **Living document.** Updated when scope, architecture or sequencing changes.
 Day-to-day progress lives in `STATUS.md`, not here.
@@ -8,7 +8,7 @@ Day-to-day progress lives in `STATUS.md`, not here.
 ## 1. The one-sentence pitch
 
 > MTN gave 11 million South Africans *access* to financial services.
-> **Vula turns access into daily participation** — by digitising the three things
+> **MoMo Kasi turns access into daily participation** — by digitising the three things
 > township money actually does every day: it is **earned** in the informal economy,
 > **shared** through stokvels, and **spent** on taxis, electricity and school fees.
 
@@ -49,7 +49,7 @@ need, sharing airtime and data, pooling for December groceries, burial societies
                     v                                      |
    +----------------------------+                          |
    |  EARN                      |   Gigs create the income |
-   |  - Vula Gigs (escrow)      |   that funds the         |
+   |  - Kasi Gigs (escrow)      |   that funds the         |
    |  - Rank micro-work         |   spending.              |
    |  - Remittance in (diaspora)|                          |
    +-------------+--------------+                          |
@@ -110,7 +110,7 @@ Full detail in `docs/00-PRODUCT-BRIEF.md`. Cut order in `docs/05-DELIVERY-PLAN.m
 
 | ID | Item |
 |---|---|
-| S1 | USSD fallback (`*120*VULA#`) with an on-screen feature-phone simulator |
+| S1 | USSD fallback (`*120*KASI#`) with an on-screen feature-phone simulator |
 | S2 | Offline-first fare capture (service worker + queued sync, demoed in airplane mode) |
 | S3 | MoMo Remittances: diaspora funds a **purpose-locked** family sub-wallet |
 | S4 | Ubuntu Trust Score (completed gigs unlock tool-lease eligibility) |
@@ -175,7 +175,7 @@ Rationale and alternatives: `docs/01-ARCHITECTURE.md` and `docs/adr/`.
 | ADR | Decision |
 |---|---|
 | 0001 | Single Next.js + TypeScript monolith on Vercel. No FastAPI, no separate Node service. |
-| 0002 | Product name **Vula**; modules Vula Ride / Gigs / Stokvel / Bills. |
+| 0002 | Product name **MoMo Kasi**; modules Kasi Ride / Gigs / Stokvel / Bills. |
 | 0003 | Double-entry ledger as the single source of truth for all balances. |
 | 0004 | Money is `bigint` minor units; splits use integer basis points. |
 | 0005 | **Repository is public** — the only way to get branch protection on GitHub Free. |
@@ -224,3 +224,108 @@ Rationale and alternatives: `docs/01-ARCHITECTURE.md` and `docs/adr/`.
 | Q3 | Is a public repo acceptable under the competition rules? | ADR-0005 | Tumo | Day 1 |
 | Q4 | Any hackathon-mandated stack, region or template? | Scope | Tumo | Day 2 |
 | Q5 | Team name / entry registration required first? | Submission | Tumo | Day 5 |
+
+---
+
+## 10. Phase plan
+
+The 28-day schedule (`docs/05`) expressed as the phases the audit suite gates on. Each phase
+closes with the audits it owes — **only those**, never the whole catalogue. That is the whole
+point: a phase gate you can actually afford to run is a phase gate you will actually run.
+
+### Phase 0 — Foundation and walking skeleton
+
+Days 1-3. Repo, protected `main`, CI, Supabase projects, Vercel, the directory structure and the
+frozen contracts. Closes on the **walking skeleton**: a real `requesttopay` from a deployed
+function, resolved by the reconciler, writing balanced ledger rows.
+
+Exit criterion: money moves end to end, ugly but real. Every integration risk retired by Day 3.
+
+### Phase 1 — Design system and app shell
+
+Days 4-5. Token source of truth, the artifact renderers, the chat shell, responsive down to 320px,
+first accessibility pass. Largely built already on Day 1 — this phase finishes and grades it.
+
+Exit criterion: the critical journey renders correctly on a real phone.
+
+### Phase 2 — Narrative and content surfaces
+
+Day 6. The public landing page, metadata, Open Graph, the pitch copy. Small on purpose.
+
+Exit criterion: the link is shareable and says what this is.
+
+### Phase 3 — Money engine
+
+Days 7-13. Ledger, split engine, escrow state machine, Collections, Disbursements, reconciler,
+outbox, the MoMo emulator. The core of the submission.
+
+Exit criterion: the ledger always balances, under concurrency, with property tests to prove it.
+
+### Phase 4 — Channels and products
+
+Days 14-19. Telegram bot, the conversational agent and its artifacts, taxi fare and split,
+stokvel engine, bills, remittances.
+
+Exit criterion: the full earn -> share -> spend loop works from a phone.
+
+### Phase 5 — Reach: offline, USSD, voice
+
+Days 20-23. Offline-first PWA with the queued fare capture, the USSD state machine and simulator,
+the English phrase bank and speech input.
+
+Exit criterion: the loop works in airplane mode and on a feature phone.
+
+### Phase 6 — Hardening, demo and submission
+
+Days 24-28. Load and chaos testing, accessibility and performance passes, security review, seed
+data, three rehearsals, code freeze, submit.
+
+Exit criterion: submitted, with a day of buffer.
+
+---
+
+## 11. Audit suite
+
+Audits are the shared TUMO OLO suite (`tumoOLO_Audits`), not bespoke checks. They live outside
+this repo so a fix reaches every project, and so this project cannot quietly drift onto a softer
+version of the accessibility standard.
+
+**Run at the close of each phase, and only the audits that phase owes.**
+
+| Audit | What it catches that the others do not | Runs at phases |
+|---|---|---|
+| A1 | Architecture, quality and UX in one sweep — the catch-all | Every phase |
+| A2 | Drift from the design reference, token by token | 1, 3, 4, 5 |
+| A3 | WCAG 2.2 AA beyond what axe sees — focus order, announcements, real keyboard journeys | 1, 3, 4, 5, 6 |
+| A4 | Core Web Vitals, bundle weight, fonts, animation jank | 3, 4, 5, 6 |
+| A5 | The whole system: headers, CSP, endpoint abuse, secrets, injection, reachability | 3, 4, 6 |
+| A6 | Metadata, structured data, crawlability and copy — read from source | 2, 3, 6 |
+| A7 | Offline behaviour, safe areas, platform conventions — PWA-scoped here | 5, 6 |
+| A8 | CVEs, unmaintained packages, lockfile integrity, licences | 0, 4, 6 |
+| A9 | Per-PR diff review — **disabled, needs a paid API key. A real gap, not a pass** | Disabled |
+| S1 | The deployed site, not the source — a canonical that resolves, an index that is real | 6 |
+
+### How a phase closes
+
+```bash
+node ../tumoOLO_Audits/runner/audit.mjs status     # where the project thinks it is
+node ../tumoOLO_Audits/runner/audit.mjs plan       # what this phase owes, and why
+node ../tumoOLO_Audits/runner/audit.mjs brief A5   # one self-contained brief per audit
+node ../tumoOLO_Audits/runner/audit.mjs check      # A8 deterministic half
+node ../tumoOLO_Audits/runner/audit.mjs gate       # fails if a Critical or High is still open
+```
+
+Each brief is run in a Claude Code session, the result written to
+`docs/audits/results/PHASE-<n>-<ID>.md`, and `STATUS.md` updated — ledger row, open findings,
+board cell from white to green. **An audit not written to `STATUS.md` did not happen.**
+
+### The rules that are not negotiable
+
+- **Report only. Never fix while auditing.** The order is audit, report, approve, fix. A fix pass
+  inside the audit means nobody ever saw the finding.
+- **Unmeasured is never a pass.** If a placeholder is empty or an audit did not run, it is
+  reported as *Not measured*. A9 being disabled shows up as a gap on every report.
+- **Project specifics go in an overlay**, `docs/audits/<ID>.project.md`, never by editing a shared
+  audit. Wanting to edit a shared audit is the signal that an overlay is needed.
+- **A Critical or High blocks the phase.** `gate` enforces it, so a phase cannot be declared
+  closed with something real still open.

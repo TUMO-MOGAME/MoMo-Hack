@@ -22,9 +22,9 @@ Every external API call this system makes or receives, what triggers it, and wha
 | A7 | **Africa's Talking USSD** | AT | **inbound** | shared secret + IP allowlist | Free (sandbox) | Feature-phone input |
 | A8 | **Supabase** (Postgres, Auth, Storage, Realtime) | Supabase | outbound | anon key / service-role key | Free tier | Everything persistent |
 | A9 | **GitHub Actions → our cron routes** | us | **inbound** | `CRON_SECRET` bearer | Free | Scheduling |
-| A10 | **Groq** (agent LLM) | Groq | outbound | API key | Free, no card | The conversational agent |
-| A11 | **Google Gemini Flash** (fallback LLM) | Google | outbound | API key | Free, no card | Used only when Groq rate-limits |
-| A12 | **ElevenLabs TTS** | ElevenLabs | outbound | API key | Free tier | Phrase-bank generation (build time) + capped live TTS |
+| A10 | **Google Gemini Flash** (agent LLM) | Google | outbound | API key | Free, no card | The conversational agent |
+| A11 | **Groq** (fallback LLM) | Groq | outbound | API key | Free, no card | Used only when Gemini rate-limits |
+| A12 | **ElevenLabs TTS** | ElevenLabs | outbound | API key | Free tier | **English only (v1).** Phrase-bank generation at build time + capped live TTS |
 | A13 | **Web Speech API** | browser | on-device | none | Free | Speech input; TTS fallback |
 
 Not used, and why — so nobody adds them later without a decision:
@@ -32,7 +32,7 @@ Not used, and why — so nobody adds them later without a decision:
 | Rejected | Why |
 |---|---|
 | Claude / OpenAI APIs | Paid from the first call, card required. Groq and Gemini Flash are free with no card (ADR-0012). |
-| Lelapa AI Vulavula | The right provider for South African language speech, but no free tier ($9.99/mo). Documented paid exit (ADR-0011). |
+| Lelapa AI MoMo Kasivula | The right provider for South African language speech, but no free tier ($9.99/mo). Documented paid exit (ADR-0011). |
 | ElevenLabs Scribe (STT) | Metered against the same 10k credits the phrase bank needs. Web Speech API is free and on-device. |
 | CopilotKit Cloud | The runtime is self-hosted inside our Next.js app; the cloud tier adds nothing we need. |
 | A2A / multi-agent orchestration | Each agent hop consumes part of Vercel's 10s budget, and it violates ADR-0001. |
@@ -165,7 +165,7 @@ Response protocol: body starts with `CON ` to continue the session, `END ` to te
 
 ```
 *120*8862#
-CON Vula
+CON MoMo Kasi
 1. Pay taxi fare
 2. My jobs
 3. Stokvel
@@ -238,8 +238,8 @@ best-effort and may fire late, early, or twice.
 | **Phrase-bank generation** | Build time, `npm run voice:build`, run manually | ~180 clips ≈ 7,200 chars, **once** | Output cached in Supabase Storage forever. **Never runs in CI or at runtime.** |
 | **Live TTS** | A genuinely novel agent reply | Capped at **500 chars/day** | On exhaustion: fall back to the phrase bank, then to text. Never fails, never bills. |
 
-Languages: English, Swahili, Hausa, Lingala, Somali only. isiZulu, isiXhosa, Sesotho and Afrikaans
-use human recordings; the rest use A13 or text (ADR-0011).
+**Languages: English only for v1** (ADR-0011 amendment). Every other language is understood and
+answered in **text**; spoken output falls back to the on-device Web Speech API (A13) or to text.
 
 **Web Speech API (A13)** — on-device, no network. `SpeechRecognition` for input,
 `speechSynthesis` as the Tier 3 voice fallback. **Raw audio never leaves the device**
