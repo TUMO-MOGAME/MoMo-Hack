@@ -27,7 +27,9 @@
     "images": "node scripts/optimise-images.mjs",
     "db:migrate": "node scripts/migrate.mjs",
     "db:check": "node scripts/migrate.mjs --dry",
-    "test:int": "vitest run tests/integration"
+    "test:int": "vitest run tests/integration",
+    "telegram:setup": "node scripts/telegram-setup.mjs",
+    "dev:telegram": "node scripts/telegram-dev-bridge.mjs"
   },
   "dependencies": {
     "next": "^15.5.25",

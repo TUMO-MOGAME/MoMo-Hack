@@ -76,23 +76,33 @@ an `esbuild` block is silently ignored under Vite 8). Two lessons worth keeping:
 3. **Telegram handler (M5a).** `/api/telegram/webhook` does not exist. Now unblocked — the public
    HTTPS URL it needs is live. See the note below.
 
-### Why the Telegram bot does not reply
+### The Telegram bot now replies
 
-Diagnosed 2026-09-02 against the live bot. **The bot is fine; nothing is listening.** Three
-separate things are missing, and all three are needed:
+Built and **verified end to end against the live bot** on 2026-09-02. The three blockers in the
+previous version of this section are down to one, and it is a BotFather setting rather than code:
 
 | | State |
 |---|---|
 | Bot itself | ✅ `@momokasi_demo_bot` live, `getMe` 200 |
-| **Webhook URL** | ❌ **none set.** Telegram has **1 update queued** — that is the message that was sent. |
-| **Handler route** | ❌ `/api/telegram/webhook` **does not exist.** M5a is not built; the only routes are `health`, `cron/reconcile` and `momo/callback`. |
-| **Public HTTPS URL** | ❌ Telegram will not deliver to `localhost`. Needs F7 (Vercel). |
+| **Handler route** | ✅ `/api/telegram/webhook` built (M5a). Secret-verified, `update_id`-deduplicated. |
+| **Agent** | ✅ Replies through Gemini `gemini-3.6-flash`, persona from `docs/12` §4.2. |
+| **Public HTTPS URL** | ✅ F7 landed. `https://mo-mo-hack.vercel.app` is the delivery target. |
+| **Webhook URL** | ⏳ set with `npm run telegram:setup -- <url>` once the secrets are on Vercel. |
+| **Group message reads** | ❌ `/setprivacy` → **Disable** in @BotFather. Split-a-bill needs to see who replied. |
 
-So a sent message is being queued by Telegram with nowhere to go. Nothing is broken — this part
-of the product has not been written yet. It is Phase 4, and it is gated on F7.
+**Proved locally before any deploy.** `scripts/telegram-dev-bridge.mjs` long-polls `getUpdates` and
+POSTs each update into the local route exactly as Telegram would, secret header and all — so the
+whole path is exercised with no tunnel and no deployment. Only the inbound delivery is simulated;
+the route, handler, model call and outbound send are the deployed ones. Measured against the real
+bot: `/start` **0.75s** (no model call), an agent turn **5.5s**, a duplicate `update_id` **8ms** and
+no second reply, a wrong secret **401**.
 
-One thing to change while it is queued: `/setprivacy` → **Disable** in @BotFather. Split-a-bill
-needs to see who replied in a group, and the bot currently cannot read group messages.
+**Two limits worth knowing before the demo.** An agent turn at 5.5s has ~4.5s of headroom under
+Vercel's 10s Hobby ceiling, so a slow Gemini response is the most likely way this fails live — the
+handler already degrades to a friendly fallback rather than silence. And de-duplication plus
+conversation history are **per-instance and in-memory**: they hold across a warm function, not
+across a cold start. Nothing here writes to the ledger, so the worst case is a repeated reply or a
+forgotten sentence, never a repeated payment. Both become exact when the outbox lands (M5c).
 
 ### CRITICAL, found and fixed the first time the tests met a real database
 
@@ -277,9 +287,9 @@ is the honest one, and it is why the percentage in §Progress counts both ways.
 
 | ID | Item | State | Tests | Required tests | PR | Notes |
 |---|---|---|---|---|---|---|
-| M5a | Telegram webhook + secret verification | `[ ]` | none | +int | — | ADR-0007 |
-| M5b | Bot conversation state machine | `[ ]` | none | +prop | — | |
-| M5c | Bot flows: pay, earn, stokvel, balance | `[ ]` | none | +e2e | — | |
+| M5a | Telegram webhook + secret verification | `[~]` | **contract (27)** | +int | #23 | Built and verified against the live bot. Constant-time secret compare, `update_id` de-duplication, `200` on every path except a bad secret (`401`). `[~]` not `[x]` because the required level is `+int` and de-duplication is in-memory, not a table. |
+| M5b | Bot conversation state machine | `[~]` | contract | +prop | #23 | Short per-chat history (8 turns, 30 min), reset by `/start`. **In-memory, so it survives a warm function and not a cold start.** Not a state machine yet — there are no flows to hold state for until M5c. |
+| M5c | Bot flows: pay, earn, stokvel, balance | `[ ]` | none | +e2e | — | The agent explains all four; it cannot execute any of them. Needs the read tools (S7a) and the outbox. |
 | M9a | Web shell + auth | `[~]` | unit | +e2e | #11 | Shell, landing page, chat surface and context sidebar shipped and serving 200. **There is no auth of any kind** — no sign-in, no session, no `auth.uid()`, so the one RLS policy we wrote cannot yet be exercised. |
 | M9b | Commuter view | `[ ]` | none | +e2e | — | |
 | M9c | Worker view | `[ ]` | none | +e2e | — | |
@@ -379,6 +389,8 @@ Format: one line per merged workstream, with the evidence.
 | 2026-09-02 | **Concurrency — Phase 3 exit criterion** | **integration** | Two connections racing one account: one spend committed, one refused, **global ledger sum exactly 0**, wallet never positive. |
 | 2026-09-02 | Live spend guard (#18) | unit + **empirical** | 15 tests on the cap. Verified by pointing `.env.local` at `production` and running `npm run check:momo`: it **refused and exited before issuing a token**, then the env was restored. 331 tests pass overall. |
 | 2026-09-02 | Footer rebuild + attribution | manual + build | Footer replaced: nav columns, the MTN MoMo mark and the TUMO OLO wordmark. Both logos are the owners' own assets, not traced — MoMo is MTN's `mtnmomoLogo.svg` payload (**`#FFCB05` / `#003A58`** sampled from the file), TUMO OLO is the outline served at tumoolo.tech, checked side by side against their own nav render. Screenshotted from the **production** build at 1280px and 390px. Caught a real overflow at 390px: the old small-print row pushed the copyright past the viewport edge, now stacked. Re-verified after merging `main`: **331 passed, 29 skipped**, typecheck, lint, format and build green. `/` still prerendered **static** at 6.3 kB / 112 kB First Load JS — the footer is a server component and ships no client JavaScript, though no pre-change baseline was measured to quote a delta. |
+| 2026-09-02 | **Telegram bot replies** (#23) | contract + **live end-to-end** | 27 contract tests, and the real bot answering from a local server via `scripts/telegram-dev-bridge.mjs`. Measured, not assumed: `/start` **0.75s** canned with no model call, an agent turn **5.5s**, a repeated `update_id` **8ms** with no second reply, a wrong or absent secret **401**. Suite **387 passed, 1 skipped** — higher than the usual 331/29 because `DATABASE_URL` was present locally, so the integration and RLS tests ran instead of skipping, and passed. |
+| 2026-09-02 | Agent LLM provider | **integration** | `GROQ_API_KEY` is present in `.env.local` and **empty**, so ADR-0012's primary cannot serve a request. Fell back to Gemini (A11 in `docs/11`, already sanctioned). Model chosen by querying the live API, not from memory: `gemini-2.5-flash` **404s for new keys** and Google's own error names `gemini-3.6-flash` as the replacement. 3.6-flash is a thinking model that spends the output budget on reasoning and returns a truncated sentence until `thinkingLevel: 'low'` is set. |
 
 ---
 
