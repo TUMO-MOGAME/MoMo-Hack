@@ -17,7 +17,9 @@
     "audit:plan": "node scripts/audit.mjs plan --tier gate",
     "audit:brief": "node scripts/audit.mjs brief",
     "audit:check": "node scripts/audit.mjs check",
-    "audit:gate": "node scripts/audit.mjs gate"
+    "audit:gate": "node scripts/audit.mjs gate",
+    "pr:merge": "node scripts/safe-merge.mjs",
+    "agent:worktree": "node scripts/agent-worktree.mjs"
   },
   "dependencies": {
     "next": "15.1.6",
