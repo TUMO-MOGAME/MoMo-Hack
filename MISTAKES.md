@@ -183,6 +183,39 @@ is a required check.
 
 ---
 
+## M9 · Every test rolled back, so nothing ever ran twice
+
+**What happened.** `ensureAccount` inserts with `on conflict do nothing` and falls back to a
+`SELECT` when the row already exists. The fallback passed **six** parameters to SQL that referenced
+**five** of them — `allow_negative` was carried over from the INSERT and used nowhere — so Postgres
+refused the statement outright: `could not determine data type of parameter $5`.
+
+That branch runs **only when the account already exists**. So the first journal against any account
+succeeded and every one after it threw. **The ledger worked exactly once.** The first real
+collection in the project's history passed; the second failed, and would have kept failing forever.
+
+**Why.** Not the typo — the typo is ordinary. The reason it survived a 361-test suite that includes
+property tests and real-Postgres integration tests is that **every integration test rolls back**.
+`inRollback` is the right default and it is why the suite can run against the production project
+without seeding or cleaning. But it means no test had ever seen a **committed** account, so the
+entire `on conflict` branch — half of `ensureAccount` — was dead code as far as the suite was
+concerned. Unit tests could not help either: the in-memory adapter has no SQL to get wrong.
+
+The general shape: **a rolled-back test suite proves the first use of everything and the second use
+of nothing.** Anything whose behaviour depends on state already existing — upserts, caches,
+idempotency keys, "create if missing" — is invisible to it.
+
+**The rule.** For any code path that behaves differently when a row already exists, write a test
+that **calls it twice in the same transaction** and asserts the second call agrees with the first.
+Rolling back afterwards is fine; what matters is that both calls happen on the same state.
+
+**The guard.** `tests/integration/ledger-invariants.test.ts` → *"ensureAccount is idempotent"*: two
+tests that call `ensureAccount` twice for the same natural key, one subject-scoped and one for the
+null/null system key, asserting the same id both times. Proved to fire — reintroducing the sixth
+parameter fails both with the original `could not determine data type of parameter $5`.
+
+---
+
 ## What has gone right, and why
 
 Worth recording, because these are the patterns to keep:

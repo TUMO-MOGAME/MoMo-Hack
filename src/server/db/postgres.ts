@@ -125,14 +125,27 @@ export function createMoneyTx(sql: SqlExecutor): MoneyTx {
       const created = one(inserted);
       if (created) return created.id;
 
+      // NOTE the parameter list. It is NOT `[...params, NIL_UUID]`.
+      //
+      // `params` carries `allow_negative` in position 5 for the INSERT above,
+      // and this SELECT has no use for it. Passing it anyway left `$5`
+      // referenced nowhere in the SQL, and Postgres refuses a parameter it
+      // cannot infer a type for:
+      //
+      //     error: could not determine data type of parameter $5
+      //
+      // This branch runs ONLY when `on conflict do nothing` fired — that is,
+      // only when the account already exists. So the first journal against any
+      // account succeeded and every subsequent one threw: the ledger worked
+      // exactly once. Found against the live database, not in review.
       const found = await sql.query<{ id: string }>(
         `select id from ledger_account
           where type = $1::account_type
-            and coalesce(owner_id,   $6::uuid) = coalesce($2::uuid, $6::uuid)
-            and coalesce(subject_id, $6::uuid) = coalesce($3::uuid, $6::uuid)
+            and coalesce(owner_id,   $5::uuid) = coalesce($2::uuid, $5::uuid)
+            and coalesce(subject_id, $5::uuid) = coalesce($3::uuid, $5::uuid)
             and currency = $4
           limit 1`,
-        [...params, NIL_UUID],
+        [params[0], params[1], params[2], params[3], NIL_UUID],
       );
       const row = one(found);
       if (!row) {
