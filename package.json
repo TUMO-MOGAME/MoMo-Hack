@@ -8,7 +8,11 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run typecheck && npm run lint && npm run build",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run tests/unit tests/property",
+    "test:coverage": "vitest run --coverage",
+    "verify": "npm run typecheck && npm run lint && npm run test:unit && npm run build",
     "audit:status": "node scripts/audit.mjs status",
     "audit:plan": "node scripts/audit.mjs plan --tier gate",
     "audit:brief": "node scripts/audit.mjs brief",
@@ -25,10 +29,13 @@
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
+    "@vitest/coverage-v8": "^2.1.9",
     "eslint": "^9",
     "eslint-config-next": "15.1.6",
+    "fast-check": "^3.23.2",
     "postcss": "^8.4.49",
     "tailwindcss": "^4.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^2.1.9"
   }
 }

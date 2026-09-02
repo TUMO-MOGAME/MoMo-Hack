@@ -195,7 +195,7 @@ Nothing yet. Anything merged at a lower test level than
 
 | Item | Merged at | Needs | Due | Why deferred |
 |---|---|---|---|---|
-| `src/domain/split.ts` | manual exhaustive check | **fast-check property suite** (`docs/04` §3, P1-P2) | Day 5 | Vitest not yet installed; the algorithm was needed to build the UI against |
+| ~~`src/domain/split.ts`~~ | — | ~~fast-check property suite~~ | **PAID 2026-09-02** | 6 properties green, 5,000+ generated cases |
 | `src/domain/money.ts` | typecheck only | unit tests for `parseMinor` / `formatZAR` edge cases | Day 5 | as above |
 | Artifact renderers | manual | fixture unit tests + axe | Day 22 | Skin will change when the template lands |
 | `src/lib/agent/mock.ts` | manual | becomes the UI test fixture source | Day 18 | Replaced by the real agent route (S7a) |
