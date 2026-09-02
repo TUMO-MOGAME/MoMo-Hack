@@ -285,6 +285,15 @@ outbox, the MoMo emulator. The core of the submission.
 
 Exit criterion: the ledger always balances, under concurrency, with property tests to prove it.
 
+**Exit criterion MET, 2026-09-02** — measured against real Postgres, not asserted: two connections
+racing the same account produced one committed spend, one refusal, a global ledger sum of exactly
+zero, and a credit-normal wallet that never went positive. Property tests had covered the pure
+logic; only a real database could show the `DEFERRABLE` triggers actually firing.
+
+**Phase 3 is not closed**, because it still owes its six audits (A1 A2 A3 A4 A5 A6) and none has
+been run. Escrow (M4a), disbursements (M3a) and the outbox drain (M3b) are also still unbuilt —
+they belong to this phase's scope even though the exit criterion is about the ledger.
+
 ### Phase 4 — Channels and products
 
 Days 14-19. Telegram bot, the conversational agent and its artifacts, taxi fare and split,

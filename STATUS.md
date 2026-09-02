@@ -3,13 +3,17 @@
 **This file is the single source of truth for "where are we".**
 Every PR must update it. If you are a fresh session, read this before touching anything.
 
-- **Last updated:** 2026-09-02 (planning session)
-- **Phase:** Day 1 — planning complete, repo live, build not started
-- **Days to code freeze (27 Sep 2026):** 25
+- **Last updated:** 2026-09-02 (session 2 close)
+- **Phase:** Phase 3 — money engine. **Exit criterion met**; its six audits are still owed.
 - **Local path:** `C:\MoMo-Hack`
-- **Repo:** <https://github.com/TUMO-MOGAME/MoMo-Hack> — **public**, `main` **protected** (verified)
-- **Tree state:** documentation only, no application code yet
-- **Blocked on:** deadline confirmation (Q1), the frontend template Tumo is providing
+- **Repo:** <https://github.com/TUMO-MOGAME/MoMo-Hack> — **public**, `main` **protected**, and as of
+  this session **8 required status checks with `strict` on**, so a branch must be up to date with
+  `main` before it merges.
+- **Deployed:** <https://mo-mo-hack.vercel.app> — live and public. Production deploys on every
+  merge, previews on every PR.
+- **Database:** live. 3 migrations applied to Supabase `edtduvwbejdfahkmfort` (`eu-west-2`).
+- **Tree state:** 360 tests green (23 files), 0 vulnerabilities, CI enforcing all of it.
+- **Blocked on:** nothing external. The next steps are work, not credentials.
 
 ---
 
@@ -22,7 +26,7 @@ Every PR must update it. If you are a fresh session, read this before touching a
 | **Audits owed at close** | Phase 3: A1 A2 A3 A4 A5 A6 — **none run yet** |
 | **Blocking findings** | none — the CI gate landed in #13 and all eight checks are green |
 | **Days to code freeze** | 25 (27 Sep 2026) |
-| **Open PRs** | #11 frontend shell + sidebar (this one). #10 and #13 merged. |
+| **Open PRs** | none. #10, #11, #13-#21 all merged. |
 
 ### The CI finding, kept because it changes how every merge before it was judged
 
@@ -60,16 +64,17 @@ an `esbuild` block is silently ignored under Vite 8). Two lessons worth keeping:
 
 ### The next three actions
 
-1. **`DATABASE_URL` — the one credential in the way.** Everything for F5 is built and green:
-   the migration runner, the `pg` binding, the bootstrap that finally calls `setMoneyDb`, and
-   35 integration and RLS tests. They **skip, announcing themselves**, until a connection string
-   exists. Supabase → Project Settings → Database → Connection string → **Session pooler** URI.
-   One line in `.env.local`, then `npm run db:migrate` and `npm run test:int`.
-2. **Vercel (F7).** Needed twice over: the walking skeleton's definition is *"a real
-   `requesttopay` from a **deployed** function"*, and the Telegram bot cannot work at all without
-   a public HTTPS URL — Telegram will not deliver to localhost. F9's secrets also need to reach
-   GitHub Secrets and Vercel, where nothing has been set yet.
-3. **Telegram handler (M5a).** `/api/telegram/webhook` does not exist. See the note below.
+1. **Set the environment variables on Vercel (F9).** The site is live and has **no
+   credentials** — `/api/health` says `database: unconfigured` and `momoMode: sandbox` (the
+   default, because `MOMO_MODE` is unset). Needed there: the 5 MoMo values, `CRON_SECRET`,
+   `DATABASE_URL`, and the 3 Supabase values. **Nothing else can be joined end to end until this
+   is done**, because the deployed function is the only thing MTN can call back.
+2. **Close the walking skeleton (Phase 0).** With step 1 done, this is the last piece: a real
+   `requesttopay` from the deployed function, resolved by the reconciler, writing balanced ledger
+   rows. Demo MSISDN `46733123454` — the only number that exercises a real ~25s async resolution.
+   Every part exists and is tested; nothing has been joined.
+3. **Telegram handler (M5a).** `/api/telegram/webhook` does not exist. Now unblocked — the public
+   HTTPS URL it needs is live. See the note below.
 
 ### Why the Telegram bot does not reply
 
@@ -441,6 +446,33 @@ Deferring is legitimate; deferring silently is not.
 ---
 
 ## Session log
+
+### 2026-09-02 (session 3) — the database is real, and it immediately found a Critical
+
+**Merged #13-#21.** CI became an actual quality gate (9 checks), Prettier landed, the landing page
+got photography, the board was reconciled against the code, live MoMo spend was capped, and the
+database went from "written" to "running".
+
+**The finding of the session: `anon` could `TRUNCATE` the ledger.** RLS with no policies denies
+row operations; TRUNCATE is not a row operation. Supabase's default privileges had granted ALL
+privileges on every table in `public` to `anon` and `authenticated`. Found within minutes of the
+integration suite first reaching a real database, fixed in `0002`, verified closed.
+
+**Second finding: `wallet_balance` was `numeric`, not `bigint`** — `sum(bigint)` widens in
+Postgres. Nothing was rounded, but it broke the contract rule 1 promises.
+
+**Neither was findable by the static CI guards**, which grep migration *text*. A type the database
+infers and a privilege the platform grants are both invisible to a grep. That is the argument for
+integration tests in one sentence.
+
+**Phase 3's exit criterion is met**, measured rather than asserted: two connections racing one
+account, one spend committed, one refused, global ledger sum exactly 0.
+
+**Required status checks are on** — 8 of them, `strict`. It bit immediately and correctly: #21
+was refused because the frontend agent's #20 had moved `main` underneath it.
+
+**Still owed:** Vercel environment variables (nothing deployed has credentials), the walking
+skeleton join, and Phase 3's six audits — none run.
 
 ### 2026-09-02 (session 2) — money engine merged, and CI made real
 
