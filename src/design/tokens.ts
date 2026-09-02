@@ -1,5 +1,5 @@
 /**
- * src/design — THE single source of truth for Vula's design.
+ * src/design — THE single source of truth for MoMo Kasi's design.
  *
  * Architecture adopted from the Social-Assembly design system (the reference
  * template): platform-agnostic tokens, plain data, no framework imports,

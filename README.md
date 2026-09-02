@@ -1,4 +1,4 @@
-# Vula
+# MoMo Kasi
 
 **The daily-money app for Mzansi.** Youth **earn** through micro-gigs, money **circulates** through
 stokvels and shared bills, and is **spent** on taxi fare, electricity and school fees — all on the
@@ -9,7 +9,7 @@ Built for the MTN MoMo API Hackathon, South Africa · 2026
 ---
 
 > MTN gave 11 million South Africans *access* to financial services.
-> **Vula turns access into daily participation.**
+> **MoMo Kasi turns access into daily participation.**
 
 ---
 
@@ -21,15 +21,15 @@ Built for the MTN MoMo API Hackathon, South Africa · 2026
 | **R90-100bn** | annual minibus taxi revenue, effectively all in cash |
 | **~11 million** | stokvel members across ~800,000 groups, moving **R50bn+** a year in cash and paper books |
 
-A wallet you open when you remember it is not financial inclusion. Vula targets **~16 transactions
+A wallet you open when you remember it is not financial inclusion. MoMo Kasi targets **~16 transactions
 per user per week** by digitising the three things township money already does every day.
 
 ## The loop
 
 ```
    EARN                 SHARE                    SPEND
-   Vula Gigs      ->    Vula Stokvel      ->     Vula Ride    (taxi fare, QR)
-   rank micro-work      split-a-bill             Vula Bills   (electricity, school fees, airtime)
+   Kasi Gigs      ->    Kasi Stokvel      ->     Kasi Ride    (taxi fare, QR)
+   rank micro-work      split-a-bill             Kasi Bills   (electricity, school fees, airtime)
    remittance in        family sub-wallet
       ^                                              |
       +----------- demand creates the next gig ------+

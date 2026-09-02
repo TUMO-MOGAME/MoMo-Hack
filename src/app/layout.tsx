@@ -7,7 +7,7 @@ const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin']
 const playfair = Playfair_Display({ variable: '--font-playfair', subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Vula — the daily-money app for Mzansi',
+  title: 'MoMo Kasi — the daily-money app for Mzansi',
   description:
     'Earn through micro-gigs, share through stokvels, spend on taxi fare, electricity and school fees. Built on the MTN MoMo API suite.',
 };

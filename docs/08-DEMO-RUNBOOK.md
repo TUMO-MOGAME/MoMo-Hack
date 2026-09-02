@@ -106,7 +106,7 @@ One slide. The container diagram from `docs/01`. Then:
 > double-pay. Two independent paths to resolution: the callback, and a reconciler that is the
 > authority. Five hundred concurrent fares in our load test, and the ledger still balances to zero.*
 >
-> *Zaka moved money that already existed. Vula creates income for people who have none, and gives
+> *Zaka moved money that already existed. MoMo Kasi creates income for people who have none, and gives
 > it somewhere to go — sixteen times a week."*
 
 Stop talking. Take questions.

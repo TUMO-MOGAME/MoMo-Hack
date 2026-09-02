@@ -102,10 +102,10 @@ POPIA's openness condition applies on every channel, including USSD — where yo
 characters**. Most implementations quietly skip this. We do not.
 
 ```
-CON Vula stores your number
+CON MoMo Kasi stores your number
 to send/receive money. We
 never sell your data.
-Full notice: vula.co.za/p
+Full notice: momokasi.co.za/p
 1. I agree  2. No thanks
 ```
 

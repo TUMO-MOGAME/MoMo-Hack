@@ -90,7 +90,7 @@ X-Reference-Id: <UUID v4 you generate — this becomes your apiUser>
 Ocp-Apim-Subscription-Key: <subscription key>
 Content-Type: application/json
 
-{ "providerCallbackHost": "vula.vercel.app" }
+{ "providerCallbackHost": "momo-kasi.vercel.app" }
 ```
 `201 Created`, empty body.
 
@@ -181,7 +181,7 @@ Content-Type: application/json
   "currency": "EUR",
   "externalId": "fare-8842",
   "payer": { "partyIdType": "MSISDN", "partyId": "46733123453" },
-  "payerMessage": "Vula taxi fare",
+  "payerMessage": "MoMo Kasi taxi fare",
   "payeeNote": "Rank 42 fare"
 }
 ```
@@ -207,7 +207,7 @@ Ocp-Apim-Subscription-Key: <collections key>
   "amount": "12.50",
   "currency": "EUR",
   "payer": { "partyIdType": "MSISDN", "partyId": "46733123453" },
-  "payerMessage": "Vula taxi fare",
+  "payerMessage": "MoMo Kasi taxi fare",
   "payeeNote": "Rank 42 fare",
   "status": "SUCCESSFUL"
 }
@@ -251,7 +251,7 @@ Transfer body mirrors `requesttopay`, with `payee` instead of `payer`:
   "currency": "EUR",
   "externalId": "payout-8842-owner",
   "payee": { "partyIdType": "MSISDN", "partyId": "46733123453" },
-  "payerMessage": "Vula fare split",
+  "payerMessage": "MoMo Kasi fare split",
   "payeeNote": "Owner share"
 }
 ```

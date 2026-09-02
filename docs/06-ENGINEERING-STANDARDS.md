@@ -10,7 +10,7 @@ Protection cannot be applied to a branch that does not exist, so there is exactl
 `main` that is not a PR — the first one.
 
 ```bash
-cd /c/Users/tumom/vula
+cd /c/Users/tumom/momo-kasi
 git add -A
 git commit -m "chore: project planning and documentation"
 
@@ -268,7 +268,7 @@ Rules:
   Enforced by an ESLint `no-restricted-imports` boundary rule.
 - Money is `bigint` everywhere. An ESLint rule bans `parseFloat`, `Number()` and `toFixed()` in any
   file under `src/domain/` or `src/server/`.
-- Errors are `VulaError` (`docs/01` §10), never bare `Error`.
+- Errors are `AppError` (`docs/01` §10), never bare `Error`.
 - Prettier, default config, no arguments about formatting.
 
 ---

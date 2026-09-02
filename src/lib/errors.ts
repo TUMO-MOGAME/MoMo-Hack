@@ -5,7 +5,7 @@
  * way to fail. Never throw a bare Error from application code.
  */
 
-export type VulaError =
+export type AppError =
   | { kind: 'VALIDATION'; field: string; message: string }
   | { kind: 'AUTHZ'; message: string }
   | { kind: 'NOT_FOUND'; resource: string }
@@ -14,14 +14,14 @@ export type VulaError =
   | { kind: 'UPSTREAM'; provider: 'momo' | 'telegram' | 'groq' | 'elevenlabs'; retryable: boolean; status?: number }
   | { kind: 'INTERNAL'; cause: unknown };
 
-export class VulaException extends Error {
-  constructor(readonly error: VulaError) {
+export class AppException extends Error {
+  constructor(readonly error: AppError) {
     super(describe(error));
-    this.name = 'VulaException';
+    this.name = 'AppException';
   }
 }
 
-export function describe(e: VulaError): string {
+export function describe(e: AppError): string {
   switch (e.kind) {
     case 'VALIDATION':
       return `${e.field}: ${e.message}`;
@@ -41,7 +41,7 @@ export function describe(e: VulaError): string {
 }
 
 /** HTTP status for an error. Keeps route handlers free of mapping logic. */
-export function httpStatus(e: VulaError): number {
+export function httpStatus(e: AppError): number {
   switch (e.kind) {
     case 'VALIDATION':
       return 400;
@@ -64,7 +64,7 @@ export function httpStatus(e: VulaError): number {
  * Safe for a user to read. Never leaks a key, a token, or a full MSISDN —
  * POPIA s105/106 (docs/14 §5).
  */
-export function userMessage(e: VulaError): string {
+export function userMessage(e: AppError): string {
   switch (e.kind) {
     case 'VALIDATION':
       return e.message;
@@ -83,6 +83,6 @@ export function userMessage(e: VulaError): string {
   }
 }
 
-export const fail = (error: VulaError): never => {
-  throw new VulaException(error);
+export const fail = (error: AppError): never => {
+  throw new AppException(error);
 };

@@ -1,5 +1,5 @@
 {
-  "name": "vula",
+  "name": "momo-kasi",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -8,7 +8,12 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "verify": "npm run typecheck && npm run lint && npm run build"
+    "verify": "npm run typecheck && npm run lint && npm run build",
+    "audit:status": "node scripts/audit.mjs status",
+    "audit:plan": "node scripts/audit.mjs plan --tier gate",
+    "audit:brief": "node scripts/audit.mjs brief",
+    "audit:check": "node scripts/audit.mjs check",
+    "audit:gate": "node scripts/audit.mjs gate"
   },
   "dependencies": {
     "next": "15.1.6",

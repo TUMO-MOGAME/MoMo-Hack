@@ -5,7 +5,7 @@
 MTN does not have a distribution problem in South Africa. It has a **frequency** problem.
 
 MoMo has access. What it does not yet have is a reason for a person in Tembisa to open it on a
-Tuesday morning. Every feature in Vula is chosen to answer one question: *what makes someone use
+Tuesday morning. Every feature in MoMo Kasi is chosen to answer one question: *what makes someone use
 this again tomorrow?*
 
 The answer, in South Africa, is not a better wallet UI. It is the three money behaviours that
@@ -66,12 +66,12 @@ the pitch.
 
 **NEET** — Not in Employment, Education or Training — is the sharper number. Unemployment counts
 people still *looking*. NEET counts people who have disengaged entirely. Nearly half of South
-Africans aged 15-34 are in that category, and it is the demographic Vula Gigs is built for: they do
+Africans aged 15-34 are in that category, and it is the demographic Kasi Gigs is built for: they do
 not need a better CV, they need a first transaction.
 
 Two of every five young South Africans in the labour force cannot find work, while a
 R90bn transport industry and 800,000 savings groups run on cash that nobody can see.
-Vula sits in the middle of those two facts.
+MoMo Kasi sits in the middle of those two facts.
 
 ---
 
@@ -81,26 +81,26 @@ Vula sits in the middle of those two facts.
 Matric, no formal job, has a smartphone with 500MB of data and a MoMo wallet she uses twice a
 month. She washes taxis at the rank on good days and gets paid in cash, sometimes.
 **What she needs:** to be paid the day she works, without arguing, and proof she did the work.
-**What Vula gives her:** an escrowed job with a photo-verified release, straight to her MoMo
+**What MoMo Kasi gives her:** an escrowed job with a photo-verified release, straight to her MoMo
 wallet, plus a growing Trust Score that gets her a leased pressure washer.
 
 ### Thabo, 41, taxi owner, 3 vehicles
 Trusts his drivers about as far as he can count the cash they hand over. Buys tyres from a
 Mashonisa at 30% a month because no bank will score him.
 **What he needs:** to see his revenue without being at the rank, and to borrow at a sane rate.
-**What Vula gives him:** automatic 60/25/10/5 splitting at the moment of collection, a fuel and
+**What MoMo Kasi gives him:** automatic 60/25/10/5 splitting at the moment of collection, a fuel and
 parts pool that fills itself, and a verifiable transaction history that *is* a credit file.
 
 ### MaDlamini, 52, Soweto — the connector
 Runs a 12-member grocery stokvel. Collects R300 a week from each member, in cash, in a book.
 **What she needs:** to stop carrying R3,600 in a handbag and to stop chasing three people every week.
-**What Vula gives her:** a group pool with automated collection, a visible balance every member can
+**What MoMo Kasi gives her:** a group pool with automated collection, a visible balance every member can
 see, and an automatic rotating payout. She is our distribution: she brings 11 users with her.
 
 ### Sipho, 33, London — the diaspora funder
 Sends money home monthly and suspects some of it does not reach the school.
 **What he needs:** to fund a *purpose*, not a person.
-**What Vula gives him:** a purpose-locked sub-wallet via the Remittances API. His R2,000 can pay
+**What MoMo Kasi gives him:** a purpose-locked sub-wallet via the Remittances API. His R2,000 can pay
 school fees and nothing else.
 
 ---
@@ -109,14 +109,14 @@ school fees and nothing else.
 
 | Module | What it does | MoMo API |
 |---|---|---|
-| **Vula Ride** | QR/NFC taxi fare, automatic revenue split at source, driver float, offline capture | Collections + Disbursements |
-| **Vula Gigs** | Micro-work marketplace with milestone escrow, photo proof, Trust Score | Collections + Disbursements |
-| **Vula Stokvel** | Group pools, scheduled contributions, rotating payouts, shared visibility | Collections + Disbursements |
-| **Vula Bills** | Prepaid electricity, school fees, airtime and data, split-a-bill | Collections |
-| **Vula Home** | Purpose-locked family sub-wallet funded from the diaspora | Remittances |
+| **Kasi Ride** | QR/NFC taxi fare, automatic revenue split at source, driver float, offline capture | Collections + Disbursements |
+| **Kasi Gigs** | Micro-work marketplace with milestone escrow, photo proof, Trust Score | Collections + Disbursements |
+| **Kasi Stokvel** | Group pools, scheduled contributions, rotating payouts, shared visibility | Collections + Disbursements |
+| **Kasi Bills** | Prepaid electricity, school fees, airtime and data, split-a-bill | Collections |
+| **Kasi Home** | Purpose-locked family sub-wallet funded from the diaspora | Remittances |
 
 The modules are not four apps. They share one ledger, one identity, one wallet. A fare paid in
-Vula Ride is spendable in Vula Bills within the same second, because both are postings against the
+Kasi Ride is spendable in Kasi Bills within the same second, because both are postings against the
 same account.
 
 ---
@@ -126,7 +126,7 @@ same account.
 Zaka won the 2023 MTN MoMo API Hackathon with cash-flow financing for informal merchants: instant
 access to POS revenue. Good product, one API pipeline, one side of a market that already had money.
 
-| Judging criterion | Zaka | Vula |
+| Judging criterion | Zaka | MoMo Kasi |
 |---|---|---|
 | **Beyond payments** | Cash-flow factoring on existing merchant revenue | Escrow, group savings, purpose-locked remittance, alternative credit scoring, micro-insurance pool — all on one ledger |
 | **Financial inclusion** | Formalises money informal merchants already earn | Creates income for 5M unemployed youth who currently earn nothing, and digitises R50bn of stokvel money that never touched a bank |
@@ -134,7 +134,7 @@ access to POS revenue. Good product, one API pipeline, one side of a market that
 | **Technical complexity** | One API pipeline | Three MoMo APIs orchestrated over a double-entry ledger, async state machines, idempotent webhook handling, reconciliation, offline queue, USSD fallback |
 | **Design** | Polished merchant app | Telegram bot for zero-data users, PWA for smartphones, USSD for feature phones — the same ledger behind all three |
 
-The honest one-line version: **Zaka moved existing money faster. Vula creates money that does not
+The honest one-line version: **Zaka moved existing money faster. MoMo Kasi creates money that does not
 exist yet, and gives it somewhere to go.**
 
 ---

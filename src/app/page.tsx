@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * The Vula shell: a conversation that grows a dashboard (docs/13).
+ * The MoMo Kasi shell: a conversation that grows a dashboard (docs/13).
  *
  * Pattern taken from the Social-Assembly reference: the chat holds a compact,
  * clickable CHIP; the full artifact lives beside it (desktop) or in a bottom
@@ -26,7 +26,7 @@ interface Message {
 const GREETING: Message = {
   id: 'm0',
   role: 'agent',
-  text: "Sawubona. I'm Vula. Ask me about your money, find work near you, or check the stokvel.",
+  text: "Sawubona. I'm MoMo Kasi. Ask me about your money, find work near you, or check the stokvel.",
 };
 
 export default function Page() {
@@ -70,7 +70,7 @@ export default function Page() {
       <section className="flex min-h-0 flex-1 flex-col lg:max-w-[520px] lg:border-r lg:border-border">
         <header className="flex items-center justify-between border-b border-border px-5 py-4">
           <div className="flex items-baseline gap-2">
-            <span className="font-display text-2xl text-brand">Vula</span>
+            <span className="font-display text-2xl text-brand">MoMo Kasi</span>
             <span className="text-xs text-muted-foreground">daily money for Mzansi</span>
           </div>
           <span className="rounded-full border border-border px-2 py-0.5 text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -97,7 +97,7 @@ export default function Page() {
           )}
 
           {thinking ? (
-            <div className="flex items-center gap-1.5" aria-label="Vula is thinking">
+            <div className="flex items-center gap-1.5" aria-label="MoMo Kasi is thinking">
               {[0, 1, 2].map((i) => (
                 <span
                   key={i}
@@ -136,8 +136,8 @@ export default function Page() {
             <input
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask Vula anything about your money…"
-              aria-label="Message Vula"
+              placeholder="Ask MoMo Kasi anything about your money…"
+              aria-label="Message MoMo Kasi"
               className="min-w-0 flex-1 rounded-lg border border-input bg-card px-4 py-3 text-[15px] text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-brand/60"
             />
             <button
@@ -250,7 +250,7 @@ function EmptyPanel() {
   return (
     <div className="grid h-full place-items-center px-8">
       <div className="max-w-sm text-center">
-        <div className="font-display text-3xl text-muted-foreground/40">Vula</div>
+        <div className="font-display text-3xl text-muted-foreground/40">MoMo Kasi</div>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
           Ask a question and the answer opens here — your wallet, a fare split, the stokvel, work
           near you. Everything stays in the conversation, so you can scroll back and reopen it.

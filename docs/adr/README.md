@@ -6,7 +6,7 @@ stays, marked superseded. The reasoning trail is part of what a technical judge 
 | # | Decision | Status |
 |---|---|---|
 | [0001](0001-single-nextjs-monolith.md) | Single Next.js + TypeScript monolith | Accepted |
-| [0002](0002-product-name-and-scope.md) | Product name **Vula**, four modules, one wallet | Accepted |
+| [0002](0002-product-name-and-scope.md) | Product name **MoMo Kasi**, four modules, one wallet | Accepted |
 | [0003](0003-double-entry-ledger.md) | Double-entry ledger as the source of truth | Accepted |
 | [0004](0004-integer-money.md) | Money as `bigint` minor units; integer basis-point splits | Accepted |
 | [0005](0005-public-repository.md) | Public repository | Accepted |
@@ -19,5 +19,7 @@ stays, marked superseded. The reasoning trail is part of what a technical judge 
 | [0012](0012-groq-as-agent-llm.md) | Groq as the agent LLM | Accepted |
 | [0013](0013-typed-artifact-schema.md) | The agent emits typed data, never markup | Accepted |
 | [0014](0014-agent-cannot-move-money.md) | The agent cannot move money | Accepted |
+| [0015](0015-popia-by-design.md) | POPIA compliance by design | Accepted |
+| [0016](0016-shared-audit-suite.md) | Phase gates run the shared audit suite | Accepted |
 
 Template in `docs/06-ENGINEERING-STANDARDS.md` §10.

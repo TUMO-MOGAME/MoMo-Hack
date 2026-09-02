@@ -17,7 +17,7 @@ Verified against ElevenLabs' language documentation on 2026-09-02:
 Separately, the ElevenLabs free tier is 10,000 credits/month (~15 minutes of conversational agent
 time), carries no commercial rights, and watermarks output. Three demo rehearsals would exhaust it.
 
-Lelapa AI's **Vulavula** — a South African company — does support isiZulu, Afrikaans, Sesotho and
+Lelapa AI's **MoMo Kasivula** — a South African company — does support isiZulu, Afrikaans, Sesotho and
 English, but has **no free tier** ($9.99/month minimum).
 
 ## Options
@@ -28,7 +28,7 @@ for Africans*. Rejected on quality and on principle.
 
 **B. English only.** Safe, and abandons the language goal entirely.
 
-**C. Pay for Lelapa AI Vulavula.** The right long-term partner, and it breaks the R0 constraint.
+**C. Pay for Lelapa AI MoMo Kasivula.** The right long-term partner, and it breaks the R0 constraint.
 
 **D. Provider-per-language, with a pre-generated phrase bank.**
 
