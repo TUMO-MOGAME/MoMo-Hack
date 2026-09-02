@@ -13,7 +13,7 @@ Every PR must update it. If you are a fresh session, read this before touching a
   `mo-mo-hack.vercel.app` alias still serves the same deployment. Production deploys on every
   merge, previews on every PR.
 - **Database:** live. 3 migrations applied to Supabase `edtduvwbejdfahkmfort` (`eu-west-2`).
-- **Tree state:** 363 green + 2 skipped over 24 files, 0 vulnerabilities, CI enforcing all of it.
+- **Tree state:** 390 green + 2 skipped over 25 files, 0 vulnerabilities, CI enforcing all of it.
   Both skips are opt-in and announce themselves: the walking skeleton (`MOMO_SKELETON=1`) and the
   write-skew case (`allowWrites`). Both commit permanent rows, so neither runs by accident.
 - **Blocked on:** nothing external. **F9 is done** and **the walking skeleton is closed** — a real
@@ -252,23 +252,33 @@ Why nothing caught it earlier:
 calls `getMoneyDb` without `ensureMoneyDb`. **Proved the guard fires**: commenting the call out
 makes it fail with `expected [ 'app/api/cron/reconcile/route.ts' ] to deeply equal []`.
 
-### Why the Telegram bot does not reply
+### The Telegram bot now replies
 
-Diagnosed 2026-09-02 against the live bot. **The bot is fine; nothing is listening.** Three
-separate things are missing, and all three are needed:
+Built and **verified end to end against the live bot** on 2026-09-02. The three blockers in the
+previous version of this section are down to one, and it is a BotFather setting rather than code:
 
 | | State |
 |---|---|
 | Bot itself | ✅ `@momokasi_demo_bot` live, `getMe` 200 |
-| **Webhook URL** | ❌ **none set.** Telegram has **1 update queued** — that is the message that was sent. |
-| **Handler route** | ❌ `/api/telegram/webhook` **does not exist.** M5a is not built; the only routes are `health`, `cron/reconcile` and `momo/callback`. |
-| **Public HTTPS URL** | ❌ Telegram will not deliver to `localhost`. Needs F7 (Vercel). |
+| **Handler route** | ✅ `/api/telegram/webhook` built (M5a). Secret-verified, `update_id`-deduplicated. |
+| **Agent** | ✅ Replies through Gemini `gemini-3.6-flash`, persona from `docs/12` §4.2. |
+| **Public HTTPS URL** | ✅ F7 landed. **`https://momo.tumoolo.tech`** is the delivery target — the custom domain is now canonical, and it is what `MOMO_CALLBACK_HOST` and the MoMo API user are bound to. `mo-mo-hack.vercel.app` still serves the same deployment. |
+| **Webhook URL** | ⏳ set with `npm run telegram:setup -- <url>` once the secrets are on Vercel. |
+| **Group message reads** | ❌ `/setprivacy` → **Disable** in @BotFather. Split-a-bill needs to see who replied. |
 
-So a sent message is being queued by Telegram with nowhere to go. Nothing is broken — this part
-of the product has not been written yet. It is Phase 4, and it is gated on F7.
+**Proved locally before any deploy.** `scripts/telegram-dev-bridge.mjs` long-polls `getUpdates` and
+POSTs each update into the local route exactly as Telegram would, secret header and all — so the
+whole path is exercised with no tunnel and no deployment. Only the inbound delivery is simulated;
+the route, handler, model call and outbound send are the deployed ones. Measured against the real
+bot: `/start` **0.75s** (no model call), an agent turn **5.5s**, a duplicate `update_id` **8ms** and
+no second reply, a wrong secret **401**.
 
-One thing to change while it is queued: `/setprivacy` → **Disable** in @BotFather. Split-a-bill
-needs to see who replied in a group, and the bot currently cannot read group messages.
+**Two limits worth knowing before the demo.** An agent turn at 5.5s has ~4.5s of headroom under
+Vercel's 10s Hobby ceiling, so a slow Gemini response is the most likely way this fails live — the
+handler already degrades to a friendly fallback rather than silence. And de-duplication plus
+conversation history are **per-instance and in-memory**: they hold across a warm function, not
+across a cold start. Nothing here writes to the ledger, so the worst case is a repeated reply or a
+forgotten sentence, never a repeated payment. Both become exact when the outbox lands (M5c).
 
 ### CRITICAL, found and fixed the first time the tests met a real database
 
@@ -453,9 +463,9 @@ is the honest one, and it is why the percentage in §Progress counts both ways.
 
 | ID | Item | State | Tests | Required tests | PR | Notes |
 |---|---|---|---|---|---|---|
-| M5a | Telegram webhook + secret verification | `[ ]` | none | +int | — | ADR-0007 |
-| M5b | Bot conversation state machine | `[ ]` | none | +prop | — | |
-| M5c | Bot flows: pay, earn, stokvel, balance | `[ ]` | none | +e2e | — | |
+| M5a | Telegram webhook + secret verification | `[~]` | **contract (27)** | +int | #24 | Built and verified against the live bot. Constant-time secret compare, `update_id` de-duplication, `200` on every path except a bad secret (`401`). `[~]` not `[x]` because the required level is `+int` and de-duplication is in-memory, not a table. |
+| M5b | Bot conversation state machine | `[~]` | contract | +prop | #24 | Short per-chat history (8 turns, 30 min), reset by `/start`. **In-memory, so it survives a warm function and not a cold start.** Not a state machine yet — there are no flows to hold state for until M5c. |
+| M5c | Bot flows: pay, earn, stokvel, balance | `[ ]` | none | +e2e | — | The agent explains all four; it cannot execute any of them. Needs the read tools (S7a) and the outbox. |
 | M9a | Web shell + auth | `[~]` | unit | +e2e | #11 | Shell, landing page, chat surface and context sidebar shipped and serving 200. **There is no auth of any kind** — no sign-in, no session, no `auth.uid()`, so the one RLS policy we wrote cannot yet be exercised. |
 | M9b | Commuter view | `[ ]` | none | +e2e | — | |
 | M9c | Worker view | `[ ]` | none | +e2e | — | |
@@ -562,6 +572,8 @@ Format: one line per merged workstream, with the evidence.
 | 2026-09-02 | **✅ WALKING SKELETON — Phase 0 closed** | **integration, live** | A real `requesttopay` to MTN's sandbox (R1.00, MSISDN `46733123454`), resolved through the **deployed** function, writing a balanced journal. Measured: `SUCCESSFUL`, `journal d6df990b`, `MOMO_SETTLEMENT +100` / `SUSPENSE -100`, sum `0`, **initiate → resolved 66.4s**. Global ledger sum `0` over 8 rows. Driven by `tests/integration/walking-skeleton.test.ts`, opt-in behind `MOMO_SKELETON=1` because it cannot roll back. |
 | 2026-09-02 | **CRITICAL — the ledger worked exactly once** | **integration + regression** | `ensureAccount`'s `on conflict` fallback passed 6 params to SQL referencing 5 → `could not determine data type of parameter $5`. That branch runs only when the account already **exists**, so the first journal against any account succeeded and every later one threw. Found on the second real collection. Missed by 361 tests because every integration test rolls back and so had never seen a committed account. Fixed; two idempotency tests added and **proved to fire** against the reintroduced bug. Second collection then resolved: `journal a7cc179a`. M9 in `MISTAKES.md`. |
 | 2026-09-02 | **HIGH — MoMo callback host is bound at provisioning** | **integration, controlled experiment** | A mismatched `X-Callback-Url` returns **`500 INVALID_CALLBACK_URL_HOST`** and creates no payment — `momoAPIs.md` §4.1 had guessed "silently dropped". Proved by inversion: bound to host A, sending B is 500 and A is 202; after re-provisioning against B the results flip exactly; no callback URL is 202 either way. `GET /v1_0/apiuser/{id}` confirmed both bindings. The project had been provisioned against `momo-kasi.vercel.app`, **which 404s**, so the callback path had never worked. API user re-provisioned as `28b81c8c…` against `momo.tumoolo.tech`. §4.1 and §4.3 promoted `[P]` → `[V]`. |
+| 2026-09-02 | **Telegram bot replies** (#24) | contract + **live end-to-end** | 27 contract tests, and the real bot answering from a local server via `scripts/telegram-dev-bridge.mjs`. Measured, not assumed: `/start` **0.75s** canned with no model call, an agent turn **5.5s**, a repeated `update_id` **8ms** with no second reply, a wrong or absent secret **401**. Suite **387 passed, 1 skipped** — higher than the usual 331/29 because `DATABASE_URL` was present locally, so the integration and RLS tests ran instead of skipping, and passed. |
+| 2026-09-02 | Agent LLM provider | **integration** | `GROQ_API_KEY` is present in `.env.local` and **empty**, so ADR-0012's primary cannot serve a request. Fell back to Gemini (A11 in `docs/11`, already sanctioned). Model chosen by querying the live API, not from memory: `gemini-2.5-flash` **404s for new keys** and Google's own error names `gemini-3.6-flash` as the replacement. 3.6-flash is a thinking model that spends the output budget on reasoning and returns a truncated sentence until `thinkingLevel: 'low'` is set. |
 
 ---
 

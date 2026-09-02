@@ -13,7 +13,9 @@ export type AppError =
   | { kind: 'INSUFFICIENT'; available: bigint; required: bigint }
   | {
       kind: 'UPSTREAM';
-      provider: 'momo' | 'telegram' | 'groq' | 'elevenlabs';
+      // `gemini` is A11 in docs/11 — ADR-0012's documented fallback, and the
+      // only LLM that can serve a request while GROQ_API_KEY is empty.
+      provider: 'momo' | 'telegram' | 'groq' | 'gemini' | 'elevenlabs';
       retryable: boolean;
       status?: number;
     }
