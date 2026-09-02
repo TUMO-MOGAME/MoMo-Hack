@@ -76,20 +76,61 @@ if (meta.headRefOid !== remoteSha) {
 }
 console.log(`  ${g('✓')} head matches origin  ${d(remoteSha.slice(0, 8))}`);
 
-// If the branch exists locally too, it must agree — otherwise we have unpushed work.
-try {
-  const localSha = probe('git', ['rev-parse', branch]);
-  if (localSha !== remoteSha) {
-    die(
-      `M1 GUARD: local ${branch} differs from origin/${branch}.\n` +
-        `    local   ${localSha}\n` +
-        `    origin  ${remoteSha}\n\n` +
-        '    You have unpushed commits. Push them first, or you will merge without them.',
-    );
+// If the branch exists locally too, check it has nothing origin lacks.
+//
+// ⚠️ ASK THE RIGHT QUESTION. This used to be `localSha !== remoteSha`, and it
+// failed with "You have unpushed commits" — a cause it had never checked. A
+// difference has two directions and only ONE of them is dangerous:
+//
+//   local AHEAD of origin   → real. Merging would drop work that exists only
+//                             on this machine. Refuse.
+//   local BEHIND origin     → harmless. Someone else advanced the branch and
+//                             this checkout has not pulled. There is nothing
+//                             unpushed; the PR head IS origin, and that is
+//                             what gets merged.
+//
+// The behind case is normal here: agents work in separate worktrees
+// (MISTAKES.md M4), so a branch checked out in one tree goes stale the moment
+// another tree pushes to it. Blocking on that stops a correct merge and — worse
+// — tells the operator to "push first", which in a shared branch is how you
+// clobber someone else's work. A guard that misdiagnoses is worse than no guard,
+// because it is obeyed.
+const ancestor = (a, b) => {
+  try {
+    probe('git', ['merge-base', '--is-ancestor', a, b]);
+    return true;
+  } catch {
+    return false;
   }
-  console.log(`  ${g('✓')} local branch agrees`);
+};
+
+// Scoped tightly to the probe: `die` exits the process rather than throwing, so
+// a wider try would never catch it anyway — but a wider try WOULD swallow a
+// genuine failure of the checks below and report it as "no local copy".
+let localSha;
+try {
+  localSha = probe('git', ['rev-parse', branch]);
 } catch {
+  localSha = undefined;
+}
+
+if (localSha === undefined) {
   console.log(`  ${d('–')} no local copy of ${branch} ${d('(fine)')}`);
+} else if (localSha === remoteSha) {
+  console.log(`  ${g('✓')} local branch agrees`);
+} else if (ancestor(localSha, remoteSha)) {
+  const behind = probe('git', ['rev-list', '--count', `${localSha}..${remoteSha}`]);
+  console.log(
+    `  ${y('!')} local ${branch} is ${behind} behind origin ${d('(fine — merging origin)')}`,
+  );
+  console.log(`      ${d(`that checkout should: git merge --ff-only origin/${branch}`)}`);
+} else {
+  die(
+    `M1 GUARD: local ${branch} has commits origin does not.\n` +
+      `    local   ${localSha}\n` +
+      `    origin  ${remoteSha}\n\n` +
+      '    These are genuinely unpushed. Push them first, or you merge without them.',
+  );
 }
 
 // ── 3. Mergeability ──────────────────────────────────────────────────────────

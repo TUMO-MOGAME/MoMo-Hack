@@ -36,6 +36,22 @@ equals local `HEAD` before merging.
 **The guard.** `npm run pr:merge` (`scripts/safe-merge.mjs`) refuses to merge unless the SHAs match.
 Use it instead of `gh pr merge`.
 
+> **The guard was itself wrong, twice, and that is worth more than the original entry.**
+>
+> It once reported #10's *successful* merge as a failure. Then it blocked #24 with
+> *"You have unpushed commits. Push them first"* — a cause it had never checked. It compared
+> `local !== origin` and assumed the difference meant local was **ahead**. Local was three commits
+> **behind**: another worktree held that branch and had not pulled. There was nothing unpushed.
+>
+> A difference has two directions and only one is dangerous. It now asks
+> `git merge-base --is-ancestor local origin` and only refuses when local has commits origin
+> lacks; behind is reported and allowed.
+>
+> **The lesson: a guard that misdiagnoses is worse than no guard, because it is obeyed.** Its
+> advice here — "push first" — would, on a branch another agent owns, have clobbered their work
+> to fix a problem that did not exist. When a guard fires, verify its *reasoning*, not just its
+> verdict.
+
 ---
 
 ## M2 · A deleted branch was not deleted, and became a conflicting duplicate PR
