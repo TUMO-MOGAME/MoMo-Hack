@@ -31,7 +31,8 @@
     "test:int": "vitest run tests/integration",
     "demo": "node scripts/demo.mjs",
     "telegram:setup": "node scripts/telegram-setup.mjs",
-    "dev:telegram": "node scripts/telegram-dev-bridge.mjs"
+    "dev:telegram": "node scripts/telegram-dev-bridge.mjs",
+    "contrast": "node scripts/contrast.mjs"
   },
   "dependencies": {
     "next": "^15.5.25",

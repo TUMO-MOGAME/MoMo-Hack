@@ -5,8 +5,8 @@ Every PR must update it. If you are a fresh session, read this before touching a
 
 - **⏰ PRESENTATION: Thu 3 Sep 2026, 09:30.** Everything below is now read against that, not
   against the 27 Sep code freeze. See **§Tomorrow 09:30** for what is in and what is cut.
-- **Last updated:** 2026-09-02 (session 5 — the agent claimed a payment it had not made; see
-  **§The agent invented an action** and `MISTAKES.md` M10)
+- **Last updated:** 2026-09-02 (session 5 — the agent claimed a payment it had not made
+  (`MISTAKES.md` M10, fixed in #35), and **Phase 3's six audits ran**: 0 Critical, 13 High)
 - **Phase:** Phase 3 — money engine. **Exit criterion met**; its six audits are still owed.
 - **Local path:** `C:\MoMo-Hack`
 - **Repo:** <https://github.com/TUMO-MOGAME/MoMo-Hack> — **public**, `main` **protected**, and as of
@@ -30,12 +30,12 @@ Every PR must update it. If you are a fresh session, read this before touching a
 | | |
 |---|---|
 | **Current phase** | Phase 3 — Money engine |
-| **Phase state** | **Phase 0 closed** — walking skeleton proved end to end. Phase 3 exit criterion met; its six audits still owed. |
-| **Audits owed at close** | Phase 3: A1 A2 A3 A4 A5 A6 — **none run yet** |
-| **Blocking findings** | none — the CI gate landed in #13 and all eight checks are green |
+| **Phase state** | **Phase 0 closed.** Phase 3 exit criterion met and **all six audits now run** — the phase stays open because the gate says so. |
+| **Audits owed at close** | Phase 3: A1 A2 A3 A4 A5 A6 — **all six run 2026-09-02**, results in `docs/audits/results/`. A8 passes, 0 vulnerabilities. |
+| **Blocking findings** | **13 High, 0 Critical.** `npm run audit:gate` → *"Gate shut"*. Nineteen of the 22 High/Medium items are perimeter work — headers, auth, loading states, metadata. **Every money-integrity check passed.** |
 | **Next milestone** | **PRESENTATION Thu 3 Sep 09:30** — hours away, not days |
 | **Days to code freeze** | 25 (27 Sep 2026) |
-| **Open PRs** | none. #10, #11, #13-#21, #23, #24, #25 merged. |
+| **Open PRs** | none. #10, #11, #13-#21, #23-#25, #35 merged. |
 
 ### The CI finding, kept because it changes how every merge before it was judged
 
@@ -134,6 +134,47 @@ height: 100% }` (the *small* viewport) while the chat shell is `h-dvh` (the *dyn
 browser that retracts its toolbar those differ, and the difference is exactly the blank band. Now
 the message log's own `scrollTop` is set — which cannot touch an ancestor — and the shell carries
 `overflow-hidden`.
+
+### Phase 3's six audits ran, and they agree with each other about where the risk is
+
+**A1 A2 A3 A4 A5 A6, all six, results in [`docs/audits/results/`](docs/audits/results/).** A8
+passes with 0 vulnerabilities. **0 Critical · 13 High · 19 Medium · 15 Low.**
+
+The gate is **shut** — `npm run audit:gate` names all thirteen — so Phase 3 stays open. That is the
+system working as designed, not a setback: an audit suite that never blocks anything is decoration.
+
+**The finding that matters most is the shape, not any single row.** Six audits run independently
+converged on the same split:
+
+> **Every money-integrity check passed, structurally.** One ledger writer, enforced by a test that
+> reads the source tree. `claimTransition` is `SELECT … FOR UPDATE` + `WHERE prev.status = any(…)`,
+> so a read-then-write race cannot be written. `X-Reference-Id` is the persisted row id, so a retry
+> cannot double-pay. The split is integer-exact over 5,000+ generated cases. `ROUNDING` sits at
+> zero. **Twelve of thirteen Highs are in the perimeter** — headers, auth, loading states,
+> metadata, a missing favicon.
+>
+> The money cannot go wrong. The things standing in front of the money can, and they are the parts
+> with the least test coverage. M10, earlier the same day, is that sentence as a live incident.
+
+**Three findings are worth reading in full even if nothing is fixed tonight:**
+
+| | |
+|---|---|
+| **A5-02** — the outbound prompt is not scrubbed | The user's raw message goes to Gemini verbatim. `src/server/log.ts` has an excellent tested MSISDN scrubber; the model call never calls it. **This is not hypothetical — the M10 transcript contained a real SA mobile number and it was sent to Google.** POPIA s105/106. The fix is one import and two `.map()`s |
+| **A3-01 / A3-03** — measured contrast failures | Computed from the OKLCH tokens, not eyeballed. Text contrast is *excellent* (worst pairing 7.26:1 against a 4.5 requirement). But `--input` composites to **1.39:1** and `--border` to **1.27:1** against a 3:1 requirement, and the focus ring lands at **2.98:1** on cards. On a cracked screen in Highveld sun the composer has no visible edge |
+| **A2-01** — the token gate does not exist | `tokens.ts` instructs the reader to regenerate CSS with `npm run tokens`. **There is no such script.** `globals.css` is a second hand-maintained copy. Verified 60/60 roles agree *today*; nothing keeps them agreeing |
+
+**A correction worth keeping, because it nearly became a headline.** My first token-drift script
+reported **all 30 dark roles drifted** — a confident, specific, entirely false Critical. It had
+matched the *light* scale out of `tokens.ts` against the `.dark` CSS block. Re-extracting by line
+range gave zero drift. `MISTAKES.md` M5 says verify before reporting a fault; this is the second
+time in one session that rule paid for itself, and it is the argument for A2-01's generated gate
+over any hand-written checker, mine included.
+
+**What was honestly not measured**, rather than quietly counted as a pass: Core Web Vitals (no
+Lighthouse run), axe (never run, Q7 still owed), RLS under a real principal (needs M9a), a
+full-history secret scan, screen-reader verification, and anything on the actual target device.
+Each is listed in its own report with the reason.
 
 ### What we can already show, and it is more than it looks
 
@@ -417,13 +458,25 @@ so they cannot break the demo before it happens.
 
 ### The next three actions
 
-1. **Phase 3's six audits (A1 A2 A3 A4 A5 A6).** `npm run audit:plan`. None have been run, and
-   the phase cannot close without them (CLAUDE.md #13). This is now the front of the queue.
+**Superseded — the six audits are done.** What they found reorders the queue, and the top of it is
+now roughly two hours of work with a disproportionate return before 09:30:
+
+1. **The seven cheap Highs, in this order.** None is a redesign; several are one line.
+   - **A5-02** — apply the existing `scrub()` to the outbound Gemini prompt. One import, two
+     `.map()`s. It is a POPIA leak that has *already happened once*.
+   - **A3-03 / A3-01** — raise `--ring` to ~50% and `--input` to ~38%. Two values, and they close
+     three WCAG failures measured at 2.98:1, 1.39:1 and 1.27:1.
+   - **A6-02 / A6-01** — a favicon and Open Graph tags. Right now the tab is blank and every link
+     shared into WhatsApp is a bare grey URL.
+   - **A4-01** — `loading.tsx` for `/ledger`, using the `ChipSkeleton` that already exists. That
+     route measures **722–1432 ms** and currently looks frozen.
+   - **A3-02** — one `<h1>` on `/chat`, which has none at all.
+   - **A5-01** — four header lines in `next.config.ts` (`nosniff`, `Referrer-Policy`,
+     `frame-ancestors`, `Permissions-Policy`). CSP can follow report-only.
 2. **The scheduler (F8).** The reconciler works in production but **nothing calls it on a
-   timer** — every tick so far has been a human with `curl`. Until the GitHub Actions cron exists,
-   a transaction resolves only when someone pokes it. ADR-0006.
+   timer** — every tick so far has been a human with `curl`. ADR-0006.
 3. **Disbursements (M3a).** Nothing pays anybody out yet. Money can come in and stop; it cannot
-   leave. That is the other half of every product surface.
+   leave. It is also what lets the agent stop refusing every payment request (see M10).
 
 ### ✅ THE WALKING SKELETON IS CLOSED (Phase 0)
 
@@ -786,7 +839,7 @@ written up. Only the audits listed are run at that phase — see `PLANNING.md` �
 | 0 | Foundation and walking skeleton | **DONE.** Skeleton closed — real requesttopay → deployed function → balanced journal, measured | 1-3 | A1 A8 ⚪ |
 | 1 | Design system and app shell | built, in PR #11 | 4-5 | A1 A2 A3 ⚪ |
 | 2 | Narrative and content surfaces | landing page built, in PR #11 | 6 | A1 A6 ⚪ |
-| 3 | Money engine | **in progress** — ledger/client/state machine merged (#10); no integration tests yet | 7-13 | A1 A2 A3 A4 A5 A6 ⚪ |
+| 3 | Money engine | exit criterion met; **all six audits run** ✅ — 13 Highs open, so the gate holds the phase open | 7-13 | A1 A2 A3 A4 A5 A6 ✅ |
 | 4 | Channels and products | not started | 14-19 | A1 A2 A3 A4 A5 A8 ⚪ |
 | 5 | Reach — offline, USSD, voice | not started | 20-23 | A1 A2 A3 A4 A7 ⚪ |
 | 6 | Hardening, demo and submission | not started | 24-28 | A1 A3 A4 A5 A6 A7 A8 S1 ⚪ |
@@ -1010,7 +1063,17 @@ finding is never re-reported as new. **An audit not written here did not happen.
 
 | Phase | Audit | Crit | High | Med | Low | Status | Date |
 |---|---|---|---|---|---|---|---|
-| — | — | — | — | — | — | nothing run yet | — |
+| 3 | A1 Comprehensive codebase | 0 | 2 | 5 | 4 | run · [`PHASE-3-A1.md`](docs/audits/results/PHASE-3-A1.md) | 2026-09-02 |
+| 3 | A2 Design fidelity | 0 | 1 | 1 | 3 | run · [`PHASE-3-A2.md`](docs/audits/results/PHASE-3-A2.md) | 2026-09-02 |
+| 3 | A3 Accessibility | 0 | 3 | 2 | 2 | run · [`PHASE-3-A3.md`](docs/audits/results/PHASE-3-A3.md) | 2026-09-02 |
+| 3 | A4 Performance & CWV | 0 | 1 | 3 | 2 | run · [`PHASE-3-A4.md`](docs/audits/results/PHASE-3-A4.md) | 2026-09-02 |
+| 3 | A5 Security | 0 | 4 | 4 | 2 | run · [`PHASE-3-A5.md`](docs/audits/results/PHASE-3-A5.md) | 2026-09-02 |
+| 3 | A6 SEO & content | 0 | 2 | 4 | 2 | run · [`PHASE-3-A6.md`](docs/audits/results/PHASE-3-A6.md) | 2026-09-02 |
+| 3 | A8 Dependency & supply chain | 0 | 0 | 0 | 0 | pass · `npm audit --audit-level=high`, 0 vulnerabilities | 2026-09-02 |
+
+**Totals: 0 Critical · 13 High · 19 Medium · 15 Low.** Nineteen of the 22 High/Medium items are
+in the *perimeter* — headers, auth, loading states, metadata. **Every money-integrity check
+passed**, structurally rather than by convention (A5 §3).
 
 ---
 
@@ -1019,9 +1082,25 @@ finding is never re-reported as new. **An audit not written here did not happen.
 Critical and High block the phase gate. `runner/audit.mjs gate` fails while any row here is
 unresolved — where resolved means fixed, or accepted with a written reason.
 
+**13 open Highs, 0 Criticals.** `audit:gate` fails while these stand, so **Phase 3 cannot be
+declared closed** — which is the gate working, not a setback. Ordered by value-per-minute, and the
+first six are collectively about two hours.
+
 | ID | Audit | Severity | Location | Summary | Status |
 |---|---|---|---|---|---|
-| — | — | — | — | — | — |
+| A5-02 | A5 | High | `src/server/agent/respond.ts` | The user's raw message goes to Gemini unscrubbed. POPIA s105/106 — a real MSISDN has **already** been sent (the M10 transcript). `scrub()` exists and is tested; it is simply not applied here | open |
+| A3-03 | A3 | High | `globals.css` `--ring` | Focus ring measured **2.98:1** on cards, **3.01:1** on the ground. SC 1.4.11 needs 3:1. One value | open |
+| A3-01 | A3 | High | `globals.css` `--border` / `--input` | Non-text contrast **1.27:1** and **1.39:1** against 3:1. The message composer's border is effectively invisible on the target device | open |
+| A6-02 | A6 | High | `public/`, `src/app/` | No favicon — `/favicon.ico` is **404**. Blank browser tab beside every other submission | open |
+| A6-01 | A6 | High | `src/app/layout.tsx` | No Open Graph or Twitter tags. Every shared link renders as a bare grey URL in WhatsApp, Slack and LinkedIn | open |
+| A4-01 | A4 | High | `src/app/(app)/ledger/` | No `loading.tsx` on a route with a measured **722–1432 ms** TTFB. The page looks frozen; `ChipSkeleton` already exists | open |
+| A3-02 | A3 | High | `src/app/(app)/chat/page.tsx` | `/chat` renders **zero** headings. No `h1` on the product's primary surface. Filed again as A6-05 (Medium), where it is an SEO problem — one `<h1>` closes both | open |
+| A1-02 | A1 | High | `src/app/**` | No `error.tsx` anywhere — a thrown Server Component renders Next's generic "Application error" | open |
+| A5-03 | A5 | High | `src/app/api/agent/route.ts` | Accepts cross-origin POSTs (verified: `Origin: evil.example` → 200). A third-party page can drain the Gemini quota through its visitors | open |
+| A5-01 | A5 | High | no `headers()` / `middleware` | **No security headers at all** — no CSP, `nosniff`, `Referrer-Policy` or `frame-ancestors`. The A5 overlay explicitly said to flag this if Phase 3 closed without a CSP | open |
+| A2-01 | A2 | High | `src/design/tokens.ts`, `package.json` | `tokens.ts` documents `npm run tokens` and **that script does not exist**. `globals.css` is a second hand-maintained copy. Verified 60/60 roles agree *today*; nothing keeps them agreeing | open |
+| A5-04 | A5 | High | whole app | **No authentication.** Every RLS policy across 8 tables is therefore unexercised — design, not control. M9a | open · blocked on M9a |
+| A1-01 | A1 | High | `/api/agent`, `/api/context` | Same root cause as A5-04, from the architecture side: both money-reading endpoints answer any caller and the read tools are scoped to no user | open · blocked on M9a |
 
 ---
 
@@ -1032,7 +1111,14 @@ Deferring is legitimate; deferring silently is not.
 
 | ID | Audit | Severity | Summary | Why deferred | Due |
 |---|---|---|---|---|---|
-| — | — | — | — | — | — |
+| A5-04 / A1-01 | A5, A1 | High | No auth; 8 tables of RLS unexercised | M9a is a workstream, not a fix. Cut from the presentation on Day 1 for the same reason as WhatsApp — it cannot be done well in the window | Phase 4 |
+| A5-05 / A1-05 | A5, A1 | Medium | In-memory rate limiter, per serverless instance | A durable limiter needs a Postgres table or Upstash; Upstash is out on free-tier grounds. Acceptable while the only cost is our own quota | Phase 6 |
+| A1-06 | A1 | Medium | No zod runtime validation of artifacts (S7c) | Harmless while the server constructs every artifact. A hard blocker before any artifact is parsed from model output | Before the agent write path |
+| A5-08 | A5 | Medium | `history` is client-supplied and echoed into the prompt | Bounded today — no write tools exist, so the worst case is a wrong card. Must become server-held before `propose_*` ships | Before S7f |
+| A4-02 | A4 | Medium | Core Web Vitals never measured | One Lighthouse command, but the numbers change nothing before the demo and the bundle totals are already healthy | Phase 6 |
+| A5 §5 | A5 | Medium | POPIA retention purging does not exist | There is nothing to purge yet — no proof photos (M4b unbuilt), no stored request bodies. Reported as absent, not as passing | Phase 6 |
+| A3-04 | A3 | Medium | axe has never been run (Q7) | Cheap, and it needs a decision about whether to add `axe-core` as a dependency | Phase 6 |
+| A1-03 | A1 | Medium | Agent core tests part-paid — modelled path and read tools uncovered | 30 tests landed with the M10 fix; the rest needs a stubbed client | Phase 4 |
 
 ---
 
