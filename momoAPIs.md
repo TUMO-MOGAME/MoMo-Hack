@@ -315,11 +315,61 @@ Used for: diaspora funding of a purpose-locked family sub-wallet (S3).
 
 ---
 
-## 9a. MTN South Africa PRODUCTION cannot collect from a real wallet — **[V] MEASURED 2026-09-02**
+## 9a. `PAYER_NOT_FOUND` on production means the PAYER, not us — **[V] MEASURED 2026-09-02**
 
-**The production credentials authenticate, accept requests, and cannot reach a single real
-subscriber.** This corrects an optimistic reading recorded elsewhere in the project, which held
-that working production access made the portal's "Go Live" application unnecessary.
+**Our production merchant account is fully live. The payer's wallet is not an active MoMo account
+holder.** Those are very different problems and the first hour of diagnosis assumed the wrong one.
+
+### The two calls that settled it
+
+Both are read-only, both are free, and between them they separate every hypothesis:
+
+```
+GET /collection/v1_0/account/balance                     ← is OUR side live?
+GET /collection/v1_0/accountholder/msisdn/{n}/active     ← can MTN SEE that wallet?
+```
+
+Measured against `https://proxy.momoapi.mtn.com`, `X-Target-Environment: mtnsouthafrica`:
+
+| Call | Result |
+|---|---|
+| our collection account balance | **`200 {"availableBalance":"32.39","currency":"ZAR"}`** |
+| `accountholder/msisdn/27767221345/active` | `200 {"result": false}` |
+| `accountholder/msisdn/0767221345/active` | `200 {"result": false}` |
+| `accountholder/msisdn/27761346606/active` | `200 {"result": false}` |
+
+**Our account is provisioned, live, and holds a real ZAR balance.** The API user is not blocked —
+a blocked one returns `401`/`403`, and every call here returns `200`/`202`.
+
+**Sandbox, as the control:** the same `active` check returns `{"result": true}` for an arbitrary
+South African number, because the sandbox is a simulator that recognises anything. Useful to know
+before trusting a `true` there for anything.
+
+### What `PAYER_NOT_FOUND` therefore means
+
+Exactly what it says: MTN looked for a chargeable wallet at that MSISDN and did not find one. Not a
+format problem, not a credentials problem, not a Go Live problem. **A wallet can hold a balance and
+still not be an active account holder** — registration without completed FICA/RICA verification is
+the usual reason in South Africa, and money loaded as *airtime* is not in the MoMo wallet at all.
+
+**Diagnose in this order, before spending anything.** `active` is free, instant, and sends nothing
+to the payer's handset:
+
+1. `GET /collection/v1_0/account/balance` — if this fails, the problem is ours.
+2. `GET /collection/v1_0/accountholder/msisdn/{n}/active` — if `false`, stop. A `requesttopay` to
+   that number can only ever return `PAYER_NOT_FOUND`.
+3. Only then send a `requesttopay`.
+
+> **The correction worth keeping.** The first version of this section concluded that production
+> "cannot reach a single real subscriber" and blamed the Go Live business verification. That was
+> inference from a failure, not measurement — and one extra read-only call disproved it. When an
+> API tells you *which* thing it could not find, check that thing before theorising about a
+> different one.
+
+### The earlier attempts, for the record
+
+Before the `active` check existed, five `requesttopay` calls were sent across two real numbers and
+four MSISDN formats. Every one returned `202` and then `FAILED · PAYER_NOT_FOUND`:
 
 Measured against `https://proxy.momoapi.mtn.com`, `X-Target-Environment: mtnsouthafrica`, with a
 real MTN SA number belonging to a consenting person who had loaded R10 onto that exact wallet:
@@ -334,19 +384,20 @@ real MTN SA number belonging to a consenting person who had loaded R10 onto that
 A second real MTN SA number gave the same result. **Five attempts, two numbers, four formats, one
 answer.**
 
-**What this rules out, and it is worth being precise:** not the number (two of them), not the
-format (four of them), not the credentials (the token issues `200` and every request is accepted
-`202`), and not the callback binding (no `X-Callback-Url` was sent, which §4.1 measured as `202`
-under any binding — and it was).
+**What this ruled out:** the MSISDN format (four of them), and the callback binding — no
+`X-Callback-Url` was sent, which §4.1 measured as `202` under any binding, and it was.
 
-**What it leaves:** the API user is not provisioned to collect from live MTN South Africa
-subscribers. That is the **"Go Live" business-verification process**, measured in days, not an
-integration problem anyone can code around.
+**What it did NOT establish, though the first write-up claimed it did:** that our API user was
+unprovisioned. Four failures in a row make a provisioning story feel obvious, and it was wrong.
+The `active` check above took one call and showed our account live with a ZAR balance while all
+three payer numbers came back `false`.
 
-**The operational consequence.** `mtnsouthafrica` is not a demo path and cannot be made into one
-by trying harder on the night. Sandbox is the only environment in which money moves, and the
-honest claim about production is *"credentials are integrated and authenticating"* — which is
-true, verifiable in seconds, and stops well short of implying a payment has ever succeeded there.
+**The operational consequence.** `mtnsouthafrica` is not a demo path *tonight*, because no payer
+we can reach has an active wallet. That is a different and much more fixable problem than an
+unprovisioned merchant account: it needs the payer's MoMo registration completed, not a
+business-verification queue. Sandbox remains the environment where the demo runs, and the honest
+claim about production is *"our merchant account is live and authenticating against MTN South
+Africa"* — which is now stronger than the previous wording, and true.
 
 > **A `202` is not an acceptance of the payment.** It is an acceptance of the *request*, and this
 > is the second time in this file that a success-shaped response has meant less than it looked
