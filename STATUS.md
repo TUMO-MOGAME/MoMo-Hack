@@ -96,6 +96,14 @@ needs to see who replied in a group, and the bot currently cannot read group mes
   than one we do not. Not revisited — recreating the project after migrations land is expensive
   and the free tier allows exactly two.
 - **Q1 — submission deadline: dropped.** No longer tracked as a blocker.
+- **The live MoMo testing budget is about R10, total.** Now CLAUDE.md rule 15, and enforced
+  rather than remembered. `src/lib/momo/budget.ts` caps any amount bound for a non-sandbox
+  environment at **R1.00 per transaction** (`MOMO_LIVE_MAX_MINOR`), checked inside
+  `toMomoAmount` — the single chokepoint every outbound MoMo request passes through, so there is
+  no path that skips it. Sandbox is uncapped; sandbox money is not real. `scripts/momo-smoke.mjs`
+  additionally refuses to run against a live environment without `MOMO_ALLOW_LIVE=1`, and drops
+  its amounts to R0.10 when it does. **That one script sends eight payments — R85 at the sandbox
+  amounts, or eight times the entire budget.**
 
 ---
 
@@ -307,6 +315,7 @@ Format: one line per merged workstream, with the evidence.
 | 2026-09-02 | Required status checks on `main` | **verified** | 8 checks now required — Lockfile, Typecheck, Lint, Format, Tests, Build, Money guards, A8 — with **`strict` on**, so a branch must be up to date with `main` before it merges. Read back from the API, not assumed. That last setting is what would have caught the #10 + #11 interaction *before* the merge instead of after. |
 | 2026-09-02 | Telegram bot | **integration** | Re-checked live. Bot healthy; **no webhook set and 1 update queued**; `/api/telegram/webhook` does not exist (M5a). A sent message has nowhere to go. Not a fault — unbuilt, and gated on F7. |
 | 2026-09-02 | DB wiring (#17) | unit + skip-verified | `pg` bound, bootstrap calls `setMoneyDb`, migration runner with checksum enforcement. **35 integration + RLS tests written**; they skip cleanly and visibly without `DATABASE_URL` (315 passed, 29 skipped). Typecheck, lint, format and build all green. |
+| 2026-09-02 | Live spend guard (#18) | unit + **empirical** | 15 tests on the cap. Verified by pointing `.env.local` at `production` and running `npm run check:momo`: it **refused and exited before issuing a token**, then the env was restored. 331 tests pass overall. |
 
 ---
 
