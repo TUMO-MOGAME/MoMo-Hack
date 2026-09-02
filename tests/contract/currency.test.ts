@@ -50,14 +50,28 @@ describe('toMomoAmount', () => {
     expect(toMomoAmount(1250n, 'sandbox')).toEqual({ amount: '12.50', currency: 'EUR' });
   });
 
+  // These two used to assert the shim at R12.50 against production. The live
+  // spend guard (src/lib/momo/budget.ts) now refuses that — the real testing
+  // budget is about R10, and R12.50 to a live environment is more than a tenth
+  // of it in one call. The PROPERTY under test is "identical number, different
+  // label", which is not a property of any particular amount, so these assert
+  // it inside the cap. The refusal itself is covered in live-budget.test.ts.
   test('production sends the identical number under the ZAR label', () => {
-    expect(toMomoAmount(1250n, 'production')).toEqual({ amount: '12.50', currency: 'ZAR' });
+    expect(toMomoAmount(50n, 'production')).toEqual({ amount: '0.50', currency: 'ZAR' });
   });
 
   test('the numeric value is byte-identical across environments', () => {
-    for (const cents of [1n, 5n, 99n, 100n, 101n, 123456789n]) {
+    // Within the live cap, both environments can be asked directly.
+    for (const cents of [1n, 5n, 99n, 100n]) {
       expect(toMomoAmount(cents, 'sandbox').amount).toBe(toMomoAmount(cents, 'production').amount);
     }
+  });
+
+  test('large amounts still format exactly — sandbox, where no cap applies', () => {
+    // The point of the original large cases: no float, no rounding, at any
+    // magnitude. Sandbox is the right place to assert it now.
+    expect(toMomoAmount(101n, 'sandbox').amount).toBe('1.01');
+    expect(toMomoAmount(123456789n, 'sandbox').amount).toBe('1234567.89');
   });
 
   test('cents are always two digits', () => {

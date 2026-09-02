@@ -57,6 +57,39 @@ const d = (s) => `\x1b[2m${s}\x1b[0m`;
 
 const sleep = (ms) => new Promise((res) => setTimeout(res, ms));
 
+// ── The live spend guard, at the script level ────────────────────────────────
+//
+// This script sends EIGHT payments. At the sandbox amounts below that is R85 —
+// against a real testing budget of about R10. Run casually against a non-
+// sandbox environment it would empty the budget eight times over before the
+// first poll came back.
+//
+// So: sandbox uses realistic demo amounts because sandbox money is not real,
+// and anything else drops to 10 cents AND requires the operator to say so out
+// loud. `src/lib/momo/budget.ts` enforces the same ceiling inside the
+// application; this is the same rule at the other end of the same risk.
+const LIVE = TARGET !== 'sandbox';
+const AMOUNT = LIVE ? '0.10' : '12.50';
+const DUPE_AMOUNT = LIVE ? '0.10' : '5.00';
+
+if (LIVE && process.env.MOMO_ALLOW_LIVE !== '1') {
+  console.error(
+    `\n  ${r('✖')} MOMO_TARGET_ENVIRONMENT is "${TARGET}", which is NOT the sandbox.\n\n` +
+      `  This script sends 8 payments. Real money, and the whole testing budget\n` +
+      `  is about R10. Amounts would drop to R${AMOUNT} each, but nothing here\n` +
+      `  should run against a live environment by accident.\n\n` +
+      `  If you genuinely mean it:  MOMO_ALLOW_LIVE=1 npm run check:momo\n`,
+  );
+  process.exit(1);
+}
+
+if (LIVE) {
+  console.log(
+    `\n  ${y('!')} LIVE environment "${TARGET}". Amounts reduced to R${AMOUNT}; ` +
+      `8 payments ≈ R${(Number(AMOUNT) * 6 + Number(DUPE_AMOUNT) * 2 || 0).toFixed(2)}.\n`,
+  );
+}
+
 console.log(`\n  MoMo sandbox smoke test  ${d(BASE)}\n`);
 
 // ── token ────────────────────────────────────────────────────────────────────
@@ -110,7 +143,7 @@ for (const [label, msisdn, expected] of CASES) {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      amount: '12.50',
+      amount: AMOUNT,
       currency: 'EUR', // sandbox is EUR-only — the shim, momoAPIs.md §11
       externalId: `smoke-${Date.now()}`,
       payer: { partyIdType: 'MSISDN', partyId: msisdn },
@@ -160,7 +193,7 @@ for (const [label, msisdn, expected] of CASES) {
 console.log(`\n  ${d('─'.repeat(66))}`);
 const dupeRef = randomUUID();
 const body = JSON.stringify({
-  amount: '5.00',
+  amount: DUPE_AMOUNT,
   currency: 'EUR',
   externalId: `dupe-${Date.now()}`,
   payer: { partyIdType: 'MSISDN', partyId: TEST_MSISDN.ASYNC_SUCCESS },
