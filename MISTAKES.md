@@ -147,6 +147,42 @@ file that involves `sed` was caught by looking; the ones that hurt were the ones
 
 ---
 
+## M8 · Trusted a 200 from a route that returns 200 when it fails
+
+**What happened.** `POST /api/momo/callback/collection` returned **200** from the public internet,
+and `STATUS.md` recorded that as "MTN can reach our callback" — verified, twice, in two sessions.
+It was reachable. It had also **never once reached the database**. `ensureMoneyDb()` had exactly
+one caller in the whole codebase — `/api/health` — and `setMoneyDb` writes a module-scoped
+singleton that serverless isolation does not share between routes. So the callback route threw
+`no database adapter configured` on every request, and its own catch block, which returns 200
+unconditionally so that a probe learns nothing, swallowed it. The sibling route with no such catch
+(`/api/cron/reconcile`) was 500ing on every tick, and nobody had called it with a valid bearer.
+
+**Why.** Two causes, and the second is the general one.
+
+The specific cause: `next dev` is a single process. Hitting `/api/health` first binds the singleton
+for every other route in that process, so the bug is *unreproducible locally* — it exists only
+where each route is its own instance.
+
+The general cause: I accepted a status code as evidence of an outcome. A 200 from a route whose
+documented behaviour is "return 200 unconditionally" carries **no information about whether the
+work happened**. The stronger the route's "never leak anything" posture, the weaker its response
+is as evidence — and this one was designed, correctly, to tell an attacker nothing. It told us
+nothing either.
+
+**The rule.** **Verify an effect, not a response.** For any endpoint, ask what would be observably
+different if it had genuinely worked, and check *that*: a row written, a status transitioned, a
+balance moved. Where a route deliberately returns a constant, it can never be verified from its
+own response — reach for a sibling that does report, or read the effect directly. And treat any
+`catch` that swallows into a success as a place where evidence goes to die.
+
+**The guard.** `tests/unit/ledger/single-writer.test.ts` now reads every `src/app/api/**/route.ts`
+and fails when one calls `getMoneyDb` without `ensureMoneyDb`. Proved to fire against a synthetic
+violation before being trusted — it names the offending file. It runs in the `Tests` CI job, which
+is a required check.
+
+---
+
 ## What has gone right, and why
 
 Worth recording, because these are the patterns to keep:

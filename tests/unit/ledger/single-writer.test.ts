@@ -215,3 +215,34 @@ describe('the guarded transition (A1 §4)', () => {
     }
   });
 });
+
+describe('every money route binds its own adapter', () => {
+  /**
+   * Found in production, on the first deployment that had credentials.
+   *
+   * `setMoneyDb` writes a MODULE-SCOPED singleton, and in serverless every route
+   * is its own isolated instance. `/api/health` binding the adapter therefore
+   * does nothing whatsoever for `/api/cron/reconcile`, which called
+   * `getMoneyDb()` and threw `no database adapter configured` on every tick.
+   *
+   * It could not be caught locally: `next dev` is ONE process, so hitting health
+   * first binds it for every other route and the bug disappears. It could not be
+   * caught by reading the callback route either — that one catches everything
+   * and returns 200 unconditionally, so the failure was invisible from outside.
+   *
+   * Hence a static guard rather than a test that runs the routes.
+   */
+  test('a route that calls getMoneyDb also calls ensureMoneyDb', () => {
+    const routes = sourceFiles().filter(({ path }) => /^app\/api\/.*\/route\.tsx?$/.test(path));
+
+    // If this ever hits zero the guard has silently stopped guarding.
+    expect(routes.length).toBeGreaterThan(0);
+
+    const unbound = routes
+      .filter(({ body }) => codeLines(body).some((l) => /\bgetMoneyDb\s*\(/.test(l)))
+      .filter(({ body }) => !codeLines(body).some((l) => /\bensureMoneyDb\s*\(/.test(l)))
+      .map(({ path }) => path);
+
+    expect(unbound).toEqual([]);
+  });
+});
