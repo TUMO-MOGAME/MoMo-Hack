@@ -42,10 +42,39 @@ export const dynamic = 'force-dynamic';
  */
 const rateLimited = createRateLimiter(6);
 
-/** Same allowlist as `/api/agent` (A5-03), and it matters more on this route. */
+/**
+ * Same allowlist as `/api/agent` (A5-03), and it matters more on this route.
+ *
+ * ── WHAT THIS DOES AND DOES NOT STOP, STATED HONESTLY ────────────────────────
+ *
+ * The Telegram channel has a real gate — a chat-id allowlist (M5d). This route
+ * does not, and the asymmetry is worth naming rather than leaving for someone
+ * to discover: **anyone who can reach `momo.tumoolo.tech` can POST here.**
+ *
+ * The first version allowed a request with NO `Origin` header at all
+ * (`if (!origin) return true`), which let a bare
+ * `curl -d '{"message":"/pay 1.00"}'` ring the demo phone. That default is now
+ * closed: a missing `Origin` is accepted only alongside `x-momo-chat`, which a
+ * browser cannot attach cross-origin without a preflight we never answer.
+ *
+ * **That is friction, not authentication.** A determined caller can forge both
+ * headers with one curl flag. What actually bounds the damage is elsewhere, and
+ * all of it holds:
+ *
+ * - the payee is configuration, never input — this can only ever ring ONE phone;
+ * - `MOMO_LIVE_MAX_MINOR` caps a live transaction at R1.00;
+ * - the rate limiter below allows 6/min per IP;
+ * - **no money moves without the payer typing their PIN into MTN's own app.**
+ *   The worst an attacker achieves is unsolicited prompts on one handset.
+ *
+ * If web `/pay` needs a real gate before this is public for longer than a demo,
+ * it wants a shared secret the operator holds — not a header check. That is a
+ * product decision, not a refactor, and it is recorded in `STATUS.md` rather
+ * than quietly half-built here.
+ */
 function fromOurOwnPage(request: Request): boolean {
   const origin = request.headers.get('origin');
-  if (!origin) return true;
+  if (!origin) return request.headers.get('x-momo-chat') === '1';
   let host: string;
   try {
     host = new URL(origin).host;

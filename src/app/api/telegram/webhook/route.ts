@@ -15,16 +15,32 @@
  * update is acknowledged and dropped, not rejected. The one exception is the
  * auth failure above, which must be visible.
  *
- * NOTHING HERE TOUCHES MONEY. No ledger write, no MoMo call, no database. The
- * worst a valid-but-hostile update achieves is one model call and one reply into
- * the chat it came from. That is the blast radius, and it is why the agent
- * having no write tools (CLAUDE.md #11, ADR-0014) is load-bearing rather than
- * merely tidy.
+ * ── THIS ROUTE CAN MOVE MONEY, AND THE DOCSTRING USED TO DENY IT ─────────────
+ *
+ * Until #38 this comment said *"NOTHING HERE TOUCHES MONEY. No ledger write, no
+ * MoMo call, no database."* That was true when written and false the moment
+ * `/pay` was wired in below. It is corrected here rather than quietly deleted,
+ * because it is `MISTAKES.md` M10's second cause happening a second time in a
+ * different file: **a comment that describes a build state carries an expiry
+ * date**, and the next person reads a confident false claim and stops checking.
+ *
+ * What is true now:
+ *
+ * - A valid update carrying `/pay` reaches MTN and writes to the ledger.
+ * - The blast radius is bounded by four things, none of which is this comment:
+ *   the payee is configuration and never input (`pay-replies.ts`); the amount
+ *   is capped per transaction (`lib/momo/budget.ts`); the chat must be on
+ *   `TELEGRAM_PAY_CHAT_IDS` (M5d, below); and the payer approves on their own
+ *   handset with a PIN we never see.
+ * - The AGENT still cannot move money. `respond()` has no write tools and does
+ *   not import the payment module (CLAUDE.md #11, ADR-0014). That claim is
+ *   still load-bearing — it is only the *route* that changed, not the model's
+ *   reach, and free text that merely sounds like a payment is still refused.
  */
 
 import { createAgentClient } from '@/lib/agent/gemini';
 import { createTelegramClient } from '@/lib/telegram/client';
-import { isFromTelegram, readTelegramConfig } from '@/lib/telegram/config';
+import { isFromTelegram, readPayAllowlist, readTelegramConfig } from '@/lib/telegram/config';
 import { parseUpdate } from '@/lib/telegram/types';
 import { log } from '@/server/log';
 import { handleUpdate } from '@/server/telegram/handle';
@@ -74,8 +90,17 @@ export async function POST(request: Request): Promise<Response> {
         // payment capability of this bot is visible in one place. `handleUpdate`
         // itself imports neither, and its contract tests pass none — a test can
         // therefore never accidentally reach MTN.
-        pay: (text) => payReply(text, 'telegram'),
-        status: statusReply,
+        //
+        // THE ALLOWLIST IS PART OF THE SAME VALUE (M5d). It is not a separate
+        // field this route could forget: `MoneyCommands` requires it, so the
+        // only way to give the bot a payment capability is to say in the same
+        // breath who may use it. Unset means the empty set, which denies
+        // everyone — see `readPayAllowlist`.
+        money: {
+          allowlist: readPayAllowlist(),
+          pay: (text) => payReply(text, 'telegram'),
+          status: statusReply,
+        },
       },
       update,
     );

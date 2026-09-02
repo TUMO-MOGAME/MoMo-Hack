@@ -236,6 +236,14 @@ async function main() {
       env.MOMO_DEMO_MSISDN || '46733123454',
       'the only payer /pay can ever charge',
     ],
+    // M5d. Empty is not a default here — it is a denial. An unset value means
+    // NOBODY can run /pay, which is why the live check below refuses rather
+    // than letting a public bot deploy with production credentials and no gate.
+    [
+      'TELEGRAM_PAY_CHAT_IDS',
+      env.TELEGRAM_PAY_CHAT_IDS || '',
+      'the only chats /pay works from (empty = nobody)',
+    ],
   ];
 
   // ── refuse before writing anything ─────────────────────────────────────────
@@ -250,6 +258,34 @@ async function main() {
       `MOMO_TARGET_ENVIRONMENT is "${targetEnvironment}", not "sandbox" — that is REAL MONEY,\n` +
         '      and the entire live testing budget is about R10 (CLAUDE.md #15).\n' +
         '      Pass --allow-live only if you genuinely mean it.',
+    );
+  }
+
+  // ── M5d: a public bot + production credentials + no allowlist ──────────────
+  //
+  // This is the one refusal in the script that is about somebody ELSE's phone.
+  // `@momokasi_demo_bot` is public; deployed live without this variable, every
+  // stranger who finds it in Telegram search has a button that rings a real
+  // handset. The allowlist fails closed at runtime (unset = nobody), so the
+  // deploy is safe either way — but "safe" there means the demo is dead on
+  // stage, and finding that out at 09:30 is not the plan. Catch it here.
+  //
+  // Only enforced for a live push: sandbox money is not real, and making
+  // `npm run dev` require a chat id would be friction with nothing behind it.
+  //
+  // NOT gated on `--with-telegram`. The first draft was, and that was wrong:
+  // the bot token is ALREADY in the Vercel project from an earlier push, so the
+  // bot is live whether or not this particular run re-pushes its secrets. A
+  // guard that only fires when you happen to pass a flag is not a guard.
+  if (targetEnvironment !== 'sandbox' && !env.TELEGRAM_PAY_CHAT_IDS) {
+    problems.push(
+      'TELEGRAM_PAY_CHAT_IDS is empty, and this is a LIVE push (M5d, PLANNING.md §MUST).\n' +
+        '      @momokasi_demo_bot is PUBLIC. With production credentials and no allowlist,\n' +
+        '      anyone who finds the bot can ring the demo phone with payment requests.\n' +
+        '      The bot fails closed — unset means NOBODY can /pay, including you — so this\n' +
+        '      would deploy safely and then not work on stage.\n' +
+        '      Set TELEGRAM_PAY_CHAT_IDS in .env.local. Send /pay to the bot and read the\n' +
+        '      chat id back out of its refusal, or use @userinfobot.',
     );
   }
 

@@ -140,7 +140,12 @@ export default function ChatPage() {
       if (/^\/(pay|status)\b/i.test(text)) {
         const response = await fetch('/api/pay', {
           method: 'POST',
-          headers: { 'content-type': 'application/json' },
+          // `x-momo-chat` marks this as our own page's request. A browser will
+          // not let another site attach a custom header to a cross-origin POST
+          // without a CORS preflight, and we answer no preflight — so this
+          // closes the "no Origin header, therefore allowed" default on the
+          // route. It is friction, not authentication: see `/api/pay`.
+          headers: { 'content-type': 'application/json', 'x-momo-chat': '1' },
           body: JSON.stringify({ message: text }),
         });
         const data = (await response.json()) as { reply?: string; error?: string };

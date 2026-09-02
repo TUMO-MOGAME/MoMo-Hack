@@ -5,7 +5,8 @@ Every PR must update it. If you are a fresh session, read this before touching a
 
 - **⏰ PRESENTATION: Thu 3 Sep 2026, 09:30.** Everything below is now read against that, not
   against the 27 Sep code freeze. See **§Tomorrow 09:30** for what is in and what is cut.
-- **Last updated:** 2026-09-02 (session 5 — the agent claimed a payment it had not made
+- **Last updated:** 2026-09-03 (session 6 — **M5d, the allowlist, is closed**, which unblocks the
+  production deploy. Previously: session 5, the agent claimed a payment it had not made
   (`MISTAKES.md` M10, fixed in #35), and **Phase 3's six audits ran** — 12 Highs opened, 9 fixed the same day)
 - **Phase:** Phase 3 — money engine. **Exit criterion met**; its six audits are still owed.
 - **Local path:** `C:\MoMo-Hack`
@@ -16,7 +17,7 @@ Every PR must update it. If you are a fresh session, read this before touching a
   `mo-mo-hack.vercel.app` alias still serves the same deployment. Production deploys on every
   merge, previews on every PR.
 - **Database:** live. 3 migrations applied to Supabase `edtduvwbejdfahkmfort` (`eu-west-2`).
-- **Tree state:** 420 green + 3 skipped over 27 files, 0 vulnerabilities, CI enforcing all of it.
+- **Tree state:** 470 green + 3 skipped over 29 files, 0 vulnerabilities, CI enforcing all of it.
   Both skips are opt-in and announce themselves: the walking skeleton (`MOMO_SKELETON=1`) and the
   write-skew case (`allowWrites`). Both commit permanent rows, so neither runs by accident.
 - **Blocked on:** nothing external. **F9 is done** and **the walking skeleton is closed** — a real
@@ -184,7 +185,7 @@ receipt number is the strongest possible evidence for it. Three payments already
 
 | # | Requirement | Why it is not optional |
 |---|---|---|
-| 1 | **A Telegram chat-id allowlist on `/pay`** | `@momokasi_demo_bot` is PUBLIC. Deployed with production credentials and no allowlist, any stranger who finds the bot can ring Tumo's personal phone with payment requests, repeatedly. This is the single blocking item |
+| 1 | ✅ **DONE** — **A Telegram chat-id allowlist on `/pay`** | `@momokasi_demo_bot` is PUBLIC. Deployed with production credentials and no allowlist, any stranger who finds the bot can ring Tumo's personal phone with payment requests, repeatedly. This was the single blocking item. See §M5d below |
 | 2 | **A disbursement budget guard** | Paying OUT has no second human in the loop. A collection that goes wrong annoys someone; a transfer that goes wrong is money gone |
 | 3 | **Deliberate `--allow-live` on the env push** | `vercel-env.mjs` refuses production without it, and that refusal already caught a real mistake tonight. Keep the guard; pass the flag knowingly |
 
@@ -200,6 +201,66 @@ receipt number is the strongest possible evidence for it. Three payments already
 **Sandbox remains wired and one flag away** (`npm run demo -- --emulator`, or
 `MOMO_TARGET_ENVIRONMENT=sandbox`) as the fallback if MTN or the venue wifi misbehaves at 09:30.
 That is what a fallback is for; it is not the plan.
+
+### 🔒 M5d — the Telegram allowlist. The blocking item for a production deploy is closed
+
+**`TELEGRAM_PAY_CHAT_IDS`, checked in `handleUpdate` before `/pay` or `/status` reach a handler.**
+Unset means the empty set, and an empty set denies everyone — including us. That default is the
+whole design: denying too much is a demo that says "not this chat" until someone pastes an id;
+allowing too much is a stranger spending the budget and ringing a personal phone at 03:00.
+
+**The gate and the capability are ONE value, and that is the part worth defending.** `pay` and
+`status` were two optional fields on `HandleDeps`; an allowlist as a third optional field is one a
+future route can forget to pass, and forgetting it *is* the failure M5d exists to prevent. They are
+now a single `MoneyCommands { allowlist, pay, status }`, so **you cannot give the handler the
+ability to spend money without saying, in the same expression, who may use it.** That is a
+compile-time guarantee rather than a convention — `MISTAKES.md`'s stated preference for a guard
+that makes a mistake impossible over one that merely detects it.
+
+`/status` is gated as well as `/pay`, deliberately: it drives the reconciler and reads out the
+amount and split of somebody else's payment. Neither belongs to a stranger.
+
+**14 tests, and they were proved to fire.** Disabling the check fails five by name — `/pay never
+reaches the payment handler`, `/status never reaches the ledger`, `is told plainly that nothing was
+sent or charged`, `the @botname suffix does not slip past the gate`, `an empty allowlist denies the
+whole world, including chat 0`. The dangerous direction is the one under test.
+
+Two bugs the tests were written to catch before they existed:
+
+| | |
+|---|---|
+| **A group id is negative** | `-1001234567890`. A parser written as `/^\d+$/` passes every other case and silently drops every group chat — a bug that surfaces only in a shared demo group, which is the worst place to debug it. `MISTAKES.md` M12 is the same shape: a pattern that is wrong only for the inputs nobody typed while testing |
+| **A malformed entry must not throw** | This is read on the request path. One typo in an env var would otherwise be a webhook that 500s on every update, which Telegram then retries thousands of times. A bad entry is dropped, which fails closed |
+
+**The deploy guard refuses a live push without it** — `scripts/vercel-env.mjs`, verified firing
+against a live target. It is *not* gated on `--with-telegram`: the bot token is already in the
+Vercel project from an earlier push, so the bot is live whether or not a given run re-pushes its
+secrets. A guard that only fires when you happen to pass a flag is not a guard.
+
+**And the webhook route's docstring was denying all of this.** It still said *"NOTHING HERE TOUCHES
+MONEY. No ledger write, no MoMo call, no database"* — true when written, false since #38 wired
+`/pay` in. Corrected in place rather than deleted, because it is `MISTAKES.md` M10's second cause
+recurring in a different file: **a comment that describes a build state carries an expiry date**,
+and the next person reads a confident false claim and stops checking.
+
+#### The web channel has no equivalent gate, and that asymmetry is a decision Tumo should make
+
+Found while doing the above, not asked for. `POST /api/pay` accepted a request with **no `Origin`
+header at all** (`if (!origin) return true`), so a bare
+`curl -d '{"message":"/pay 1.00"}' https://momo.tumoolo.tech/api/pay` would ring the demo phone.
+That default is closed — a missing `Origin` now also needs `x-momo-chat`, which a browser cannot
+attach cross-origin without a preflight we never answer.
+
+**That is friction, not authentication, and it is recorded as such rather than sold as a fix.** One
+curl flag forges either header. What actually bounds the damage is unchanged and does hold: the
+payee is configuration and can only ever be one phone; `MOMO_LIVE_MAX_MINOR` caps a live
+transaction at R1.00; the rate limiter allows 6/min per IP; and **no money moves without the payer
+typing their PIN into MTN's own app.** The worst an attacker achieves is unsolicited prompts on one
+handset — annoyance, not theft.
+
+A real gate for web `/pay` wants a shared secret the operator holds, which changes the demo UX on
+the morning of the presentation. **That is Tumo's call, not a refactor to slip in**, so it is
+written here instead of half-built.
 
 ### 💸 `/pay` — a payment a human can start, on both channels
 

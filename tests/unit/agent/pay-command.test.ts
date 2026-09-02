@@ -25,6 +25,7 @@ import {
 } from '@/server/momo/demo-collect';
 import { payReply } from '@/server/momo/pay-replies';
 import { handleUpdate, parseCommand } from '@/server/telegram/handle';
+import { parseChatIds, readPayAllowlist } from '@/lib/telegram/config';
 import { minor } from '@/domain/money';
 
 describe('parsing the amount', () => {
@@ -121,7 +122,20 @@ describe('the Telegram command routing', () => {
     message: { message_id: 1, date: 0, chat, text },
   });
 
-  function deps(over: Record<string, unknown> = {}) {
+  /**
+   * The money capability is ONE value (`MoneyCommands`, M5d), so this helper
+   * builds it as one. A test can no more wire `/pay` without an allowlist than
+   * the route can — which is the entire point of bundling them.
+   *
+   * `allowlist` defaults to the chat these updates come from, so the tests that
+   * are about ROUTING stay about routing. The tests that are about the
+   * allowlist pass their own.
+   */
+  function deps(money?: {
+    pay?: (text: string) => Promise<string>;
+    status?: () => Promise<string>;
+    allowlist?: ReadonlySet<number>;
+  }) {
     const sent: string[] = [];
     return {
       sent,
@@ -134,7 +148,15 @@ describe('the Telegram command routing', () => {
           sendChatAction: vi.fn(async () => undefined as never),
         },
         agent: { reply: vi.fn(async () => 'agent answered') },
-        ...over,
+        ...(money
+          ? {
+              money: {
+                allowlist: money.allowlist ?? new Set([chat.id]),
+                pay: money.pay ?? (async () => 'pay was not expected in this test'),
+                status: money.status ?? (async () => 'status was not expected in this test'),
+              },
+            }
+          : {}),
       },
     };
   }
@@ -193,5 +215,175 @@ describe('the Telegram command routing', () => {
   test('the command parser strips a group @mention', () => {
     expect(parseCommand('/pay@momokasi_demo_bot 0.20')).toBe('pay');
     expect(parseCommand('/status@momokasi_demo_bot')).toBe('status');
+  });
+});
+
+/**
+ * ⚠️ M5d — THE ALLOWLIST. The gate between a public bot and a real phone.
+ *
+ * `@momokasi_demo_bot` is public and, from the production deploy, holds
+ * production MoMo credentials. Every test here is about one question: can
+ * somebody who is not us make this bot ring Tumo's handset?
+ *
+ * The cases are chosen so that the DANGEROUS direction is the one under test.
+ * "An allowed chat can pay" failing is a broken demo. "A stranger cannot pay"
+ * failing is the incident, so it gets the plural, the group id, the empty
+ * config and the missing config.
+ */
+describe('the pay allowlist (M5d)', () => {
+  const update = (text: string, chatId: number) => ({
+    update_id: Math.floor(Math.random() * 1e9),
+    message: { message_id: 1, date: 0, chat: { id: chatId, type: 'private' as const }, text },
+  });
+
+  function wire(allowlist: ReadonlySet<number>) {
+    const sent: string[] = [];
+    const pay = vi.fn(async () => 'REQUEST SENT — this must not appear for a denied chat');
+    const status = vi.fn(async () => 'LEDGER READ — this must not appear for a denied chat');
+    return {
+      sent,
+      pay,
+      status,
+      deps: {
+        telegram: {
+          sendMessage: vi.fn(async ({ text }: { text: string }) => {
+            sent.push(text);
+            return undefined as never;
+          }),
+          sendChatAction: vi.fn(async () => undefined as never),
+        },
+        agent: { reply: vi.fn(async () => 'agent answered') },
+        money: { allowlist, pay, status },
+      },
+    };
+  }
+
+  describe('parseChatIds', () => {
+    test('an unset variable is nobody, not everybody', () => {
+      // THE most important assertion in this file. If this ever returns a set
+      // that `.has()` anything, a deploy that forgets the variable opens the
+      // bot to the world.
+      expect(parseChatIds(undefined).size).toBe(0);
+      expect(parseChatIds('').size).toBe(0);
+      expect(parseChatIds('   ').size).toBe(0);
+      expect(parseChatIds(',,').size).toBe(0);
+    });
+
+    test('reads one id, several ids, and tolerates the spacing people type', () => {
+      expect([...parseChatIds('123')]).toEqual([123]);
+      expect([...parseChatIds('123,456')]).toEqual([123, 456]);
+      expect([...parseChatIds('123, 456')]).toEqual([123, 456]);
+      expect([...parseChatIds(' 123 , 456 ')]).toEqual([123, 456]);
+      expect([...parseChatIds('123 456')]).toEqual([123, 456]);
+    });
+
+    test('keeps negative ids, because that is what a Telegram group is', () => {
+      // A parser written as /^\d+$/ passes every other test in this block and
+      // silently drops every group chat.
+      expect(parseChatIds('-1001234567890').has(-1001234567890)).toBe(true);
+      expect([...parseChatIds('42,-1001234567890')]).toEqual([42, -1001234567890]);
+    });
+
+    test('drops a malformed entry without dropping the good ones', () => {
+      expect([...parseChatIds('123,abc,456')]).toEqual([123, 456]);
+      expect([...parseChatIds('12.5,7')]).toEqual([7]);
+      expect([...parseChatIds('<your chat id>,7')]).toEqual([7]);
+    });
+
+    test('a garbage-only value denies everyone rather than throwing', () => {
+      // Read on the request path. A throw here is a webhook that 500s on every
+      // update, which Telegram then retries thousands of times.
+      expect(() => parseChatIds('abc')).not.toThrow();
+      expect(parseChatIds('abc').size).toBe(0);
+    });
+
+    test('reads the variable by its documented name', () => {
+      expect(readPayAllowlist({ TELEGRAM_PAY_CHAT_IDS: '42' }).has(42)).toBe(true);
+      expect(readPayAllowlist({}).size).toBe(0);
+    });
+  });
+
+  describe('a chat that is not on the list', () => {
+    test('/pay never reaches the payment handler', async () => {
+      const w = wire(new Set([42]));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const outcome = await handleUpdate(w.deps as any, update('/pay 1.00', 999) as any);
+
+      expect(w.pay).not.toHaveBeenCalled();
+      expect(outcome).toEqual({ kind: 'replied', source: 'denied' });
+    });
+
+    test('/status never reaches the ledger', async () => {
+      // Gated too: /status drives the reconciler and reads out somebody else's
+      // amount and split. Neither belongs to a stranger.
+      const w = wire(new Set([42]));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const outcome = await handleUpdate(w.deps as any, update('/status', 999) as any);
+
+      expect(w.status).not.toHaveBeenCalled();
+      expect(outcome).toEqual({ kind: 'replied', source: 'denied' });
+    });
+
+    test('is told plainly that nothing was sent or charged', async () => {
+      const w = wire(new Set([42]));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await handleUpdate(w.deps as any, update('/pay 1.00', 999) as any);
+
+      const reply = w.sent.join('\n');
+      // The M10 rule, applied to a refusal: never leave it ambiguous whether
+      // money moved.
+      expect(reply).toMatch(/nothing was sent/i);
+      expect(reply).toMatch(/nothing was charged/i);
+      // And the operator's fix path is in the message.
+      expect(reply).toContain('999');
+    });
+
+    test('the @botname suffix does not slip past the gate', async () => {
+      // `/pay@momokasi_demo_bot` is what Telegram delivers in a GROUP — the
+      // exact place an outsider is most likely to find the bot.
+      const w = wire(new Set([42]));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await handleUpdate(w.deps as any, update('/pay@momokasi_demo_bot 1.00', 999) as any);
+      expect(w.pay).not.toHaveBeenCalled();
+    });
+
+    test('an empty allowlist denies the whole world, including chat 0', async () => {
+      const w = wire(new Set());
+      for (const chatId of [0, 42, -1001234567890, 999]) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        await handleUpdate(w.deps as any, update('/pay 1.00', chatId) as any);
+      }
+      expect(w.pay).not.toHaveBeenCalled();
+    });
+
+    test('can still use the rest of the bot', async () => {
+      // A denial is scoped to money. Turning a stranger away from `/pay` must
+      // not turn the product into a brick for them — the read-only assistant
+      // is the part we actually want people to try.
+      const w = wire(new Set([42]));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const outcome = await handleUpdate(w.deps as any, update('how do stokvels work', 999) as any);
+
+      expect(outcome).toEqual({ kind: 'replied', source: 'agent' });
+      expect(w.deps.agent.reply).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe('a chat that is on the list', () => {
+    test('/pay works exactly as before', async () => {
+      const w = wire(new Set([42, 999]));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const outcome = await handleUpdate(w.deps as any, update('/pay 0.20', 42) as any);
+
+      expect(w.pay).toHaveBeenCalledWith('/pay 0.20');
+      expect(outcome).toEqual({ kind: 'replied', source: 'command' });
+    });
+
+    test('a group on the list works, negative id and all', async () => {
+      const w = wire(new Set([-1001234567890]));
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      await handleUpdate(w.deps as any, update('/status', -1001234567890) as any);
+      expect(w.status).toHaveBeenCalledOnce();
+    });
   });
 });
