@@ -28,6 +28,7 @@ import { isFromTelegram, readTelegramConfig } from '@/lib/telegram/config';
 import { parseUpdate } from '@/lib/telegram/types';
 import { log } from '@/server/log';
 import { handleUpdate } from '@/server/telegram/handle';
+import { payReply, statusReply } from '@/server/momo/pay-replies';
 import { claimUpdate } from '@/server/telegram/memory';
 
 export const runtime = 'nodejs';
@@ -66,7 +67,16 @@ export async function POST(request: Request): Promise<Response> {
 
   try {
     const outcome = await handleUpdate(
-      { telegram: createTelegramClient(), agent: createAgentClient() },
+      {
+        telegram: createTelegramClient(),
+        agent: createAgentClient(),
+        // The money commands are supplied HERE and nowhere else, so the whole
+        // payment capability of this bot is visible in one place. `handleUpdate`
+        // itself imports neither, and its contract tests pass none — a test can
+        // therefore never accidentally reach MTN.
+        pay: (text) => payReply(text, 'telegram'),
+        status: statusReply,
+      },
       update,
     );
     log('info', 'telegram.webhook.handled', {

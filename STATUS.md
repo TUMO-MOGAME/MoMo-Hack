@@ -135,6 +135,52 @@ browser that retracts its toolbar those differ, and the difference is exactly th
 the message log's own `scrollTop` is set — which cannot touch an ancestor — and the shell carries
 `overflow-hidden`.
 
+### 💸 `/pay` — a payment a human can start, on both channels
+
+**The first production code path in this project that can move money.** Until now
+`initiateCollection` had exactly four callers and all four were tests; no deployed route could
+move a cent. `/pay 0.20` and `/status` now work in Telegram *and* in the web chat, from one shared
+module, so the two channels say the same sentences by construction.
+
+Proved end to end against the **real MTN sandbox**, not the emulator:
+
+```
+/pay 0.20   → Request sent for R0.20 to •••• 3454.
+              Check your phone — MTN will ask you to approve it with your MoMo PIN.
+              I never see that PIN; it goes to MTN, not to me.
+/status     → That R0.20 is still created.
+/status     → ✅ R0.20 received, and the journal balances.
+              If that had been a taxi fare, R0.20 would split:
+                Taxi owner R0.12 · Driver float R0.05 · Rank fuel R0.02 · Rank insurance R0.01
+```
+
+**Why this does not break CLAUDE.md #11.** The agent still cannot move money — `respond()` has no
+write tools and does not import the payment module. `/pay` is a **command**, matched by a regex
+before anything reaches a model. Free text that merely *sounds* like a payment still goes to the
+agent, which refuses it (M10), and a test asserts exactly that.
+
+**And a `requesttopay` is a better fit for ADR-0014 than a tap in our own UI would be.** A
+collection does not move money — it *asks*. MTN pushes a prompt to the payer's own handset and the
+payer types their PIN into MTN's own app. That PIN never enters our system, our logs, or a model's
+context, which is what ADR-0017 spends two pages arguing for. The worst a misfire achieves is that
+somebody gets a request they can decline.
+
+**The payee is configuration, never input.** `MOMO_DEMO_MSISDN`, one number, and a hard refusal
+when it is unset. The obvious implementation — reading the number out of *"/pay 0.20 to
+0761234567"* — turns a public chatbot into a machine for pushing unsolicited payment prompts at
+any South African phone over MTN's real network, from an anonymous web form. That is two lines of
+code away at all times, and the API has no parameter through which a typed number could arrive.
+
+**Two bugs found while building it, both caught by evidence rather than by reading:**
+
+| | |
+|---|---|
+| `purpose: 'FARE'` would have **taken the money and never posted it** | `journalDraftFor` routes FARE to `fareSplitPostings`, which calls `required(ownerId)`, `required(driverId)` and `required(rankId)` — and the deployed reconciler's default context is `{ subjectId }` and nothing else. `required()` throws *inside the resolve transaction*, so the collection would succeed at MTN, the payer's money would leave their wallet, and every reconcile tick afterwards would throw forever. Uses `AIRTIME`, the purpose the walking skeleton proved, with the split shown beside it |
+| `initiated_by` is a **uuid** and I passed the channel name | Postgres threw `invalid input syntax for type uuid: "web"`. The reply path turned that into a polite sentence and — until the catch was made to log — into **no evidence anywhere**. `MISTAKES.md` M8, one route over: a catch that swallows into a friendly answer is where evidence goes to die. It is `null` now; there is no user until M9a |
+
+**What is still true and should be said on stage:** `/status` exists because **nothing runs the
+reconciler on a timer** (F8). It is the human standing in for the cron job, and it says so.
+
 ### Phase 3's six audits ran, and they agree with each other about where the risk is
 
 **A1 A2 A3 A4 A5 A6, all six, results in [`docs/audits/results/`](docs/audits/results/).** A8

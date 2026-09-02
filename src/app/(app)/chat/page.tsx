@@ -133,6 +133,25 @@ export default function ChatPage() {
     // turns it back into money before anything renders.
     let turn: { reply: string; artifact?: Artifact };
     try {
+      // `/pay` and `/status` are COMMANDS, not conversation. They go to a
+      // different endpoint because `/api/agent` is read-only and its docstring
+      // promises so — see the note at the top of `/api/pay`. Free text that
+      // merely sounds like a payment still goes to the agent, which refuses it.
+      if (/^\/(pay|status)\b/i.test(text)) {
+        const response = await fetch('/api/pay', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ message: text }),
+        });
+        const data = (await response.json()) as { reply?: string; error?: string };
+        turn = {
+          reply: data.reply ?? 'That command is not available right now.',
+        };
+        setMessages((m) => [...m, { id: `a${Date.now()}`, role: 'agent', text: turn.reply }]);
+        setThinking(false);
+        return;
+      }
+
       const history = messagesRef.current
         .slice(-8)
         .map((m) => ({ role: m.role === 'agent' ? 'model' : 'user', text: m.text }));
