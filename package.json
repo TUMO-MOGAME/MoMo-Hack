@@ -19,7 +19,9 @@
     "audit:check": "node scripts/audit.mjs check",
     "audit:gate": "node scripts/audit.mjs gate",
     "pr:merge": "node scripts/safe-merge.mjs",
-    "agent:worktree": "node scripts/agent-worktree.mjs"
+    "agent:worktree": "node scripts/agent-worktree.mjs",
+    "check:momo": "node scripts/momo-smoke.mjs",
+    "check:telegram": "node scripts/telegram-check.mjs"
   },
   "dependencies": {
     "next": "15.1.6",

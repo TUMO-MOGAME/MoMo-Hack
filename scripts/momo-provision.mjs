@@ -14,13 +14,13 @@
  * pass --force, because the API key is unrecoverable once lost.
  */
 
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
-import { join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { findEnvFile } from './_env.mjs';
 
-const root = resolve(fileURLToPath(import.meta.url), '..', '..');
-const envPath = join(root, '.env.local');
+// Resolved across worktrees — .env.local lives in exactly one of them, and we
+// deliberately run agents in others (MISTAKES.md M4).
+const envPath = findEnvFile();
 const force = process.argv.includes('--force');
 
 const c = {
@@ -36,7 +36,7 @@ const die = (msg) => {
   process.exit(1);
 };
 
-if (!existsSync(envPath)) die('.env.local not found. Copy .env.example to .env.local first.');
+if (!envPath) die('.env.local not found in any worktree. Copy .env.example to .env.local first.');
 
 const raw = readFileSync(envPath, 'utf8');
 const env = Object.fromEntries(
