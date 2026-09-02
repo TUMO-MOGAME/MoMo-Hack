@@ -94,9 +94,7 @@ export function Label({ children, sub }: { children: React.ReactNode; sub?: stri
 
 /** The small all-caps line above a number. 12px floor — cracked screens. */
 export function Kicker({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="text-xs uppercase tracking-widest text-muted-foreground">{children}</div>
-  );
+  return <div className="text-xs uppercase tracking-widest text-muted-foreground">{children}</div>;
 }
 
 export type PillTone = 'success' | 'warning' | 'destructive' | 'brand' | 'muted';

@@ -7,7 +7,18 @@
  */
 
 import { describe, expect, test } from 'vitest';
-import { accountKey, driverFloat, escrowHold, familyLocked, fuelPool, insurancePool, MOMO_SETTLEMENT, PLATFORM_FEE, stokvelPool, userWallet } from '@/domain/ledger/accounts';
+import {
+  accountKey,
+  driverFloat,
+  escrowHold,
+  familyLocked,
+  fuelPool,
+  insurancePool,
+  MOMO_SETTLEMENT,
+  PLATFORM_FEE,
+  stokvelPool,
+  userWallet,
+} from '@/domain/ledger/accounts';
 import { type DraftPosting, journalTotal } from '@/domain/ledger/journal';
 import {
   POSTING_PURPOSES,

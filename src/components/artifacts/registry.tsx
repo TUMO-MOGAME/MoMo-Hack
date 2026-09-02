@@ -67,7 +67,12 @@ export interface ArtifactBodyProps {
  * says the spoken line and the `aria-label` are one string — build the voice
  * layer and the accessibility layer falls out of it.
  */
-export function ArtifactBody({ artifact, status = 'complete', onConfirm, onCancel }: ArtifactBodyProps) {
+export function ArtifactBody({
+  artifact,
+  status = 'complete',
+  onConfirm,
+  onCancel,
+}: ArtifactBodyProps) {
   if (status === 'streaming') return <ArtifactSkeleton type={artifact.type} />;
 
   if (!isKnownArtifactType(artifact.type)) {
@@ -77,9 +82,11 @@ export function ArtifactBody({ artifact, status = 'complete', onConfirm, onCance
   // The one cast in the artifact path. The registry is keyed by the same
   // literal union as the artifact itself, so the pairing is correct by
   // construction; TypeScript just cannot see through the index.
-  const Renderer = ARTIFACT_RENDERERS[artifact.type] as unknown as (
-    props: { a: Artifact; onConfirm?: () => void; onCancel?: () => void },
-  ) => React.ReactElement;
+  const Renderer = ARTIFACT_RENDERERS[artifact.type] as unknown as (props: {
+    a: Artifact;
+    onConfirm?: () => void;
+    onCancel?: () => void;
+  }) => React.ReactElement;
 
   return (
     <section aria-label={artifactSummary(artifact)} className="animate-rise">

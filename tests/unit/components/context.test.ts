@@ -116,9 +116,7 @@ describe('the rail obeys the provenance rule', () => {
 
 describe('the phone form', () => {
   test('the strip carries the two numbers and opens the rest', () => {
-    const html = renderToStaticMarkup(
-      createElement(ContextStrip, { context, onOpen: noop }),
-    );
+    const html = renderToStaticMarkup(createElement(ContextStrip, { context, onOpen: noop }));
     expect(html).toContain('R340.00');
     expect(html).toContain('340 rand available');
     expect(html).toContain('Masakhane stokvel due in 3 days');

@@ -67,7 +67,10 @@ export function SplitBreakdown({ a }: { a: SplitArtifact }) {
           <li key={p.key}>
             <Row>
               <div className="flex min-w-0 items-center gap-3">
-                <span className={`size-2 shrink-0 rounded-full ${chartClass(i)}`} aria-hidden="true" />
+                <span
+                  className={`size-2 shrink-0 rounded-full ${chartClass(i)}`}
+                  aria-hidden="true"
+                />
                 <Label sub={`${(p.bps / 100).toFixed(0)}% of the fare`}>{p.label}</Label>
               </div>
               <Money

@@ -54,10 +54,7 @@ export function collection(overrides: Partial<NewMomoTransaction> = {}): NewMomo
 }
 
 /** Seed a PENDING collection, the state a resolver actually finds in the wild. */
-export function seedPending(
-  memory: MemoryDb,
-  overrides: Partial<NewMomoTransaction> = {},
-): string {
+export function seedPending(memory: MemoryDb, overrides: Partial<NewMomoTransaction> = {}): string {
   const row = collection(overrides);
   memory.seedTransaction({ ...row, status: 'PENDING' });
   return row.id;

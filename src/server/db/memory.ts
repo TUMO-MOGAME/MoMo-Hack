@@ -22,7 +22,12 @@
  * being atomic — the same place it comes from in Postgres.
  */
 
-import { type AccountRef, accountKey, allowsNegative, isDebitNormal } from '@/domain/ledger/accounts';
+import {
+  type AccountRef,
+  accountKey,
+  allowsNegative,
+  isDebitNormal,
+} from '@/domain/ledger/accounts';
 import { type MomoStatus, isClaimable, isTerminal } from '@/domain/ledger/state-machine';
 import { AppException } from '@/lib/errors';
 import type {

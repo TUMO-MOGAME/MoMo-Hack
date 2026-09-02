@@ -122,7 +122,11 @@ export function stubFetch(options: StubOptions): Stub {
 }
 
 export function tokenOk(expiresIn = 3600): Response {
-  return json(200, { access_token: 'test.access.token', token_type: 'access_token', expires_in: expiresIn });
+  return json(200, {
+    access_token: 'test.access.token',
+    token_type: 'access_token',
+    expires_in: expiresIn,
+  });
 }
 
 /** A client with an isolated token cache, so tests never leak state into each other. */

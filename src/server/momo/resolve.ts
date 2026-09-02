@@ -108,9 +108,7 @@ export async function resolveTransaction(
         applied: false,
         status: current.status,
         ...(current.journalId ? { journalId: current.journalId } : {}),
-        reason: isTerminal(current.status)
-          ? ('ALREADY_RESOLVED' as const)
-          : ('NO_CHANGE' as const),
+        reason: isTerminal(current.status) ? ('ALREADY_RESOLVED' as const) : ('NO_CHANGE' as const),
       };
     }
 

@@ -113,9 +113,9 @@ describe('assertWritable', () => {
   test('refuses a single-posting journal even when it sums to zero', () => {
     // CLAUDE.md #2: every value movement is >= 2 postings. A one-row journal is
     // either unbalanced or a no-op, and both are bugs.
-    expect(() =>
-      assertWritable({ kind: 'TEST', postings: [{ account: A, amount: 0n }] }),
-    ).toThrow(InvalidJournalError);
+    expect(() => assertWritable({ kind: 'TEST', postings: [{ account: A, amount: 0n }] })).toThrow(
+      InvalidJournalError,
+    );
   });
 
   test('refuses a zero posting', () => {

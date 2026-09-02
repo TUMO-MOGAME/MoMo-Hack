@@ -14,7 +14,12 @@
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative, sep } from 'node:path';
 import { describe, expect, test } from 'vitest';
-import { fromMomoAmount, isExpectedCurrency, momoCurrency, toMomoAmount } from '@/lib/momo/currency';
+import {
+  fromMomoAmount,
+  isExpectedCurrency,
+  momoCurrency,
+  toMomoAmount,
+} from '@/lib/momo/currency';
 import { formatZAR, parseMinor, posting } from '@/domain/money';
 
 const SRC = join(process.cwd(), 'src');

@@ -6,7 +6,16 @@
 import { formatZAR, type Minor } from '@/domain/money';
 import type { Artifact } from '@/lib/artifacts/types';
 import { moneyLabel } from './summary';
-import { EmptyState, Footnote, isSourced, Kicker, Label, Money, Row, UnsourcedMoney } from './shared';
+import {
+  EmptyState,
+  Footnote,
+  isSourced,
+  Kicker,
+  Label,
+  Money,
+  Row,
+  UnsourcedMoney,
+} from './shared';
 
 type WalletArtifact = Extract<Artifact, { type: 'wallet' }>;
 

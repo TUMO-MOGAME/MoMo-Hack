@@ -83,9 +83,20 @@ export type Artifact =
   | (Base & { type: 'wallet'; balances: BalanceRow[] })
   | (Base & { type: 'transactions'; items: TxnRow[]; caption?: string })
   | (Base & { type: 'split-breakdown'; fare: SourcedMoney; parts: SplitPartRow[]; route: string })
-  | (Base & { type: 'stokvel'; pool: SourcedMoney; target: SourcedMoney; members: StokvelMemberRow[]; cadence: string })
+  | (Base & {
+      type: 'stokvel';
+      pool: SourcedMoney;
+      target: SourcedMoney;
+      members: StokvelMemberRow[];
+      cadence: string;
+    })
   | (Base & { type: 'job-list'; jobs: JobRow[] })
-  | (Base & { type: 'trust-score'; score: number; completed: number; factors: { label: string; met: boolean }[] })
+  | (Base & {
+      type: 'trust-score';
+      score: number;
+      completed: number;
+      factors: { label: string; met: boolean }[];
+    })
   | (Base & { type: 'confirm'; action: ProposedAction })
   | (Base & { type: 'error'; message: string });
 

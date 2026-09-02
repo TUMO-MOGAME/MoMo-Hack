@@ -11,7 +11,12 @@ export type AppError =
   | { kind: 'NOT_FOUND'; resource: string }
   | { kind: 'CONFLICT'; message: string }
   | { kind: 'INSUFFICIENT'; available: bigint; required: bigint }
-  | { kind: 'UPSTREAM'; provider: 'momo' | 'telegram' | 'groq' | 'elevenlabs'; retryable: boolean; status?: number }
+  | {
+      kind: 'UPSTREAM';
+      provider: 'momo' | 'telegram' | 'groq' | 'elevenlabs';
+      retryable: boolean;
+      status?: number;
+    }
   | { kind: 'INTERNAL'; cause: unknown };
 
 export class AppException extends Error {

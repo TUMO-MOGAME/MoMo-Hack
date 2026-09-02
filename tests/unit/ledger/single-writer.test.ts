@@ -33,7 +33,9 @@ function codeLines(body: string): string[] {
   return body
     .split('\n')
     .map((l) => l.trim())
-    .filter((l) => l.length > 0 && !l.startsWith('//') && !l.startsWith('*') && !l.startsWith('/*'));
+    .filter(
+      (l) => l.length > 0 && !l.startsWith('//') && !l.startsWith('*') && !l.startsWith('/*'),
+    );
 }
 
 describe('one ledger writer', () => {

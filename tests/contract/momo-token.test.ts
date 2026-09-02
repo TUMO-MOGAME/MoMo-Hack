@@ -150,7 +150,11 @@ describe('token cache', () => {
   });
 
   test('invalidate forces a fresh fetch', async () => {
-    const { transport: t, recorder, cache } = transport({
+    const {
+      transport: t,
+      recorder,
+      cache,
+    } = transport({
       token: [tokenOk(), tokenOk()],
       api: [empty(202), empty(202)],
     });

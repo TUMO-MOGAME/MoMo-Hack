@@ -105,7 +105,10 @@ describe('the VERIFIED test MSISDN table (momoAPIs.md §10)', () => {
   test('46733123454 goes CREATED -> SUCCESSFUL after ~25s — THE DEMO PATH', async () => {
     const c = client();
 
-    const accepted = await c.collections.requestToPay(REFERENCE_ID, input(TEST_MSISDN.ASYNC_SUCCESS));
+    const accepted = await c.collections.requestToPay(
+      REFERENCE_ID,
+      input(TEST_MSISDN.ASYNC_SUCCESS),
+    );
     expect(accepted.outcome).toBe('ACCEPTED');
 
     // CREATED is not in MTN's documented vocabulary. The sandbox emits it, and

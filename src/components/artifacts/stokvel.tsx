@@ -6,7 +6,16 @@
 import { formatZAR, type Minor } from '@/domain/money';
 import type { Artifact } from '@/lib/artifacts/types';
 import { moneyLabel } from './summary';
-import { CheckIcon, ClockIcon, EmptyState, Footnote, Kicker, Pill, UnsourcedMoney, isSourced } from './shared';
+import {
+  CheckIcon,
+  ClockIcon,
+  EmptyState,
+  Footnote,
+  Kicker,
+  Pill,
+  UnsourcedMoney,
+  isSourced,
+} from './shared';
 
 type StokvelArtifact = Extract<Artifact, { type: 'stokvel' }>;
 
@@ -30,7 +39,10 @@ export function Stokvel({ a }: { a: StokvelArtifact }) {
         ) : (
           <UnsourcedMoney money={a.pool} />
         )}
-        <span className="text-sm text-muted-foreground" aria-label={`of ${moneyLabel(target as Minor)}`}>
+        <span
+          className="text-sm text-muted-foreground"
+          aria-label={`of ${moneyLabel(target as Minor)}`}
+        >
           <span aria-hidden="true">of {formatZAR(target as Minor)}</span>
         </span>
       </div>
@@ -57,7 +69,10 @@ export function Stokvel({ a }: { a: StokvelArtifact }) {
       ) : (
         <ul className="mt-5 space-y-2">
           {a.members.map((m) => (
-            <li key={m.name} className="flex min-h-11 flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
+            <li
+              key={m.name}
+              className="flex min-h-11 flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm"
+            >
               <span className="flex min-w-0 items-center gap-2">
                 <span
                   className={m.paid ? 'text-success' : 'text-muted-foreground'}
@@ -65,7 +80,9 @@ export function Stokvel({ a }: { a: StokvelArtifact }) {
                 >
                   {m.paid ? <CheckIcon /> : <ClockIcon />}
                 </span>
-                <span className={`truncate ${m.paid ? 'text-foreground' : 'text-muted-foreground'}`}>
+                <span
+                  className={`truncate ${m.paid ? 'text-foreground' : 'text-muted-foreground'}`}
+                >
                   {m.name}
                 </span>
               </span>

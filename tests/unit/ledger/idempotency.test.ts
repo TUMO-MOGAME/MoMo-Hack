@@ -101,9 +101,7 @@ describe('persist BEFORE the network call', () => {
     const result = await initiateCollection({ db: memory, client, uuid: nextReference }, INPUT);
 
     // The COLUMN keeps the real number — the reconciler needs it to re-send.
-    expect(memory.transaction_(result.transactionId)?.counterparty).toBe(
-      TEST_MSISDN.ASYNC_SUCCESS,
-    );
+    expect(memory.transaction_(result.transactionId)?.counterparty).toBe(TEST_MSISDN.ASYNC_SUCCESS);
     // Everything that leaves the database carries the masked form instead.
     expect(maskMsisdn(TEST_MSISDN.ASYNC_SUCCESS)).toBe('•••• 3454');
   });
@@ -178,9 +176,14 @@ describe('the reconciler re-sends with the SAME id', () => {
     const start = new Date('2026-09-02T10:00:00Z');
 
     const { transactionId } = await initiateCollection(
-      { db: memory, client: fakeClient(async () => {
+      {
+        db: memory,
+        client: fakeClient(async () => {
           throw new MomoRequestError('HTTP', upstream(503, true), 'down');
-        }), uuid: nextReference, now: () => start },
+        }),
+        uuid: nextReference,
+        now: () => start,
+      },
       INPUT,
     );
     expect(memory.transaction_(transactionId)?.status).toBe('INITIATED');

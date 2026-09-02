@@ -15,7 +15,12 @@
 
 import { describe, expect, test } from 'vitest';
 import fc from 'fast-check';
-import { ACCOUNT_TYPES, type AccountType, allowsNegative, isDebitNormal } from '@/domain/ledger/accounts';
+import {
+  ACCOUNT_TYPES,
+  type AccountType,
+  allowsNegative,
+  isDebitNormal,
+} from '@/domain/ledger/accounts';
 import { journalTotal } from '@/domain/ledger/journal';
 import { POSTING_PURPOSES, journalDraftFor } from '@/domain/ledger/postings';
 import { createMemoryDb } from '@/server/db/memory';

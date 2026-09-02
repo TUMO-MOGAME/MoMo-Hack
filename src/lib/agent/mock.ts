@@ -58,7 +58,11 @@ function walletArtifact(): Artifact {
     title: 'Your money',
     type: 'wallet',
     balances: [
-      { label: 'Available', kind: 'WALLET', money: { amount: minor(34000n), sourceAccountId: 'acc_w1' } },
+      {
+        label: 'Available',
+        kind: 'WALLET',
+        money: { amount: minor(34000n), sourceAccountId: 'acc_w1' },
+      },
       {
         label: 'Held in escrow',
         kind: 'ESCROW',
@@ -82,12 +86,60 @@ function transactionsArtifact(): Artifact {
     type: 'transactions',
     caption: 'R340 in, mostly from washes.',
     items: [
-      { id: 't1', at: 'Today 07:12', label: 'Kombi wash', counterparty: 'Rank 42', direction: 'IN', money: { amount: minor(6000n), sourceTxnId: 't1' }, status: 'SUCCESSFUL' },
-      { id: 't2', at: 'Today 07:40', label: 'Taxi fare', counterparty: 'Katlehong → Germiston', direction: 'OUT', money: { amount: minor(1250n), sourceTxnId: 't2' }, status: 'SUCCESSFUL' },
-      { id: 't3', at: 'Yesterday', label: 'Interior clean', counterparty: 'Rank 42', direction: 'IN', money: { amount: minor(4500n), sourceTxnId: 't3' }, status: 'SUCCESSFUL' },
-      { id: 't4', at: 'Yesterday', label: 'Electricity', counterparty: 'Meter 0412', direction: 'OUT', money: { amount: minor(10000n), sourceTxnId: 't4' }, status: 'SUCCESSFUL' },
-      { id: 't5', at: 'Mon', label: 'Stokvel contribution', counterparty: 'Masakhane', direction: 'OUT', money: { amount: minor(30000n), sourceTxnId: 't5' }, status: 'SUCCESSFUL' },
-      { id: 't6', at: 'Mon', label: 'Tyre check ×3', counterparty: 'Rank 42', direction: 'IN', money: { amount: minor(9000n), sourceTxnId: 't6' }, status: 'PENDING' },
+      {
+        id: 't1',
+        at: 'Today 07:12',
+        label: 'Kombi wash',
+        counterparty: 'Rank 42',
+        direction: 'IN',
+        money: { amount: minor(6000n), sourceTxnId: 't1' },
+        status: 'SUCCESSFUL',
+      },
+      {
+        id: 't2',
+        at: 'Today 07:40',
+        label: 'Taxi fare',
+        counterparty: 'Katlehong → Germiston',
+        direction: 'OUT',
+        money: { amount: minor(1250n), sourceTxnId: 't2' },
+        status: 'SUCCESSFUL',
+      },
+      {
+        id: 't3',
+        at: 'Yesterday',
+        label: 'Interior clean',
+        counterparty: 'Rank 42',
+        direction: 'IN',
+        money: { amount: minor(4500n), sourceTxnId: 't3' },
+        status: 'SUCCESSFUL',
+      },
+      {
+        id: 't4',
+        at: 'Yesterday',
+        label: 'Electricity',
+        counterparty: 'Meter 0412',
+        direction: 'OUT',
+        money: { amount: minor(10000n), sourceTxnId: 't4' },
+        status: 'SUCCESSFUL',
+      },
+      {
+        id: 't5',
+        at: 'Mon',
+        label: 'Stokvel contribution',
+        counterparty: 'Masakhane',
+        direction: 'OUT',
+        money: { amount: minor(30000n), sourceTxnId: 't5' },
+        status: 'SUCCESSFUL',
+      },
+      {
+        id: 't6',
+        at: 'Mon',
+        label: 'Tyre check ×3',
+        counterparty: 'Rank 42',
+        direction: 'IN',
+        money: { amount: minor(9000n), sourceTxnId: 't6' },
+        status: 'PENDING',
+      },
     ],
   };
 }
@@ -117,10 +169,34 @@ function jobsArtifact(): Artifact {
     title: 'Jobs near you',
     type: 'job-list',
     jobs: [
-      { id: 'j1', title: 'Wash kombi', where: 'Rank 42 · 400m', money: { amount: minor(6000n), sourceAccountId: 'acc_j1' }, state: 'OPEN' },
-      { id: 'j2', title: 'Interior sanitise ×2', where: 'Rank 42 · 400m', money: { amount: minor(9000n), sourceAccountId: 'acc_j2' }, state: 'OPEN' },
-      { id: 'j3', title: 'Queue marshalling, 3h', where: 'Rank 12 · 1.2km', money: { amount: minor(12000n), sourceAccountId: 'acc_j3' }, state: 'OPEN' },
-      { id: 'j4', title: 'Yard maintenance', where: 'Katlehong ext 4', money: { amount: minor(25000n), sourceAccountId: 'acc_j4' }, state: 'OPEN' },
+      {
+        id: 'j1',
+        title: 'Wash kombi',
+        where: 'Rank 42 · 400m',
+        money: { amount: minor(6000n), sourceAccountId: 'acc_j1' },
+        state: 'OPEN',
+      },
+      {
+        id: 'j2',
+        title: 'Interior sanitise ×2',
+        where: 'Rank 42 · 400m',
+        money: { amount: minor(9000n), sourceAccountId: 'acc_j2' },
+        state: 'OPEN',
+      },
+      {
+        id: 'j3',
+        title: 'Queue marshalling, 3h',
+        where: 'Rank 12 · 1.2km',
+        money: { amount: minor(12000n), sourceAccountId: 'acc_j3' },
+        state: 'OPEN',
+      },
+      {
+        id: 'j4',
+        title: 'Yard maintenance',
+        where: 'Katlehong ext 4',
+        money: { amount: minor(25000n), sourceAccountId: 'acc_j4' },
+        state: 'OPEN',
+      },
     ],
   };
 }
@@ -169,7 +245,8 @@ const RULES: readonly Rule[] = [
   {
     test: /\b(balance|money|wallet|how much do i have|ngingakanani)\b/i,
     turn: () => ({
-      reply: "You have R340 ready to spend. There's R60 held in escrow for the kombi wash — that lands the moment the client approves.",
+      reply:
+        "You have R340 ready to spend. There's R60 held in escrow for the kombi wash — that lands the moment the client approves.",
       artifact: walletArtifact(),
     }),
   },
@@ -183,14 +260,16 @@ const RULES: readonly Rule[] = [
   {
     test: /\b(stokvel|umgalelo|society|group|chippa)\b/i,
     turn: () => ({
-      reply: 'Masakhane is at R2 700 of R3 600. Zanele collects this round. Two people still owe — want me to nudge them?',
+      reply:
+        'Masakhane is at R2 700 of R3 600. Zanele collects this round. Two people still owe — want me to nudge them?',
       artifact: stokvelArtifact(),
     }),
   },
   {
     test: /\b(job|work|gig|earn|sebenza|umsebenzi)\b/i,
     turn: () => ({
-      reply: "Four jobs near you right now. The kombi wash at Rank 42 pays R60 and it's a four-minute walk.",
+      reply:
+        "Four jobs near you right now. The kombi wash at Rank 42 pays R60 and it's a four-minute walk.",
       artifact: jobsArtifact(),
     }),
   },
@@ -211,7 +290,8 @@ const RULES: readonly Rule[] = [
   {
     test: /\b(week|history|activity|transactions|spent)\b/i,
     turn: () => ({
-      reply: 'R340 in this week, mostly washes. R413.50 out — the stokvel and electricity are the big ones.',
+      reply:
+        'R340 in this week, mostly washes. R413.50 out — the stokvel and electricity are the big ones.',
       artifact: transactionsArtifact(),
     }),
   },
@@ -219,7 +299,7 @@ const RULES: readonly Rule[] = [
 
 const FALLBACK: AgentTurn = {
   reply:
-    "I can help with your money, finding work, your stokvel, or paying a bill. Try \"how much do I have\", \"find me work\", or \"where did my fare go\".",
+    'I can help with your money, finding work, your stokvel, or paying a bill. Try "how much do I have", "find me work", or "where did my fare go".',
 };
 
 /** Deterministic. Same input, same turn — which is what makes it testable. */
@@ -234,7 +314,6 @@ export const SUGGESTIONS: readonly string[] = [
   'Where did my fare go?',
   'How is the stokvel doing?',
 ];
-
 
 /* ── ambient context ─────────────────────────────────────────────────────────
    What the context rail shows. The chat is still the spine of this app, so

@@ -23,11 +23,7 @@ interface SurfaceProps {
   readonly onClose: () => void;
 }
 
-function ArtifactHeader({
-  artifact,
-  onClose,
-  titleId,
-}: SurfaceProps & { titleId: string }) {
+function ArtifactHeader({ artifact, onClose, titleId }: SurfaceProps & { titleId: string }) {
   return (
     <div className="mb-6 flex items-start justify-between gap-3">
       <div className="min-w-0">
@@ -99,7 +95,12 @@ export function ArtifactSheet({ artifact, status, onClose }: SurfaceProps) {
         </p>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-8 pt-2">
           <ArtifactHeader artifact={artifact} onClose={onClose} titleId={titleId} />
-          <ArtifactBody artifact={artifact} status={status} onConfirm={onClose} onCancel={onClose} />
+          <ArtifactBody
+            artifact={artifact}
+            status={status}
+            onConfirm={onClose}
+            onCancel={onClose}
+          />
         </div>
       </div>
     </div>

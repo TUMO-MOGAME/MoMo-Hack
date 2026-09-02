@@ -8,7 +8,13 @@
 import { callbackUrlFor } from './config';
 import { MomoRequestError, upstream } from './errors';
 import { toMomoAmount } from './currency';
-import { type MomoTransport, assertExternalId, assertReferenceId, classify, snippet } from './client';
+import {
+  type MomoTransport,
+  assertExternalId,
+  assertReferenceId,
+  classify,
+  snippet,
+} from './client';
 import type {
   CollectionsApi,
   RequestToPayBody,

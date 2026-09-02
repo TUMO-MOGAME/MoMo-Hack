@@ -23,7 +23,10 @@ describe('a successful resolution', () => {
   test('writes the journal, sets journal_id, and enqueues exactly one outbox row', async () => {
     const id = seedPending(memory, { amountMinor: 50_000n });
 
-    const result = await resolveTransaction({ db: memory }, { referenceId: id, observed: 'SUCCESSFUL' });
+    const result = await resolveTransaction(
+      { db: memory },
+      { referenceId: id, observed: 'SUCCESSFUL' },
+    );
 
     expect(result.applied).toBe(true);
     expect(result.status).toBe('SUCCESSFUL');
@@ -56,7 +59,9 @@ describe('a successful resolution', () => {
 
     const results = [];
     for (let i = 0; i < 5; i++) {
-      results.push(await resolveTransaction({ db: memory }, { referenceId: id, observed: 'SUCCESSFUL' }));
+      results.push(
+        await resolveTransaction({ db: memory }, { referenceId: id, observed: 'SUCCESSFUL' }),
+      );
     }
 
     expect(results.filter((r) => r.applied)).toHaveLength(1);
@@ -99,7 +104,10 @@ describe('terminal states are absorbing', () => {
     const id = seedPending(memory);
     await resolveTransaction({ db: memory }, { referenceId: id, observed: 'FAILED' });
 
-    const late = await resolveTransaction({ db: memory }, { referenceId: id, observed: 'SUCCESSFUL' });
+    const late = await resolveTransaction(
+      { db: memory },
+      { referenceId: id, observed: 'SUCCESSFUL' },
+    );
 
     expect(late.applied).toBe(false);
     expect(memory.journalCount()).toBe(0);
@@ -109,10 +117,13 @@ describe('terminal states are absorbing', () => {
 
 describe('non-terminal observations', () => {
   test('INITIATED -> PENDING is claimable', async () => {
-    const id = seedPending(memory, {}, );
+    const id = seedPending(memory, {});
     memory.seedTransaction({ ...memory.transaction_(id)!, status: 'INITIATED' });
 
-    const result = await resolveTransaction({ db: memory }, { referenceId: id, observed: 'PENDING' });
+    const result = await resolveTransaction(
+      { db: memory },
+      { referenceId: id, observed: 'PENDING' },
+    );
 
     expect(result.applied).toBe(true);
     expect(memory.transaction_(id)?.status).toBe('PENDING');
@@ -123,7 +134,10 @@ describe('non-terminal observations', () => {
     // A status poll that says "still pending" must not look like a resolution.
     const id = seedPending(memory);
 
-    const result = await resolveTransaction({ db: memory }, { referenceId: id, observed: 'PENDING' });
+    const result = await resolveTransaction(
+      { db: memory },
+      { referenceId: id, observed: 'PENDING' },
+    );
 
     expect(result.applied).toBe(false);
     expect(result.reason).toBe('NO_CHANGE');
@@ -134,7 +148,10 @@ describe('non-terminal observations', () => {
     const id = seedPending(memory);
     memory.seedTransaction({ ...memory.transaction_(id)!, status: 'INITIATED' });
 
-    const result = await resolveTransaction({ db: memory }, { referenceId: id, observed: 'INITIATED' });
+    const result = await resolveTransaction(
+      { db: memory },
+      { referenceId: id, observed: 'INITIATED' },
+    );
 
     expect(result.status).toBe('PENDING');
     expect(memory.transaction_(id)?.status).toBe('PENDING');

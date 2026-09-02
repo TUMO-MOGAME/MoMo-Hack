@@ -169,11 +169,7 @@ async function resend(deps: ReconcileDeps, row: MomoTransactionRow): Promise<boo
 }
 
 /** Close out a transaction MTN never resolved. TIMEOUT, through the same guard. */
-async function abandon(
-  deps: ReconcileDeps,
-  row: MomoTransactionRow,
-  at: Date,
-): Promise<boolean> {
+async function abandon(deps: ReconcileDeps, row: MomoTransactionRow, at: Date): Promise<boolean> {
   const result = await resolveTransaction(
     { ...deps, now: () => at },
     { referenceId: row.id, observed: 'TIMEOUT' },

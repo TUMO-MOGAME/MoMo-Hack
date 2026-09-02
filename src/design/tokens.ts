@@ -145,17 +145,21 @@ export const colors: { light: ColorScale; dark: ColorScale } = {
 /** Dark-mode glow shadows — the signature of the reference system. */
 export const glow = {
   glow: '0 0 28px rgba(255, 255, 255, 0.08), 0 0 1px rgba(255, 255, 255, 0.4)',
-  'glow-strong':
-    '0 0 60px rgba(255, 255, 255, 0.18), 0 0 1px rgba(255, 255, 255, 0.55)',
+  'glow-strong': '0 0 60px rgba(255, 255, 255, 0.18), 0 0 1px rgba(255, 255, 255, 0.55)',
   /** Brand halo, used on the money-moving surfaces. */
-  'glow-brand':
-    '0 0 0 1px rgba(255, 203, 5, 0.35), 0 0 28px -6px rgba(255, 203, 5, 0.45)',
+  'glow-brand': '0 0 0 1px rgba(255, 203, 5, 0.35), 0 0 28px -6px rgba(255, 203, 5, 0.45)',
 };
 
 export const fonts = {
-  sans: { cssVar: '--font-geist-sans', stack: 'var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif' },
+  sans: {
+    cssVar: '--font-geist-sans',
+    stack: 'var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif',
+  },
   mono: { cssVar: '--font-geist-mono', stack: 'var(--font-geist-mono), ui-monospace, monospace' },
-  display: { cssVar: '--font-playfair', stack: 'var(--font-playfair), Georgia, "Times New Roman", serif' },
+  display: {
+    cssVar: '--font-playfair',
+    stack: 'var(--font-playfair), Georgia, "Times New Roman", serif',
+  },
 } as const;
 
 export const fontSize = {

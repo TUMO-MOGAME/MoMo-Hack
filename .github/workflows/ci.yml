@@ -101,6 +101,23 @@ jobs:
       - run: npm ci
       - run: npm run lint
 
+  format:
+    name: Format
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Separate from Lint on purpose. "Your import order is wrong" and "you
+      # left a variable unused" are different problems with different fixes, and
+      # a formatting failure should never be mistaken for a code-quality one.
+      # `npm run format` fixes everything this job can complain about.
+      - run: npm run format:check
+
   test:
     name: Tests
     runs-on: ubuntu-latest
