@@ -24,6 +24,10 @@ const y = (s) => `\x1b[33m${s}\x1b[0m`;
 const d = (s) => `\x1b[2m${s}\x1b[0m`;
 
 const sh = (cmd, args) => execFileSync(cmd, args, { encoding: 'utf8' }).trim();
+// Same, but silent on failure — for probes where "it does not exist" is the answer
+// we want, not an error worth showing. A scary `fatal:` on a success path teaches
+// people to distrust the guard, and a distrusted guard gets bypassed.
+const probe = (cmd, args) => execFileSync(cmd, args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
 const die = (msg) => {
   console.error(`\n  ${r('✖')} ${msg}\n`);
   process.exit(1);
@@ -55,7 +59,7 @@ sh('git', ['fetch', '--quiet', 'origin']);
 
 let remoteSha;
 try {
-  remoteSha = sh('git', ['rev-parse', `origin/${branch}`]);
+  remoteSha = probe('git', ['rev-parse', `origin/${branch}`]);
 } catch {
   die(`origin/${branch} does not exist locally even after fetch.`);
 }
@@ -73,7 +77,7 @@ console.log(`  ${g('✓')} head matches origin  ${d(remoteSha.slice(0, 8))}`);
 
 // If the branch exists locally too, it must agree — otherwise we have unpushed work.
 try {
-  const localSha = sh('git', ['rev-parse', branch]);
+  const localSha = probe('git', ['rev-parse', branch]);
   if (localSha !== remoteSha) {
     die(
       `M1 GUARD: local ${branch} differs from origin/${branch}.\n` +
@@ -112,7 +116,7 @@ sh('git', ['fetch', '--quiet', '--prune', 'origin']);
 
 let survived = false;
 try {
-  sh('git', ['rev-parse', `origin/${branch}`]);
+  probe('git', ['rev-parse', `origin/${branch}`]);
   survived = true;
 } catch {
   /* good — it is gone */
