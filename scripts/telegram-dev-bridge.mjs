@@ -30,7 +30,10 @@ const d = (s) => `\x1b[2m${s}\x1b[0m`;
 const b = (s) => `\x1b[1m${s}\x1b[0m`;
 const y = (s) => `\x1b[33m${s}\x1b[0m`;
 
-const env = loadEnv();
+// `loadEnv()` returns { env, path }, NOT the map. Destructure it, or every
+// lookup below is undefined and the script exits claiming the keys are unset
+// while they sit correctly in .env.local. Every sibling script destructures.
+const { env } = loadEnv();
 const token = env.TELEGRAM_BOT_TOKEN;
 const secret = env.TELEGRAM_WEBHOOK_SECRET;
 
