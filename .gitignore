@@ -55,3 +55,8 @@ yarn-error.log*
 # local scratch
 /scratch/
 /tmp/
+
+# Source photography. Originals are 2-6MB JPEGs; only the optimised WebP in
+# src/assets/images/ is committed. Regenerate with:
+#   node scripts/optimise-images.mjs
+/assets-src/
