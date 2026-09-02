@@ -1,7 +1,8 @@
 # MoMo Kasi — Agent Standing Orders
 
-> **Read this first, every session.** Then read `PLANNING.md` (what we're building and why)
-> and `STATUS.md` (what is done, what is in flight, what is tested).
+> **Read this first, every session.** Then read `MISTAKES.md` (what we got wrong once and will
+> not repeat), `PLANNING.md` (what we're building and why) and `STATUS.md` (what is done, what is
+> in flight, what is tested).
 > These three files are the contract between sessions. If you are a fresh thread, you need
 > nothing else to be productive.
 
@@ -51,6 +52,7 @@ Target submission: **28 Sep 2026**. Code freeze: **27 Sep 2026**. Solo developer
 
 | Need | File |
 |---|---|
+| **Mistakes made once, and the guard against each** | **`MISTAKES.md`** |
 | Why we're building this, the pitch, scope | `PLANNING.md`, `docs/00-PRODUCT-BRIEF.md` |
 | Current state of every workstream | `STATUS.md` |
 | **MoMo API facts — paths, headers, schemas** | **`momoAPIs.md`** |
@@ -75,6 +77,7 @@ Target submission: **28 Sep 2026**. Code freeze: **27 Sep 2026**. Solo developer
 ## Session start checklist
 
 ```
+0. cat MISTAKES.md                # do not repeat any of these
 1. cat STATUS.md                  # what is done / in flight / blocked
 2. git log --oneline -10          # what actually landed
 3. gh pr list                     # what is open
@@ -85,6 +88,7 @@ Target submission: **28 Sep 2026**. Code freeze: **27 Sep 2026**. Solo developer
 ## Session end checklist
 
 ```
+0. Made a mistake? Add it to MISTAKES.md WITH A GUARD, not just a note
 1. Update STATUS.md (done / tested / blocked / next)
 2. Add an ADR if you made a decision that constrains future work
 3. Commit on a branch, open a PR, do not merge red
