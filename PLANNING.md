@@ -224,10 +224,24 @@ Rationale and alternatives: `docs/01-ARCHITECTURE.md` and `docs/adr/`.
 | ~~Q3~~ | ~~Public repo acceptable?~~ | — | — | ✅ decided, ADR-0005 |
 | Q4 | Any hackathon-mandated stack, region or template? | Scope | Tumo | Day 4 |
 | Q5 | Team name / entry registration required first? | Submission | Tumo | Day 5 |
-| Q6 | Supabase region — closest to SA, for POPIA s72 (`docs/14` §7) | Phase 3 integration tests | Tumo | **next session** |
+| Q6 | Supabase region — **measured as `eu-west-2` (London), not an African region.** Keep it or recreate? | Phase 3 integration tests | Tumo | **now — it is free to change today and expensive later** |
 
 **Q1 is the one that matters.** Every date in §7 and §10 assumes 28 Sep. If the real deadline is
 earlier, the cut list in `docs/05` §7 starts applying immediately rather than as a contingency.
+
+**Q6 now has a measurement, and a deadline of its own.** The first Supabase project resolves to
+AWS `eu-west-2`, London — established by matching the database host's IPv6 address against
+Amazon's published `ip-ranges.json`, not by reading the dashboard. Two consequences:
+
+- **POPIA s72 is satisfiable either way**, but not identically. A transfer to the UK rests on the
+  recipient being subject to a law affording adequate protection, which UK GDPR does. That is an
+  argument we would have to make; a South African region is an argument we would not have to make
+  at all. `docs/14` §7 asks for the closest region to SA, and London is not it.
+- **The cost of changing this only goes up.** The project is empty today, so recreating it costs
+  minutes. Once migrations, storage objects and demo data exist it costs a rebuild, and the free
+  tier allows exactly two projects — so a throwaway attempt burns the staging slot.
+
+Decide before F5 applies the first migration.
 
 ---
 

@@ -79,12 +79,12 @@ Test column: `none` / `unit` / `+prop` (property-based) / `+int` (integration in
 | F3b | Design tokens (`src/design/tokens.ts` + `@theme`) | `[x]` | none | unit | — | Architecture from Social-Assembly; brand retuned to MTN gold |
 | F3c | Frozen contracts: `money`, `split`, `errors`, `artifacts/types` | `[x]` | **manual** | +prop | — | Split verified exact across 200,000 amounts. Needs the real fast-check suite (M1d). |
 | F3d | Starter chat + artifact UI (mock agent) | `[x]` | manual | +e2e | — | 7 artifact renderers, chip + panel + bottom sheet, zero keys needed |
-| F4 | Supabase staging + prod projects | `[ ]` | none | +int | — | Free tier allows exactly 2 |
-| F5 | Migration pipeline (local, CI, deploy) | `[ ]` | none | +int | — | |
-| F6 | CI quality gate workflow | `[ ]` | none | n/a | — | |
+| F4 | Supabase staging + prod projects | `[~]` | none | +int | — | **Project 1 of 2 live and verified** — URL, anon and service_role all resolve to ref `edtduvwbejdfahkmfort`, service_role authenticates 200. **Region is `eu-west-2` (London)**, measured from the DB host's IPv6 against AWS's published ranges — not an African region. See Q6. |
+| F5 | Migration pipeline (local, CI, deploy) | `[ ]` | none | +int | — | Two migrations exist and have never been applied to a real database |
+| F6 | CI quality gate workflow | `[x]` | **verified** | n/a | #13 | Typecheck · Lint · Tests · Build · Money guards, each a separate named job. Guards tested against synthetic violations to prove they fire. |
 | F7 | Vercel project + preview deploys | `[ ]` | none | +e2e | — | |
 | F8 | GitHub Actions scheduler + keep-alive | `[ ]` | none | +int | — | ADR-0006 |
-| F9 | Secrets wired (MoMo, Supabase, Telegram) | `[ ]` | n/a | n/a | — | |
+| F9 | Secrets wired (MoMo, Supabase, Telegram) | `[~]` | n/a | n/a | — | All present in `.env.local` and verified live. **None are in GitHub Secrets yet**, so nothing deployed can use them. |
 
 ## 1. Money engine (MUST)
 
@@ -190,6 +190,11 @@ Format: one line per merged workstream, with the evidence.
 | 2026-09-02 | Telegram bot | **integration** | `getMe` + `getWebhookInfo` on `@momokasi_demo_bot`. Live. |
 | 2026-09-02 | Money engine (PR #10) | unit + property + contract | **231 tests, 15 files.** Ledger balance, state transitions, MoMo response matrix, webhook/cron auth. Typecheck clean. |
 | 2026-09-02 | Frontend (PR #11) | unit | **90 tests, 6 files.** Every artifact renders from a fixture; the provenance guard is locked in. Typecheck clean. |
+| 2026-09-02 | Money engine reviewed and merged (#10) | read, not just run | Diff read in full. Verified by hand: the overdraft trigger follows each account's normal balance; `claimTransition` takes `for update` so concurrent resolvers serialise; the callback body can only trigger a lookup and never sets a status; cron uses a constant-time compare; ledger tables carry no RLS policies at all. |
+| 2026-09-02 | Supabase project 1 | **integration** | URL, anon and service_role keys all carry ref `edtduvwbejdfahkmfort`; GoTrue health 200; service_role authenticates against PostgREST 200. Region measured as `eu-west-2` (London) from the DB host's IPv6 against AWS's published ranges. |
+| 2026-09-02 | `npm run check:momo` | **integration** | Dead on main (`ReferenceError: resolve is not defined`). Fixed and re-run live: token issued, all six MSISDN cases match the `[V]` table in `momoAPIs.md` §10, idempotency `202` then `409`. |
+| 2026-09-02 | CI quality gate (#13) | **verified** | Typecheck, lint, full 231-test suite and production build all green locally on the bumped toolchain. Both content guards tested against a synthetic violation to prove they fire, and against this tree to prove they do not fire on prose. |
+| 2026-09-02 | Dependency health | **verified** | `npm audit` 9 vulnerabilities (3 critical) → **0**. `npm ci` restored — it had been failing since PR #2. |
 
 ---
 
@@ -257,6 +262,36 @@ Deferring is legitimate; deferring silently is not.
 ---
 
 ## Session log
+
+### 2026-09-02 (session 2) — money engine merged, and CI made real
+
+**Merged:** #10, the money engine, after reading the diff rather than trusting the test count.
+The design holds up: the overdraft trigger correctly follows each account's normal balance
+instead of the version printed in `docs/02`, which would have rejected the first collection ever
+taken; `claimTransition` takes `for update`, so two resolvers racing the same transaction
+serialise; the callback body can only ever trigger a lookup, never set a status.
+
+**The session's real finding is that we could not have known any of that from CI.** `STATUS.md`
+called both PRs green. Neither was — `Audits / A8` had been red on every branch since PR #2 —
+and more importantly CI ran no tests, no typecheck, no lint and no build, so it was never in a
+position to agree or disagree. Four more defects were sitting behind that: 9 vulnerabilities
+including 3 critical, an ESLint setup that could not run non-interactively (so `npm run verify`
+could not complete either), and `npm run check:momo` dead on `main` with a `ReferenceError`
+since #9. Each was found by writing the gate, not by using the code.
+
+**Two guards were themselves wrong, and both are now fixed.** `safe-merge.mjs` reported #10's
+successful merge as a failure, because `--delete-branch` could not remove a local branch a
+worktree was holding and the script concluded from the exit code instead of asking GitHub —
+which is M2, committed by the script written to prevent M2. And the no-floating-point guard
+fired on its own prose in any Windows checkout, because `core.autocrlf` gave it CRLF and its
+comment-stripping regex cannot cross a `\r`; it passed in the tree that authored the file and on
+Linux CI, which is the worst possible combination. `.gitattributes` fixes the cause.
+
+**Supabase project 1 is live and verified** — all three values belong to ref
+`edtduvwbejdfahkmfort`. It is in `eu-west-2`, London, measured from the database host's IPv6
+against AWS's published ranges. That is a decision for Tumo (Q6), cheapest to reverse today.
+
+**Still blocked:** Q1, the submission deadline. Asked a third time.
 
 ### 2026-09-02 (session 1 close) — credentials verified, money engine built, agents stopped
 
