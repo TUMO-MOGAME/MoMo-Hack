@@ -232,6 +232,59 @@ parameter fails both with the original `could not determine data type of paramet
 
 ---
 
+## M10 · The agent invented an action, and every guard we had was watching the numbers
+
+**What happened.** In the deployed chat, a user typed *"lets send money to this person send 0.01
+the number is 0761346606"*. The agent replied:
+
+> *"I've prepared a transfer of R0.01 to 0761346606 from your spendable balance. Since I cannot
+> move money myself, please confirm the payment on your phone screen to send it."*
+
+**Nothing was prepared.** Disbursements (M3a) are not built, `propose_*` (S7f) is not built, and
+there is no confirmation surface on any device. The card rendered beside that sentence was the
+wallet — *"Where the money is"* — which is not what the sentence claimed to be showing. The user
+was told money was one tap from moving. It was not, and no tap would ever have arrived.
+
+Two turns earlier the same agent had said *"my live tools aren't connected in this demo"* while
+quoting a correct R2.00 balance it had just read from the ledger.
+
+**Why.** Three causes. The third is the one that generalises.
+
+1. **The routing mapped a DO request onto a READ tool.** The wallet pattern contains the word
+   `money`, so *"send **money** to…"* matched it. The server read the ledger, built a wallet
+   artifact, and handed the model a balance card as the premise for a payment request. **The model
+   then wrote prose that fits the card rather than prose that fits the truth** — which is what a
+   model asked to narrate a mismatched artifact will always do.
+2. **The system prompt had expired.** `persona.ts`'s GROUNDING block said, in as many words,
+   *"You have NO tools connected yet, and no access to any real account… You have NO balances, NO
+   transactions."* True when written; false from #32, when the read tools landed. Its own docstring
+   said *"when the read tools land, delete GROUNDING"* and nobody did. So the prompt shipped
+   **contradicting itself** — GROUNDING swearing the agent was blind while `grounding()` in
+   `respond.ts` handed it real balances in the same message. A model given two contradicting
+   instructions honours whichever it likes, turn by turn, and that is exactly the transcript.
+3. **Every control we had was pointed at the numbers.** The server builds the artifact; `grounding()`
+   pins the figures; the provenance guard strikes through any amount without a `sourceTxnId`. All
+   three held perfectly here — R0.01 was the user's own figure and no balance was invented.
+   **The lie was in the verb.** "I've prepared" is not a number, so nothing in a stack of numeric
+   provenance controls could see it. CLAUDE.md #14 covers invented amounts; nothing covered
+   invented *actions* — and an invented action is worse, because the user acts on it.
+
+**The rule.** **A request to DO something must never route to a tool that READS something.** If the
+verb is unbuilt, answer deterministically, render no artifact, and do not call the model at all —
+there is nothing true for it to add, and a refusal it cannot reword is a refusal it cannot be
+talked out of. Separately: **a prompt that describes a build state carries an expiry date.** Any
+block naming which tools exist is updated in the same PR as the tool it describes, and the file
+that claims to be a spec's verbatim copy is tested against that spec.
+
+**The guard.** `tests/unit/agent/refusal.test.ts` — the agent core's first tests. Nine real
+phrasings (including the verbatim transcript line) must each return no artifact, `tool: 'none'`,
+`modelled: false` and a sentence that says no; five ordinary money questions must *not* be
+swallowed by the new route; the prompt is asserted not to claim it has no tools; and the VOICE
+block is diffed against docs/12 §4.2 so the two cannot drift in either direction. Proved to fire:
+disabling the `unbuilt` route fails 9 tests by name.
+
+---
+
 ## What has gone right, and why
 
 Worth recording, because these are the patterns to keep:
