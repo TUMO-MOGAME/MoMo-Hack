@@ -34,6 +34,7 @@
 import type { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
+import { MomoMark, TumoOloMark } from '@/components/brand-marks';
 import { ShieldIcon } from '@/components/icons';
 import earnHustle from '@/assets/images/earn-hustle.webp';
 import heroPhone from '@/assets/images/hero-phone.webp';
@@ -131,6 +132,36 @@ const PEOPLE: readonly Person[] = [
     name: 'MaDlamini, 52',
     who: 'Soweto. Runs a 12-member grocery stokvel, R300 a week each, in a book.',
     need: 'To stop carrying R3 600 in a handbag and chasing three people every week.',
+  },
+];
+
+const REPO_URL = 'https://github.com/TUMO-MOGAME/MoMo-Hack';
+const BUILDER_URL = 'https://www.tumoolo.tech/work';
+
+/** The source list the statistics above are drawn from, kept one click away. */
+const SOURCES_URL = `${REPO_URL}/blob/main/docs/00-PRODUCT-BRIEF.md`;
+
+interface FooterColumn {
+  readonly title: string;
+  readonly links: readonly { readonly label: string; readonly href: string }[];
+}
+
+const FOOTER_COLUMNS: readonly FooterColumn[] = [
+  {
+    title: 'The pitch',
+    links: [
+      { label: 'Why now', href: '#why' },
+      { label: 'The product', href: '#what' },
+      { label: 'Who it is for', href: '#who' },
+    ],
+  },
+  {
+    title: 'The build',
+    links: [
+      { label: 'Engineering', href: '#how' },
+      { label: 'Open the demo', href: '/chat' },
+      { label: 'Source and sources', href: SOURCES_URL },
+    ],
   },
 ];
 
@@ -476,31 +507,104 @@ export default function LandingPage() {
         </section>
       </main>
 
-      <footer className="border-t border-border px-5 py-10 text-xs leading-relaxed text-muted-foreground sm:px-8">
-        <div className="mx-auto max-w-4xl space-y-2">
-          <p>
-            Figures verified 2026-09-02. Unemployment and NEET: Stats SA QLFS Q2 2026. Stokvel
-            membership: NASASA. Taxi industry sizing: TopAuto and Kuba. MoMo scale and the
-            quotation: MTN Group, reported by TechCabal, 1 September 2026. Full source list in{' '}
-            <span className="text-foreground">docs/00-PRODUCT-BRIEF.md</span> in the repository.
-          </p>
-          <p>
-            A hackathon submission. MoMo sandbox only — no real money, no KYC implementation, no
-            licence, and no taxi-association agreement. Those boundaries are written down rather
-            than glossed over.
-          </p>
+      {/*
+        The footer used to be three dense paragraphs of citation and disclaimer.
+        Everything in them was true and worth saying, but stacked as grey prose
+        it read as a licence agreement and nobody finished it. The facts did not
+        move — the sources sit behind "Source and sources", the sandbox boundary
+        is a badge you cannot miss, and the trademark line is one sentence. What
+        was lost is the wall, not the honesty.
+      */}
+      <footer className="border-t border-border">
+        {/* A single gold thread, the brand colour used once, to close the page. */}
+        <div
+          aria-hidden="true"
+          className="h-px bg-gradient-to-r from-transparent via-brand/60 to-transparent"
+        />
+
+        <div className="mx-auto max-w-4xl px-5 py-14 sm:px-8">
+          <div className="grid gap-10 sm:grid-cols-[1.6fr_1fr_1fr]">
+            <div>
+              <span className="font-display text-2xl text-brand">MoMo Kasi</span>
+              <p className="mt-3 max-w-xs text-sm leading-relaxed text-muted-foreground">
+                Earn, share, spend. One double-entry ledger across three MTN MoMo APIs.
+              </p>
+            </div>
+
+            {FOOTER_COLUMNS.map((column) => (
+              <nav key={column.title} aria-label={column.title}>
+                <h2 className="text-xs uppercase tracking-widest text-muted-foreground">
+                  {column.title}
+                </h2>
+                <ul className="mt-4 space-y-2.5">
+                  {column.links.map((link) => (
+                    <li key={link.label}>
+                      <Link
+                        href={link.href}
+                        className="text-sm text-foreground transition-colors hover:text-brand"
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+            ))}
+          </div>
+
           {/*
-            The Pexels licence does not require attribution. We do it anyway: a
-            page whose argument is that every cent traces to a journal should not
-            use five uncredited photographs of other people's work.
+            The two attributions, given equal weight and held apart: whose rails
+            this runs on, and who built it. Neither is decoration — the MoMo mark
+            is the reason the app can move money at all, and Tumo Olo is the
+            answer to "who do we talk to".
           */}
-          <p>
-            Photographs, under the Pexels licence, by Shutter Rwanda, Khetho Mkhaliphi, Ntate
-            Mohlala Sir, Ario Stories and Alvin Caal. They are atmosphere, not evidence — nobody
-            pictured is a MoMo Kasi user, and the three people in{' '}
-            <span className="text-foreground">Who it is for</span> are composite personas from the
-            product brief, not the people in these frames.
-          </p>
+          <div className="mt-12 grid gap-8 border-t border-border pt-8 sm:grid-cols-2 sm:items-start">
+            <div className="flex items-center gap-3.5">
+              <MomoMark size={44} />
+              <div>
+                <p className="text-sm font-medium text-foreground">Built on the MTN MoMo API</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Collections · Disbursements · Remittances
+                </p>
+              </div>
+            </div>
+
+            <div className="sm:justify-self-end sm:text-right">
+              <p className="text-xs uppercase tracking-widest text-muted-foreground">Built by</p>
+              <a
+                href={BUILDER_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="mt-2.5 inline-block transition-opacity hover:opacity-80"
+              >
+                <TumoOloMark className="h-6 w-auto sm:h-7" />
+              </a>
+              <p className="mt-2.5 text-xs text-muted-foreground">
+                Built in Johannesburg. Designed to be handed over.
+              </p>
+            </div>
+          </div>
+
+          {/*
+            Stacked by default, one row from `sm` up. Three variable-length
+            items sharing a single wrapping flex row overflowed a 390px phone —
+            the trademark sentence has no break opportunity short enough to save
+            it — so the small print is two blocks that cannot fight each other.
+          */}
+          <div className="mt-10 flex flex-col gap-4 border-t border-border pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
+            {/*
+              Kept, and made louder rather than quieter. We are showing MTN's
+              mark on a page that says "tap to pay your fare"; without this the
+              page implies a live integration it does not have.
+            */}
+            <span className="inline-flex w-fit shrink-0 items-center gap-2 rounded-full border border-brand/40 px-3 py-1 font-medium text-brand">
+              <span aria-hidden="true" className="size-1.5 rounded-full bg-brand" />
+              Sandbox only — no real money moves
+            </span>
+            <p className="text-balance sm:text-right">
+              © 2026 Tumo Olo (Pty) Ltd. MTN, MoMo and the MoMo logo are trademarks of MTN Group.
+            </p>
+          </div>
         </div>
       </footer>
     </div>
