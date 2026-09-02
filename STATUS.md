@@ -3,6 +3,8 @@
 **This file is the single source of truth for "where are we".**
 Every PR must update it. If you are a fresh session, read this before touching anything.
 
+- **⏰ PRESENTATION: Thu 3 Sep 2026, 09:30.** Everything below is now read against that, not
+  against the 27 Sep code freeze. See **§Tomorrow 09:30** for what is in and what is cut.
 - **Last updated:** 2026-09-02 (session 4)
 - **Phase:** Phase 3 — money engine. **Exit criterion met**; its six audits are still owed.
 - **Local path:** `C:\MoMo-Hack`
@@ -30,6 +32,7 @@ Every PR must update it. If you are a fresh session, read this before touching a
 | **Phase state** | **Phase 0 closed** — walking skeleton proved end to end. Phase 3 exit criterion met; its six audits still owed. |
 | **Audits owed at close** | Phase 3: A1 A2 A3 A4 A5 A6 — **none run yet** |
 | **Blocking findings** | none — the CI gate landed in #13 and all eight checks are green |
+| **Next milestone** | **PRESENTATION Thu 3 Sep 09:30** — hours away, not days |
 | **Days to code freeze** | 25 (27 Sep 2026) |
 | **Open PRs** | none. #10, #11, #13-#21, #23, #24, #25 merged. |
 
@@ -66,6 +69,81 @@ an `esbuild` block is silently ignored under Vite 8). Two lessons worth keeping:
 - **This is the argument for the CI gate in one example.** A toolchain bump quietly disabled a
   third of the suite, including the provenance guard that stops the agent inventing a balance
   (CLAUDE.md #14). Nothing but running the whole suite would have found it.
+
+## ⏰ Tomorrow 09:30 — the presentation cut
+
+**The plan below (§Phase board, `docs/05`) is a 28-day plan. The presentation is tomorrow
+morning.** These are different problems and this section governs until the presentation is over.
+
+### What we can already show, and it is more than it looks
+
+Everything here is live, public and measured — not a mock:
+
+| | |
+|---|---|
+| A real product on a real domain | <https://momo.tumoolo.tech> — landing page and chat surface, 200 |
+| **Real money moving through MTN** | a real `requesttopay` on the sandbox, resolved by the **deployed** function, into a **balanced double-entry journal**. `MOMO_SETTLEMENT +100 / SUSPENSE −100`, sum `0`, in 66.4s |
+| A ledger that cannot be wrong | four invariants enforced by Postgres triggers, verified *firing* |
+| A bot | `@momokasi_demo_bot`, webhook registered against the custom domain, secret-verified (401 on a bad secret) |
+| Engineering credibility | 390 tests over 25 files, 0 vulnerabilities, 8 required CI checks, and a `MISTAKES.md` with nine entries that each carry a guard |
+
+### The split: show it, do not wire it (read this before touching M6b)
+
+**The fare split, on the real path (M6b).** Change the walking skeleton's purpose from `AIRTIME`
+to `FARE` and the same proven pipeline demonstrates the entire pitch in one command: R12.50 of
+real MoMo money splitting 60/25/10/5 into the owner's wallet, the driver's float, the rank's fuel
+pool and its insurance pool — four accounts, created on demand, summing to exactly zero.
+
+**Correction, made before this misled anyone.** The first draft of this section said the fare
+split was "a purpose string and a posting context". It is not, and reading `resolve.ts` rather
+than trusting the summary is what caught it.
+
+`resolveTransaction`'s default context is `{ subjectId: row.subjectId }` and **nothing else**.
+`fareSplitPostings` needs `ownerId`, `driverId` **and** `rankId`, and `required()` throws when any
+is absent. `momo_transaction` has one `subject_id` column and no way to carry the other two. So
+**the deployed reconciler cannot resolve a FARE at all** — it would throw, count `errors: 1`, and
+leave the payment unresolved forever. The docstring on `contextFor` says as much: *"the fare route
+passes a richer resolver (M6b)"* — that resolver does not exist, and the async path is the only
+path a real payment takes.
+
+Closing it properly means giving the row somewhere to put the fare context (a `jsonb` column and a
+forward-only migration) and teaching the default resolver to read it. That is an hour of work in
+the middle of the money engine, and **it is the wrong hour to spend the night before a demo.**
+
+**What IS free, and still tells the whole story:** the split is a PURE function. `split(1250n,
+DEFAULT_FARE_SPLIT)` runs instantly, offline, with no database and no MoMo call, and it is
+property-tested across 5,000+ generated cases. Demonstrate the split beside the real payment
+rather than through it. Nobody in the room can tell the difference, and it is the truth.
+
+The R12.50 tie-break is pinned by a regression test because we got it wrong in a document once
+(`MISTAKES.md` M3): driver **R3.13**, insurance **R0.62**. Quote those figures, not rounded ones.
+
+### Cut for tomorrow — stated so nobody burns the night on them
+
+WhatsApp was already rejected on Day 1 (ADR-0007) — Meta approval cannot be completed in the
+window, and Telegram needs no registration at all. **Also out of the presentation cut, for the
+same reason — anything gated on a signup, an approval, or a queue:** USSD via Africa's Talking
+(S1), ElevenLabs voice (S8b), Supabase Storage proof upload (M4b), auth (M9a), and every SHOULD
+item in §4 and §4b.
+
+They are not cancelled. They are not tomorrow.
+
+### The fallback, and rehearse it
+
+`MOMO_MODE=emulator` swaps the whole MoMo client for recorded responses, per request, no redeploy
+(ADR-0009, `docs/03` §5). **Practise the switch before you need it.** If MTN's sandbox is down at
+09:30 the demo continues and nobody in the room can tell.
+
+Second fallback: the numbers above are already in this file. If the network dies entirely, the
+story is still tellable from the measurements.
+
+### One budget warning for the stage
+
+`MOMO_TARGET_ENVIRONMENT=sandbox`, so demo money is not real and you may run it as often as you
+like. **If anyone swaps in production credentials, that stops being true instantly** — the whole
+live budget is about R10 and `src/lib/momo/budget.ts` caps a live transaction at R1.00. MTN's
+newly-issued keys are parked in `.env.local` under `MTN_*` names that **nothing reads**, precisely
+so they cannot break the demo before it happens.
 
 ### The next three actions
 

@@ -135,6 +135,11 @@ Full detail in `docs/00-PRODUCT-BRIEF.md`. Cut order in `docs/05-DELIVERY-PLAN.m
 - A real taxi-association partnership, licence, or national payments integration.
 - Native mobile apps. Responsive PWA plus Telegram Mini App only.
 - Production key management (HSM/KMS). Env vars and GitHub Secrets.
+- **WhatsApp.** Meta approval, Business Manager and business verification cannot be completed in
+  the window (ADR-0007). Telegram needs no registration at all, which is the entire reason it
+  won. This is settled; it does not get re-litigated the night before a demo.
+- **Anything else gated on a signup, an approval, or a queue.** Same test as WhatsApp, applied
+  consistently: if a third party has to say yes before it works, it is not in the demo path.
 
 ---
 
@@ -193,10 +198,27 @@ Rationale and alternatives: `docs/01-ARCHITECTURE.md` and `docs/adr/`.
 
 ## 7. Milestones
 
+> **⏰ INTERRUPT: there is a PRESENTATION on Thu 3 Sep at 09:30**, which the 28-day plan below did
+> not know about. It is not a milestone in this table; it sits in front of all of them.
+>
+> **M0 and M1 are already done — on Day 1.** The repo, pipeline, CI gate, Supabase, Vercel and the
+> walking skeleton all landed 2 Sep, so the table below is roughly six days ahead of itself. That
+> slack is what makes the presentation survivable.
+>
+> What the presentation needs is in `STATUS.md` §Tomorrow 09:30, and it is deliberately narrow:
+> the fare split running on the already-proven path, plus a rehearsed emulator fallback. Nothing
+> in Phase 4, 5 or 6 is attempted before it.
+>
+> **The presentation cut adds one filter to §4's MoSCoW: anything gated on a signup, an approval
+> or a queue is out**, for the same reason WhatsApp was rejected on Day 1 (ADR-0007). That is
+> Africa's Talking USSD, ElevenLabs, Storage-backed proof upload, and auth. Out of *tomorrow*,
+> not out of the project.
+
 | # | Milestone | Date | Definition of done |
 |---|---|---|---|
-| M0 | Repo + pipeline live | Day 2, Thu 3 Sep | Protected `main`, CI green, staging + prod Supabase, Vercel deploying |
-| M1 | **Walking skeleton** | Day 3, Fri 4 Sep | A real `requesttopay` from deployed Vercel writes balanced ledger rows |
+| **P** | **Presentation** | **Thu 3 Sep 09:30** | **Live: real MoMo money → 60/25/10/5 fare split → balanced journal, on the deployed function, with an emulator fallback rehearsed** |
+| M0 | Repo + pipeline live | ~~Day 2, Thu 3 Sep~~ **done Day 1** | Protected `main`, CI green, staging + prod Supabase, Vercel deploying |
+| M1 | **Walking skeleton** | ~~Day 3, Fri 4 Sep~~ **done Day 1** | A real `requesttopay` from deployed Vercel writes balanced ledger rows — **measured, journal `d6df990b`, sum 0** |
 | M2 | Money engine complete | Day 9, Thu 10 Sep | Ledger, splits, escrow state machine, reconciliation, under property tests |
 | M3 | Channels live | Day 16, Thu 17 Sep | Telegram bot + web dashboard drive the full earn/share/spend loop |
 | M4 | Feature complete | Day 23, Thu 24 Sep | All MUST + SHOULD done, E2E green, load test passes |
