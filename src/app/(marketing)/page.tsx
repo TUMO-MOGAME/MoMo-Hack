@@ -77,40 +77,6 @@ const STATS: readonly Stat[] = [
   },
 ];
 
-interface Module {
-  readonly name: string;
-  readonly what: string;
-  readonly api: string;
-}
-
-const MODULES: readonly Module[] = [
-  {
-    name: 'Kasi Ride',
-    what: 'Tap-to-pay taxi fare that splits 60/25/10/5 at the moment of collection — owner, driver float, fuel pool, insurance pool.',
-    api: 'Collections + Disbursements',
-  },
-  {
-    name: 'Kasi Gigs',
-    what: 'Micro-work with the money escrowed before the job starts, released on photo proof, and a Trust Score that grows with every clean job.',
-    api: 'Collections + Disbursements',
-  },
-  {
-    name: 'Kasi Stokvel',
-    what: 'The group pool MaDlamini keeps in a handbag, with automated collection, a balance every member can see, and a rotating payout.',
-    api: 'Collections + Disbursements',
-  },
-  {
-    name: 'Kasi Bills',
-    what: 'Prepaid electricity, school fees, airtime and data — plus split-a-bill, so a shared cost stops being an argument.',
-    api: 'Collections',
-  },
-  {
-    name: 'Kasi Home',
-    what: 'A purpose-locked sub-wallet funded from the diaspora. R2 000 sent from London can pay school fees and nothing else.',
-    api: 'Remittances',
-  },
-];
-
 interface Person {
   readonly name: string;
   readonly who: string;
@@ -141,50 +107,37 @@ const BUILDER_URL = 'https://www.tumoolo.tech/work';
 /** The source list the statistics above are drawn from, kept one click away. */
 const SOURCES_URL = `${REPO_URL}/blob/main/docs/00-PRODUCT-BRIEF.md`;
 
-interface FooterColumn {
-  readonly title: string;
-  readonly links: readonly { readonly label: string; readonly href: string }[];
-}
-
-const FOOTER_COLUMNS: readonly FooterColumn[] = [
-  {
-    title: 'The pitch',
-    links: [
-      { label: 'Why now', href: '#why' },
-      { label: 'The product', href: '#what' },
-      { label: 'Who it is for', href: '#who' },
-    ],
-  },
-  {
-    title: 'The build',
-    links: [
-      { label: 'Engineering', href: '#how' },
-      { label: 'Open the demo', href: '/chat' },
-      // The one page on this site whose numbers are not illustrative. Everything
-      // else is driven by the mock agent; /ledger reads Postgres. It earns a
-      // link because "we keep a real ledger" is a claim, and this is the proof.
-      { label: 'The live ledger', href: '/ledger' },
-      { label: 'Source and sources', href: SOURCES_URL },
-    ],
-  },
-];
-
-const ENGINEERING: readonly string[] = [
-  'A double-entry ledger. Not a balance column — every cent traces to a journal that sums to zero.',
-  'Integer basis-point splits with explicit remainder handling. No floating-point money anywhere.',
-  'Idempotency by construction: our UUID is the MoMo X-Reference-Id, so a retry cannot double-pay.',
-  'Two independent paths to truth — the webhook callback and a reconciliation poller, both replay-safe.',
-  'Property-based tests on the money invariants. Splits always sum. Ledgers always balance.',
-  'Offline-first fare capture, demonstrated live in airplane mode.',
-];
-
 /**
- * The habit loop, as three pictures.
+ * Which MoMo environment this deployment actually talks to.
  *
- * `alt` describes the SCENE, not the label sitting on top of it — a screen
- * reader that hears "Earn" from the caption and "Earn" again from the image has
- * been told nothing twice.
+ * The footer used to state "Sandbox only — no real money moves" as a literal.
+ * That was true when written and false from the moment R0.50 cleared on MTN
+ * South Africa production — the fifth sentence in this codebase to describe a
+ * build state and then outlive it. It is read from the environment now, so it
+ * cannot expire again: change the deployment and the badge changes with it.
+ *
+ * CLAUDE.md #15: anything other than the exact string `sandbox` spends real
+ * money. So the comparison is against that exact string, and every other value
+ * — including unset — reads as live. Erring toward "real money moves" is the
+ * safe direction for a warning; the opposite understates it.
+ *
+ * Safe in a server component: this file has no `use client`, so the value is
+ * resolved at render time on the server and never shipped to the browser.
  */
+const MOMO_IS_SANDBOX = process.env.MOMO_TARGET_ENVIRONMENT === 'sandbox';
+
+const FOOTER_LINKS: readonly { readonly label: string; readonly href: string }[] = [
+  { label: 'Why now', href: '#why' },
+  { label: 'Who it is for', href: '#who' },
+  { label: 'Open the demo', href: '/chat' },
+  // The page whose numbers have always been real: /ledger reads Postgres. It
+  // earns a link because "we keep a real ledger" is a claim and this is the
+  // proof. (This entry used to carry "everything else is driven by the mock
+  // agent" — untrue since #32: the chat answers from the same database.)
+  { label: 'The live ledger', href: '/ledger' },
+  { label: 'Source and sources', href: SOURCES_URL },
+];
+
 const BEHAVIOURS = [
   {
     key: 'Earn',
@@ -310,10 +263,10 @@ export default function LandingPage() {
                 Talk to it
               </Link>
               <a
-                href="#how"
+                href="/ledger"
                 className="inline-flex min-h-12 items-center rounded-lg border border-border px-5 text-base font-medium text-foreground transition-colors hover:border-brand hover:bg-secondary"
               >
-                How it is built
+                See the live ledger
               </a>
             </div>
 
@@ -322,9 +275,9 @@ export default function LandingPage() {
                 <ShieldIcon size={14} />
               </span>
               <span>
-                MoMo <strong className="text-foreground">sandbox</strong> only. No real money moves,
-                and the assistant cannot move money at all — it can only propose, and a human tap
-                settles it.
+                The assistant <strong className="text-foreground">cannot move money</strong>. It has
+                no write tools, by design — a person types a command, and MTN asks them to approve
+                it on their own handset, with a PIN we never see.
               </span>
             </p>
           </div>
@@ -406,27 +359,6 @@ export default function LandingPage() {
           </figure>
         </section>
 
-        {/* what it is */}
-        <Section id="what" kicker="The product" title="Five modules. One wallet, one ledger.">
-          <ul className="space-y-3">
-            {MODULES.map((m) => (
-              <li key={m.name} className="rounded-lg border border-border bg-card p-5">
-                <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                  <h3 className="text-base font-semibold text-foreground">{m.name}</h3>
-                  <span className="text-xs uppercase tracking-widest text-muted-foreground">
-                    {m.api}
-                  </span>
-                </div>
-                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{m.what}</p>
-              </li>
-            ))}
-          </ul>
-          <p className="mt-6 max-w-2xl text-base leading-relaxed text-foreground">
-            These are not five apps. A fare paid in Kasi Ride is spendable in Kasi Bills the same
-            second, because both are postings against the same account.
-          </p>
-        </Section>
-
         {/* who it is for */}
         <Section id="who" kicker="Who it is for" title="Three people, not a segment.">
           <ul className="grid gap-4 sm:grid-cols-3">
@@ -438,40 +370,6 @@ export default function LandingPage() {
               </li>
             ))}
           </ul>
-        </Section>
-
-        {/* how it is built */}
-        <Section
-          id="how"
-          kicker="Engineering"
-          title="The parts a judge on the panel will look for."
-        >
-          <ul className="space-y-3">
-            {ENGINEERING.map((line) => (
-              <li
-                key={line}
-                className="flex items-start gap-3 text-base leading-relaxed text-foreground"
-              >
-                <span className="mt-2 size-1.5 shrink-0 rounded-full bg-brand" aria-hidden="true" />
-                <span>{line}</span>
-              </li>
-            ))}
-          </ul>
-
-          <div className="mt-8 rounded-lg border border-brand bg-card p-5 glow-brand">
-            <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
-              <span className="text-brand">
-                <ShieldIcon size={18} />
-              </span>
-              What if your AI hallucinates a payment?
-            </h3>
-            <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
-              It cannot. The agent only ever proposes. The proposal is server-signed and expires in
-              120 seconds, the confirmation card renders from that signature rather than from
-              anything the model said, and a human thumb is the only thing in the system that moves
-              money. No auto-confirm, no voice confirm, at any amount.
-            </p>
-          </div>
         </Section>
 
         {/* close */}
@@ -526,89 +424,101 @@ export default function LandingPage() {
           className="h-px bg-gradient-to-r from-transparent via-brand/60 to-transparent"
         />
 
-        <div className="mx-auto max-w-4xl px-5 py-14 sm:px-8">
-          <div className="grid gap-10 sm:grid-cols-[1.6fr_1fr_1fr]">
-            <div>
-              <span className="font-display text-2xl text-brand">MoMo Kasi</span>
-              <p className="mt-3 max-w-xs text-sm leading-relaxed text-muted-foreground">
-                Earn, share, spend. One double-entry ledger across three MTN MoMo APIs.
-              </p>
-            </div>
+        {/*
+          ONE ROW, EDGE TO EDGE. This was four stacked blocks — a wordmark and
+          tagline, two link columns, two attributions and a small-print row —
+          which on a laptop pushed the page's last real content most of a screen
+          above the fold. It is now a single flex row that runs the full width
+          rather than sitting inside `max-w-4xl`, because the constraint is what
+          forced the wrapping in the first place.
 
-            {FOOTER_COLUMNS.map((column) => (
-              <nav key={column.title} aria-label={column.title}>
-                <h2 className="text-xs uppercase tracking-widest text-muted-foreground">
-                  {column.title}
-                </h2>
-                <ul className="mt-4 space-y-2.5">
-                  {column.links.map((link) => (
-                    <li key={link.label}>
-                      <Link
-                        href={link.href}
-                        className="text-sm text-foreground transition-colors hover:text-brand"
-                      >
-                        {link.label}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </nav>
-            ))}
+          `flex-wrap` and not a grid: the four groups have wildly different
+          natural widths, and a grid would give the shortest one a column as wide
+          as the longest. Wrapping lets each take what it needs and drop to the
+          next line only when it genuinely cannot fit — which on a 390px phone is
+          immediately, and that is the correct outcome there.
+        */}
+        <div className="flex flex-wrap items-center justify-between gap-x-8 gap-y-4 px-5 py-4 sm:px-8">
+          <div className="flex min-w-0 items-baseline gap-2.5">
+            <span className="font-display text-lg leading-none text-brand">MoMo Kasi</span>
+            <p className="text-xs leading-snug text-muted-foreground">
+              Earn, share, spend. One double-entry ledger across three MTN MoMo APIs.
+            </p>
           </div>
 
           {/*
-            The two attributions, given equal weight and held apart: whose rails
-            this runs on, and who built it. Neither is decoration — the MoMo mark
-            is the reason the app can move money at all, and Tumo Olo is the
-            answer to "who do we talk to".
+            The column headings are gone with the columns. "The pitch" and "The
+            build" were labels for a shape that no longer exists, and five links
+            on one line need no taxonomy.
           */}
-          <div className="mt-12 grid gap-8 border-t border-divider pt-8 sm:grid-cols-2 sm:items-start">
-            <div className="flex items-center gap-3.5">
-              <MomoMark size={44} />
-              <div>
-                <p className="text-sm font-medium text-foreground">Built on the MTN MoMo API</p>
-                <p className="mt-1 text-xs text-muted-foreground">
+          <nav aria-label="Site" className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+            {FOOTER_LINKS.map((link) => (
+              <Link
+                key={link.label}
+                href={link.href}
+                className="text-xs text-foreground transition-colors hover:text-brand"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </nav>
+
+          {/*
+            The two attributions, still held apart and still given equal weight:
+            whose rails this runs on, and who built it. Neither is decoration —
+            the MoMo mark is the reason the app can move money at all, and Tumo
+            Olo is the answer to "who do we talk to".
+          */}
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+            <div className="flex items-center gap-2.5">
+              <MomoMark size={26} />
+              <div className="leading-tight">
+                <p className="text-xs font-medium text-foreground">Built on the MTN MoMo API</p>
+                <p className="text-[11px] text-muted-foreground">
                   Collections · Disbursements · Remittances
                 </p>
               </div>
             </div>
 
-            <div className="sm:justify-self-end sm:text-right">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground">Built by</p>
+            <div className="flex items-center gap-2.5">
               <a
                 href={BUILDER_URL}
                 target="_blank"
                 rel="noreferrer"
-                className="mt-2.5 inline-block transition-opacity hover:opacity-80"
+                className="inline-block transition-opacity hover:opacity-80"
               >
-                <TumoOloMark className="h-6 w-auto sm:h-7" />
+                <TumoOloMark className="h-4 w-auto" />
               </a>
-              <p className="mt-2.5 text-xs text-muted-foreground">
-                Built in Johannesburg. Designed to be handed over.
+              <p className="text-[11px] leading-tight text-muted-foreground">
+                Built in Johannesburg.
+                <br />
+                Designed to be handed over.
               </p>
             </div>
           </div>
+        </div>
 
+        {/*
+          The small print keeps its own row. The badge is a claim about real
+          money and the trademark line is a legal notice; neither should have to
+          compete for space with a navigation link.
+        */}
+        <div className="flex flex-col gap-2 border-t border-divider px-5 py-2.5 text-[11px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-8">
           {/*
-            Stacked by default, one row from `sm` up. Three variable-length
-            items sharing a single wrapping flex row overflowed a 390px phone —
-            the trademark sentence has no break opportunity short enough to save
-            it — so the small print is two blocks that cannot fight each other.
+            Kept, and made louder rather than quieter. We show MTN's mark on a
+            page that says "tap to pay your fare"; without this the page implies
+            a live integration it does not have — or, now, understates one it
+            does. Derived, so it cannot expire again.
           */}
-          <div className="mt-10 flex flex-col gap-4 border-t border-divider pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
-            {/*
-              Kept, and made louder rather than quieter. We are showing MTN's
-              mark on a page that says "tap to pay your fare"; without this the
-              page implies a live integration it does not have.
-            */}
-            <span className="inline-flex w-fit shrink-0 items-center gap-2 rounded-full border border-brand/40 px-3 py-1 font-medium text-brand">
-              <span aria-hidden="true" className="size-1.5 rounded-full bg-brand" />
-              Sandbox only — no real money moves
-            </span>
-            <p className="text-balance sm:text-right">
-              © 2026 Tumo Olo (Pty) Ltd. MTN, MoMo and the MoMo logo are trademarks of MTN Group.
-            </p>
-          </div>
+          <span className="inline-flex w-fit shrink-0 items-center gap-2 rounded-full border border-brand/40 px-2.5 py-0.5 font-medium text-brand">
+            <span aria-hidden="true" className="size-1.5 rounded-full bg-brand" />
+            {MOMO_IS_SANDBOX
+              ? 'MoMo sandbox — no real money moves'
+              : 'Live on MTN production — real money moves'}
+          </span>
+          <p className="text-balance sm:text-right">
+            © 2026 Tumo Olo (Pty) Ltd. MTN, MoMo and the MoMo logo are trademarks of MTN Group.
+          </p>
         </div>
       </footer>
     </div>

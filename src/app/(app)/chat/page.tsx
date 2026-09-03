@@ -79,7 +79,6 @@ const OPENING_CHIPS: readonly string[] = [
   'How much do I have?',
   'Where did my taxi fare go?',
   'How am I doing this month?',
-  'Ngifuna ukubona my balance',
 ];
 
 function Icon({ d, size = 20 }: { d: string; size?: number }) {
