@@ -382,6 +382,50 @@ while testing.
 opening screen and invites precisely these sentences. Flagged for a decision rather than fixed at
 04:00 on the morning of a demo.
 
+### ✂️ The pitch page lost two sections — and three claims that had expired with them
+
+**Tumo's cut**, and the removals took some untrue sentences with them.
+
+| Removed | |
+|---|---|
+| **"The product — Five modules. One wallet, one ledger."** | Asked for |
+| **"Engineering — The parts a judge on the panel will look for."** | Asked for |
+| *"Ngifuna ukubona my balance"* | The opening chip, asked for |
+
+**Two of the three expired claims were inside the Engineering block**, so cutting it was a
+correction as well as a trim:
+
+- *"What if your AI hallucinates a payment? … The proposal is server-signed and expires in 120
+  seconds, the confirmation card renders from that signature…"* — **that mechanism does not exist.**
+  `propose_*` is S7f, not built. The page described a safety architecture in the present tense
+  that no code implements.
+- The hero carried the same thing in miniature: *"the assistant cannot move money at all — it can
+  only propose, and a human tap settles it."* Replaced with what is actually true and is stronger:
+  **the agent has no write tools, by design.** A person types a command; MTN asks them on their own
+  handset for a PIN we never see.
+- The footer badge read **"Sandbox only — no real money moves."** True when written, false from the
+  moment R0.50 cleared on MTN South Africa production. It is now **derived from
+  `MOMO_TARGET_ENVIRONMENT`**, so it cannot expire again — the deployment changes and the badge
+  changes with it. Per CLAUDE.md #15 the comparison is against the exact string `sandbox`, so every
+  other value, unset included, reads as live: erring toward *"real money moves"* is the safe
+  direction for a warning.
+
+That is the **fifth, sixth and seventh** sentence this session found describing a build state it had
+outlived. The pattern is no longer a coincidence — it is what happens when prose about capability
+lives next to the capability instead of being derived from it. The badge is the first one fixed
+structurally rather than textually.
+
+**A footer link comment went the same way**: *"everything else is driven by the mock agent"* — untrue
+since #32, when the chat started answering from the same Postgres `/ledger` reads.
+
+**The footer is now one full-bleed row.** It was four stacked blocks — wordmark and tagline, two
+link columns, two attributions, small print — which on a laptop pushed the last real content most of
+a screen above the fold. The column headings went with the columns: *"The pitch"* and *"The build"*
+labelled a shape that no longer exists, and five links on one line need no taxonomy. It runs the
+full width rather than sitting inside `max-w-4xl`, because that constraint was what forced the
+wrapping. `flex-wrap` rather than a grid, because the four groups have very different natural
+widths and a grid would give the shortest one a column as wide as the longest.
+
 ### 👨‍👩‍👧 The demo has PEOPLE in it now — `demo_persona`, six rows, read from the database
 
 **Tumo's change.** The product's story is *"I pay Sipho for the garden, I send Gogo electricity and
