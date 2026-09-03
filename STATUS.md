@@ -17,7 +17,7 @@ Every PR must update it. If you are a fresh session, read this before touching a
   `mo-mo-hack.vercel.app` alias still serves the same deployment. Production deploys on every
   merge, previews on every PR.
 - **Database:** live. 3 migrations applied to Supabase `edtduvwbejdfahkmfort` (`eu-west-2`).
-- **Tree state:** 598 green + 3 skipped over 31 files, 0 vulnerabilities, CI enforcing all of it.
+- **Tree state:** 600 green + 3 skipped over 31 files, 0 vulnerabilities, CI enforcing all of it.
   Both skips are opt-in and announce themselves: the walking skeleton (`MOMO_SKELETON=1`) and the
   write-skew case (`allowWrites`). Both commit permanent rows, so neither runs by accident.
 - **Blocked on:** nothing external. **F9 is done** and **the walking skeleton is closed** — a real
@@ -201,6 +201,35 @@ receipt number is the strongest possible evidence for it. Three payments already
 **Sandbox remains wired and one flag away** (`npm run demo -- --emulator`, or
 `MOMO_TARGET_ENVIRONMENT=sandbox`) as the fallback if MTN or the venue wifi misbehaves at 09:30.
 That is what a fallback is for; it is not the plan.
+
+### 🔁 The expiry bug has now happened three times, and it finally has a guard
+
+**Found by testing the running product.** Asking the agent to send money still returned *"Payouts
+aren't built — money can come into this ledger and cannot yet leave it."* M3a built them the same
+night; `/send` was working in the next process over.
+
+That is `MISTAKES.md` M10's second cause for the **third** time:
+
+| # | Where | Said | Became false when |
+|---|---|---|---|
+| 1 | `persona.ts` GROUNDING | *"You have NO tools connected yet… NO balances"* | the read tools landed (#32) |
+| 2 | `api/telegram/webhook` docstring | *"NOTHING HERE TOUCHES MONEY"* | `/pay` was wired in (#38) |
+| 3 | the agent's refusal + `ABOUT_TEXT` | *"Payouts aren't built"*, *"no real money"* | M3a, and the production payments |
+
+**`ABOUT_TEXT` was the worst of the three**, because `/about` says it to judges on a public bot: it
+claimed *"no real money … and no way to pay anybody out"* while three production payments with MTN
+receipt numbers sat in `STATUS.md`.
+
+**The refusal itself did not change and must not.** The agent can never move money — CLAUDE.md #11
+and ADR-0014, a permanent property rather than a build state. Only the *reason* is corrected, from
+"payouts don't exist" to "I am not the thing that does it, by design". It deliberately does **not**
+point the user at `/send`: answering a free-text payment request with a working command is an
+invitation dressed as a refusal, and that route exists because a user was once about to be told
+money was one tap away.
+
+Two guards added, since a rule with no guard is a wish: the refusal is asserted not to claim payouts
+are unbuilt while still refusing for the reason that cannot expire, and `ABOUT_TEXT` is asserted not
+to deny the production payments.
 
 ### ⛔ M3a — DISBURSEMENTS ARE BUILT AND VERIFIED, AND MTN WILL NOT LET US PAY OUT
 

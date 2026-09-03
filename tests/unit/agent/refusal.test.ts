@@ -37,7 +37,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { respond } from '@/server/agent/respond';
-import { SYSTEM_PROMPT } from '@/lib/agent/persona';
+import { ABOUT_TEXT, SYSTEM_PROMPT } from '@/lib/agent/persona';
 
 /**
  * Real phrasings, including the verbatim one from the transcript.
@@ -120,6 +120,43 @@ describe('the money questions still work', () => {
   ])('%j is not treated as a payment request', async (msg) => {
     const turn = await respond(msg, { env: {} });
     expect(turn.reply).not.toMatch(/aren't built|payouts/i);
+  });
+
+  /**
+   * ⚠️ THE EXPIRY GUARD. M10's second cause, which has now bitten three times.
+   *
+   * *"A prompt that describes a build state carries an expiry date."* The
+   * GROUNDING block swore the agent had no tools after the read tools landed.
+   * The webhook route's docstring said "NOTHING HERE TOUCHES MONEY" after
+   * `/pay` was wired in. And this refusal said *"Payouts aren't built"* after
+   * M3a built them — while `/send` was working in the next process over.
+   *
+   * Each was true when written. Each became a confident false claim that the
+   * next reader would have believed. So the sentences that name a BUILD STATE
+   * are pinned to the build, rather than to whoever remembers to update them.
+   *
+   * The refusal itself is not in question — the agent must never move money,
+   * and that is permanent (CLAUDE.md #11). What is asserted here is that its
+   * REASON stays true.
+   */
+  test('the refusal does not claim payouts are unbuilt — they are built', async () => {
+    const turn = await respond('send money to this person send 0.01 the number is 0761346606', {
+      env: {},
+    });
+
+    expect(turn.reply).not.toMatch(/payouts? (aren'?t|are not|is not|isn'?t) built/i);
+    expect(turn.reply).not.toMatch(/cannot yet leave|can'?t yet leave/i);
+    // Still a refusal, and still for the reason that will never expire.
+    expect(turn.reply).toMatch(/\b(can't|cannot)\b/i);
+    expect(turn.reply).toMatch(/by design/i);
+  });
+
+  test('/about does not claim there is no real money — there is, on production', async () => {
+    // Said to judges, on a public bot, about the single most impressive fact
+    // this project has: real rands moved on MTN South Africa with their own
+    // receipt numbers.
+    expect(ABOUT_TEXT).not.toMatch(/no real money/i);
+    expect(ABOUT_TEXT).not.toMatch(/no way to pay anybody out/i);
   });
 
   test.each([
