@@ -42,9 +42,11 @@ import type { ArtifactStatus } from '@/components/artifacts/registry';
 import { ArtifactChip } from '@/components/chips/artifact-chip';
 import { SendIcon } from '@/components/icons';
 import { GreetingCycle } from '@/components/greeting-cycle';
+import { PeopleStrip } from '@/components/people-strip';
 import { ThemeToggle } from '@/components/theme-toggle';
 import type { Artifact } from '@/lib/artifacts/types';
 import type { KasiContext } from '@/lib/agent/mock';
+import type { Person } from '@/lib/roster';
 import { reviveContext, reviveTurn, type WireTurn } from '@/lib/agent/wire';
 import { formatZAR, posting } from '@/domain/money';
 
@@ -111,6 +113,10 @@ export default function ChatPage() {
   // same database is the contradiction a judge notices first. Null until it
   // arrives; the rail renders nothing rather than inventing a number.
   const [context, setContext] = useState<KasiContext | null>(null);
+  // The roster, from `demo_persona`. Empty until it arrives and empty if the
+  // fetch fails — `PeopleStrip` renders nothing rather than a placeholder
+  // family, for the same reason the rail stays blank rather than mocked.
+  const [people, setPeople] = useState<readonly Person[]>([]);
   const logRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
 
@@ -148,6 +154,34 @@ export default function ChatPage() {
       })
       .catch(() => {
         // Leave it null. An empty rail is honest; a mock one is not.
+      });
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let live = true;
+    fetch('/api/people')
+      .then((r) => r.json())
+      .then(
+        (raw: {
+          people?: readonly (Omit<Person, 'usualMinor'> & { usualMinor: string | null })[];
+        }) => {
+          if (!live) return;
+          // `usualMinor` crosses the wire as a STRING because JSON has no bigint.
+          // Parsed back to bigint here — `Number()` is how cents become a float
+          // (CLAUDE.md #1), and this is the exact seam where that happens.
+          setPeople(
+            (raw.people ?? []).map((p) => ({
+              ...p,
+              usualMinor: p.usualMinor === null ? null : BigInt(p.usualMinor),
+            })),
+          );
+        },
+      )
+      .catch(() => {
+        // Leave it empty. No family is honest; an invented one is not.
       });
     return () => {
       live = false;
@@ -472,6 +506,7 @@ export default function ChatPage() {
 
         {isOpening ? (
           <div className="mx-auto flex w-full max-w-[760px] flex-col items-center gap-5 px-4 pb-6">
+            <PeopleStrip people={people} />
             <div className="flex flex-wrap justify-center gap-2">
               {OPENING_CHIPS.map((c) => (
                 <button
