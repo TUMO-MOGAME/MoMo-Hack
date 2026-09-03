@@ -9,8 +9,23 @@
  *   ok    bg-primary text-primary-foreground, text-muted-foreground, bg-card
  *   not   bg-neutral-900, text-slate-700, #ffcb05, inline oklch(...)
  *
- * Changing the brand means editing this file and regenerating the CSS
- * (`npm run tokens`), never hand-editing globals.css.
+ * ── HOW THE CSS AND THIS FILE ARE KEPT IN STEP (A2-01) ──────────────────────
+ *
+ * This docstring used to say *"regenerating the CSS (`npm run tokens`), never
+ * hand-editing globals.css"*. **There is no `tokens` script and never was**, so
+ * `globals.css` is a second hand-maintained copy — and by the time the audit
+ * looked, three dark roles had already drifted, with the FAILING values sitting
+ * in this file (see `border` / `input` / `ring` below).
+ *
+ * What is true now: **edit both, and a test will not let them disagree.**
+ * `tests/unit/design/token-drift.test.ts` imports this module, parses
+ * `globals.css`, and compares every colour role in both scales in both
+ * directions. It runs in the `Tests` CI job.
+ *
+ * A generator is still the better answer, and A2-01 asks for one. It is not
+ * built because `globals.css` is not purely generated content — its palette
+ * lines carry hand-written rationale (why `--ring` is 45% and not 35%) that a
+ * generator would delete. That prose cost a session to recover once already.
  *
  * WHAT WE KEPT from Social-Assembly: the neutral grayscale system, the
  * "super glowing black" dark palette, the radius/motion/type scales, and the
@@ -130,9 +145,23 @@ export const colors: { light: ColorScale; dark: ColorScale } = {
     'brand-foreground': 'oklch(0 0 0)',
     'brand-accent': 'oklch(0.78 0.183 55.934)',
     'brand-accent-foreground': 'oklch(0 0 0)',
-    border: 'oklch(1 0 0 / 12%)',
-    input: 'oklch(1 0 0 / 15%)',
-    ring: 'oklch(1 0 0 / 35%)',
+    // ⚠️ THESE THREE HAD ALREADY DRIFTED, and this file held the failing values.
+    //
+    // A3-01 measured `--border` at 1.27:1 and `--input` at 1.39:1 against a 3:1
+    // requirement — on a cracked screen in Highveld sun the composer had no
+    // visible edge. The fix raised them, and it was applied to `globals.css`
+    // only. So the file calling itself "THE single source of truth" kept the
+    // values that FAILED the audit, for as long as nothing compared the two.
+    //
+    // A2-01 predicted exactly this. `tests/unit/design/token-drift.test.ts`
+    // caught it on its first run, which is the argument for that test in one
+    // example. Interaction affordances are what a user must PERCEIVE to
+    // operate, not decoration.
+    border: 'oklch(1 0 0 / 38%)',
+    input: 'oklch(1 0 0 / 40%)',
+    // 35% passes at 3.01:1 with no headroom at all (A3-08). 45% gives ~4.4:1
+    // and costs nothing, because the ring is transient.
+    ring: 'oklch(1 0 0 / 45%)',
     overlay: 'oklch(0 0 0 / 72%)',
     'chart-1': 'oklch(0.862 0.176 90.5)',
     'chart-2': 'oklch(0.765 0.177 163.223)',

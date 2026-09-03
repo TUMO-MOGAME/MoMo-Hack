@@ -22,7 +22,13 @@
 
 import { formatZAR, type Minor } from '@/domain/money';
 import { log } from '@/server/log';
-import { demoStatus, hasExtraArguments, parsePayAmount, requestDemoPayment } from './demo-collect';
+import {
+  type DemoStatus,
+  demoStatus,
+  hasExtraArguments,
+  parsePayAmount,
+  requestDemoPayment,
+} from './demo-collect';
 import { hasExtraSendArguments, parseSendAmount, sendDemoPayout } from './demo-payout';
 
 /** `/pay 0.20` → the sentence to send back. Never throws; a chat must answer. */
@@ -105,7 +111,33 @@ export async function statusReply(): Promise<string> {
   try {
     const s = await demoStatus();
     if (!s) return 'Nothing has been requested yet. Send /pay 0.20 to start one.';
+    return statusText(s);
+  } catch {
+    return 'I could not reach the ledger just then. Nothing changed — /status only ever reads.';
+  }
+}
 
+/**
+ * The words for one transaction's state — PURE, so it can be tested.
+ *
+ * Split out of `statusReply` because the bug that prompted it was found by
+ * RUNNING the product, not by a test: a payout was told to *"check your
+ * phone"*, a prompt that is never coming. Everything that made that reachable
+ * — a database, a reconciler, a live MTN call — sits on the other side of this
+ * function, and none of it is needed to assert what a person actually reads.
+ */
+export function statusText(s: DemoStatus): string {
+  // ── A PAYOUT IS NOT A COLLECTION, AND MUST NOT BE DESCRIBED AS ONE ─────────
+  //
+  // Every sentence below used to talk about a phone being asked to approve. For
+  // a `/send` there is no prompt, no PIN and no approval — telling someone to
+  // check their phone describes an event that is never coming, which is
+  // `MISTAKES.md` M10's failure in miniature: prose that fits the template
+  // instead of the truth. Caught by RUNNING `/send` and reading the `/status`
+  // that came back, not by a test.
+  const payout = s.product === 'DISBURSEMENT';
+
+  {
     // ── TERMINAL FAILURE IS NOT "STILL PENDING" ──────────────────────────────
     //
     // The first version of this said *"That R0.20 is still failed. If your phone
@@ -118,6 +150,7 @@ export async function statusReply(): Promise<string> {
     // It reads the REASON out of MTN's own response rather than guessing.
     // `PAYER_NOT_FOUND` in particular means something specific and actionable:
     // the number has no MoMo wallet in this environment.
+
     if (s.terminal && !s.settled) {
       const because = s.reason ? REASONS[s.reason] : undefined;
       return [
@@ -125,7 +158,9 @@ export async function statusReply(): Promise<string> {
         '',
         because ?? 'MTN did not say why.',
         '',
-        'No money moved, and nothing is waiting on your phone.',
+        payout
+          ? 'No money left the wallet.'
+          : 'No money moved, and nothing is waiting on your phone.',
       ].join('\n');
     }
 
@@ -133,12 +168,31 @@ export async function statusReply(): Promise<string> {
       return [
         `That ${formatZAR(s.amountMinor)} is still ${s.status.toLowerCase()}.`,
         '',
-        'If your phone has not asked you yet, give it a moment. If you have already',
-        'approved it, send /status again — I check with MTN each time.',
+        ...(payout
+          ? [
+              'Nothing to approve — a payout has no PIN prompt. MTN is still processing it.',
+              'Send /status again and I will ask them once more.',
+            ]
+          : [
+              'If your phone has not asked you yet, give it a moment. If you have already',
+              'approved it, send /status again — I check with MTN each time.',
+            ]),
       ].join('\n');
     }
 
     const parts = s.parts.map((p) => `  ${p.label} ${formatZAR(p.amountMinor)}`).join('\n');
+
+    if (payout) {
+      return [
+        `✅ ${formatZAR(s.amountMinor)} paid out, and the journal balances.`,
+        '',
+        'The ledger records it as money LEAVING — SUSPENSE debited, MOMO_SETTLEMENT',
+        'credited — which is the exact mirror of the collection that put it there.',
+        'Every posting sums to zero, and the database enforces that with a trigger.',
+        '',
+        'That is the round trip: money in, money out, and SUSPENSE back to zero.',
+      ].join('\n');
+    }
 
     return [
       `✅ ${formatZAR(s.amountMinor)} received, and the journal balances.`,
@@ -151,8 +205,6 @@ export async function statusReply(): Promise<string> {
       '',
       'Integer cents, so nothing is invented or lost in the rounding.',
     ].join('\n');
-  } catch {
-    return 'I could not reach the ledger just then. Nothing changed — /status only ever reads.';
   }
 }
 

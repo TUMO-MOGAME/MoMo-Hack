@@ -1,8 +1,17 @@
 @import 'tailwindcss';
 
 /* ─────────────────────────────────────────────────────────────────────────
-   GENERATED FROM src/design/tokens.ts — do not hand-edit the palette here.
-   Change the brand in tokens.ts, then run `npm run tokens`.
+   MIRRORS src/design/tokens.ts. NOT generated — this header used to claim it
+   was, and to tell you to run `npm run tokens`, which has never existed
+   (A2-01). Believing it is how three dark roles drifted, with the values that
+   FAILED the contrast audit left sitting in the token file.
+
+   So: change a colour in BOTH files. tests/unit/design/token-drift.test.ts
+   compares every role in both scales, in both directions, and fails the build
+   if they disagree.
+
+   The comments between these values are load-bearing — they record why a
+   number is what it is — which is why this block is not generated.
    Architecture adopted from the Social-Assembly design system.
    ───────────────────────────────────────────────────────────────────────── */
 

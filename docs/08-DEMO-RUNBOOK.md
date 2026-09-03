@@ -5,6 +5,76 @@
 
 ---
 
+## 0. ⏰ WHAT IS ACTUALLY BUILT — this governs, §1-§3 do not
+
+**§1-§3 below describe the 28-day plan.** Escrow, stokvels, offline capture, the USSD simulator and
+the rank-admin views are **not built**. Reading that script on stage would promise six things that
+do not exist, which is the one failure this project has spent the most effort preventing
+(`MISTAKES.md` M10 — an invented action is worse than an invented number, because the audience acts
+on it).
+
+This section is what is real, measured, and demonstrable. Everything in it has run.
+
+### The three things that are true, in the order to say them
+
+| # | Beat | What to show | The line |
+|---|---|---|---|
+| 1 | **Real money moves, on MTN production** | `/pay 0.20` in Telegram or the web chat → a prompt on a real handset → a PIN we never see → `/status` | *"That is not a sandbox. That is MTN South Africa, and this is their receipt number."* |
+| 2 | **The books cannot be wrong** | `/status` after settlement, then `/ledger` | *"Every posting sums to zero, and the database refuses to write a journal that doesn't. Not a convention — a trigger."* |
+| 3 | **The split is exact** | `split(1250n)` — the pure function, offline | *"R12.50 → R7.50 / R3.13 / R1.25 / R0.62. Integer cents. Property-tested over 5,000 generated cases."* |
+
+**Proof already banked** (2026-09-02, production, three payments): ftid `7451945787`, `7451955089`,
+`7451969842`. R0.50 collected, 28 postings, sum 0, both channels.
+
+### The two hard limits — state them before a judge finds them
+
+- **R12.50 cannot be SENT.** The wallet holds ~R9.50 and the live cap is R1.00 per transaction.
+  Demo the split as the **pure function**, beside a real R1.00 payment. It is more impressive that
+  way, not less: it runs offline, instantly, and is property-tested.
+- **Production waits for a human.** 103s and 42s measured, versus ~25s on sandbox. Narrate that
+  pause or it is dead air. *"That delay is a person finding their PIN. That is what a real payment
+  costs, and no sandbox will teach you it."*
+
+### Disbursements — the honest answer, and it is a good one
+
+**If asked "can money go out?":**
+
+> *"The payout path is built and contract-verified — I can show you a transfer accepted and the
+> ledger posting it as money leaving. On production MTN returns 403 on `transfer` before it reads
+> the request; a deliberately malformed body gets the identical 403, so it is their authorization
+> gate, not our code. Collections work on the same credentials in the same breath."*
+
+Then run it, because it takes eight seconds and it is the strongest possible form of that answer:
+
+```
+npm run momo:preflight -- --production
+```
+
+It probes both products per-operation, sends only amounts it has proved cannot clear, and re-reads
+both balances at the end. **Do not claim payouts work on production. Show why they cannot, and that
+we know exactly why.** See `momoAPIs.md` §8a, `MISTAKES.md` M14.
+
+### The commands, in order
+
+```
+npm run momo:preflight            # is MTN healthy right now, per operation
+/pay 0.20                         # Telegram or web chat — real money, production
+/status                           # after the PIN; resolves and reads the ledger
+/send 0.10                        # payouts, on SANDBOX (see above)
+npm run demo                      # the whole story, with an expect behind every number
+```
+
+### Before you start
+
+- [ ] `npm run momo:preflight -- --production` — collections POST must be `202`
+- [ ] `TELEGRAM_PAY_CHAT_IDS` includes the presenting phone, or `/pay` refuses (M5d)
+- [ ] The payer handset is the number in `MOMO_DEMO_MSISDN`, charged, on data, PIN known
+- [ ] `accountholder/{n}/active` returns `true` for it — a `false` means every payment returns
+      `PAYER_NOT_FOUND` and nothing else (`momoAPIs.md` §9a, `MISTAKES.md` M13)
+- [ ] Sandbox fallback rehearsed once: `MOMO_TARGET_ENVIRONMENT=sandbox`, one flag away
+
+---
+
 ## 1. The narrative
 
 Five minutes. One story, told in the order a judge can follow.

@@ -17,7 +17,7 @@ Every PR must update it. If you are a fresh session, read this before touching a
   `mo-mo-hack.vercel.app` alias still serves the same deployment. Production deploys on every
   merge, previews on every PR.
 - **Database:** live. 3 migrations applied to Supabase `edtduvwbejdfahkmfort` (`eu-west-2`).
-- **Tree state:** 517 green + 3 skipped over 30 files, 0 vulnerabilities, CI enforcing all of it.
+- **Tree state:** 598 green + 3 skipped over 31 files, 0 vulnerabilities, CI enforcing all of it.
   Both skips are opt-in and announce themselves: the walking skeleton (`MOMO_SKELETON=1`) and the
   write-skew case (`allowWrites`). Both commit permanent rows, so neither runs by accident.
 - **Blocked on:** nothing external. **F9 is done** and **the walking skeleton is closed** — a real
@@ -33,7 +33,7 @@ Every PR must update it. If you are a fresh session, read this before touching a
 | **Current phase** | Phase 3 — Money engine |
 | **Phase state** | **Phase 0 closed.** Phase 3 exit criterion met, **all six audits run, and 9 of their 12 Highs already fixed.** The phase stays open because the gate says so. |
 | **Audits owed at close** | Phase 3: A1 A2 A3 A4 A5 A6 — **all six run 2026-09-02**, results in `docs/audits/results/`. A8 passes, 0 vulnerabilities. |
-| **Blocking findings** | **3 High, 0 Critical.** Twelve Highs were opened by the audits; **nine are fixed and verified on the wire**. The three left share one root cause each: no auth (A5-04, A1-01) and no token-generation gate (A2-01). `audit:gate` still shut. **Every money-integrity check passed.** |
+| **Blocking findings** | **2 High, 0 Critical.** Twelve Highs were opened by the audits; **ten are fixed and verified on the wire**. A2-01 closed 2026-09-03 — and the drift gate caught real drift on its first run, three roles holding the values that had FAILED the contrast audit. The two left are one root cause: **no auth** (A5-04, A1-01), blocked on M9a. `audit:gate` still shut. **Every money-integrity check passed.** |
 | **Next milestone** | **PRESENTATION Thu 3 Sep 09:30** — hours away, not days |
 | **Days to code freeze** | 25 (27 Sep 2026) |
 | **Open PRs** | none. #10, #11, #13-#21, #23-#25, #35 merged. |
@@ -1439,14 +1439,45 @@ passed**, structurally rather than by convention (A5 §3).
 Critical and High block the phase gate. `runner/audit.mjs gate` fails while any row here is
 unresolved — where resolved means fixed, or accepted with a written reason.
 
-**12 Highs were opened by the audits. Nine are now fixed and verified against a running production
-build; three remain**, and all three are the same root cause wearing different hats.
+**12 Highs were opened by the audits. Ten are now fixed and verified; two remain**, and both are the
+same root cause — no authentication (M9a).
+
+#### A2-01 is closed, and the audit was righter than it knew
+
+The finding said the two token files *"agree now; nothing keeps them so."* **They did not agree.**
+`tests/unit/design/token-drift.test.ts` compares every colour role in both scales, in both
+directions, and failed on its first run:
+
+| role | `globals.css` (what ships) | `tokens.ts` ("the single source of truth") |
+|---|---|---|
+| `--border` | 38% | **12%** |
+| `--input` | 40% | **15%** |
+| `--ring` | 45% | **35%** |
+
+Those are exactly the three values A3-01 raised for contrast — 1.27:1 and 1.39:1 against a 3:1
+requirement. **The fixes were applied to the CSS and never carried back**, so the file calling
+itself the source of truth held the values that had FAILED the audit. Verified 60/60 by hand once;
+drifted three roles by the next session. Fixed, in `tokens.ts`, with the rationale carried across.
+
+**Why a test and not the `scripts/tokens.mjs` generator the finding asks for.** `globals.css` is not
+purely generated content — its palette lines carry the reasoning for the numbers (why `--ring` is
+45% and not 35%), and a generator emitting that block would delete prose that cost a session to
+recover. This takes A2-01's own stated minimum — *"a unit test asserting every role in `tokens.ts`
+equals its `globals.css` value"* — which closes the drift gap without putting a script in a position
+to rewrite explanations. The generator stays the better long-term answer once the CSS is only
+values.
+
+Built against `MISTAKES.md` M11, whose two token checkers were both confidently wrong: it imports
+the real module and parses the real stylesheet with no second copy, and it **asserts the parse found
+tokens**, because a checker comparing two empty objects passes forever. Proved to fire.
+
+Both docstrings that pointed at the non-existent `npm run tokens` now say what is actually true.
 
 | ID | Audit | Severity | Location | Summary | Status |
 |---|---|---|---|---|---|
 | A5-04 | A5 | High | whole app | **No authentication.** Every RLS policy across 8 tables is therefore unexercised — design, not control. M9a | **open** · blocked on M9a |
 | A1-01 | A1 | High | `/api/agent`, `/api/context` | The same gap from the architecture side: both money-reading endpoints answer any caller and the read tools are scoped to no user | **open** · blocked on M9a |
-| A2-01 | A2 | High | `src/design/tokens.ts`, `package.json` | `tokens.ts` instructs the reader to regenerate CSS with `npm run tokens` and **that script does not exist**. `globals.css` is a second hand-maintained copy. Verified 60/60 roles agree *today*; nothing keeps them agreeing | **open** · needs `scripts/tokens.mjs` + a `tokens:check` CI job |
+| A2-01 | A2 | High | `src/design/tokens.ts`, `package.json` | `tokens.ts` instructs the reader to regenerate CSS with `npm run tokens` and **that script does not exist**. `globals.css` is a second hand-maintained copy. Verified 60/60 roles agree *today*; nothing keeps them agreeing | **fixed** 2026-09-03 · drift gate built, and it caught real drift on its first run — see below |
 
 ### Fixed this session, each verified on the wire rather than asserted
 
