@@ -28,7 +28,14 @@
  *
  * ── THE PAYEE IS CONFIGURATION, NEVER INPUT. THIS IS THE IMPORTANT ONE. ──────
  *
- * The number comes from `MOMO_DEMO_MSISDN` and **never** from the message.
+ * The number comes from the environment — `MOMO_PAY_PAYEES`, falling back to
+ * `MOMO_DEMO_MSISDN` — and **never** from the message.
+ *
+ * A person may now SELECT which configured phone to ask, by label or by the
+ * last four digits the bot itself shows them. They still cannot SUPPLY one:
+ * `resolvePayee` (`lib/momo/payees.ts`) returns null for anything not already
+ * in the environment, and `pay-replies.ts` refuses before reaching this module.
+ * This function is handed a number its caller RESOLVED, never one it was given.
  *
  * The obvious implementation — read the number out of "/pay 0.20 to 0761234567"
  * — turns a public chatbot into a machine for pushing unsolicited payment
@@ -43,7 +50,8 @@
 
 import { formatZAR, parseMinor, type Minor } from '@/domain/money';
 import { DEFAULT_FARE_SPLIT, split } from '@/domain/split';
-import { maskMsisdn } from '@/lib/momo/test-msisdns';
+import { isDeterministic, maskMsisdn } from '@/lib/momo/test-msisdns';
+import type { Payee } from '@/lib/momo/payees';
 import { getMomoClient, readMomoMode } from '@/lib/momo';
 import { readMomoConfig } from '@/lib/momo/config';
 import { getMoneyDb } from '@/server/db';
@@ -72,6 +80,18 @@ export type DemoPayResult =
       readonly status: string;
       readonly amountMinor: Minor;
       readonly masked: string;
+      /**
+       * True when the payer is one of MTN's sandbox fixtures, whose outcome is
+       * decided by the number itself — `46733123454` goes CREATED → SUCCESSFUL
+       * on its own in about 25 seconds.
+       *
+       * It exists because the reply was telling people to check a phone that
+       * cannot ring: no prompt is pushed for a fixture, nobody is asked for a
+       * PIN, and "approve it on your handset" is an instruction that can never
+       * be followed. Carried on the result rather than re-derived in the reply,
+       * so the sentence and the transaction agree by construction.
+       */
+      readonly resolvesItself: boolean;
     }
   | { readonly ok: false; readonly reason: string };
 
@@ -139,7 +159,30 @@ export function parsePayAmount(text: string): Minor | null {
 
 /** True when the user supplied something beyond the amount — usually a payee. */
 export function hasExtraArguments(text: string): boolean {
-  return text.trim().split(/\s+/).filter(Boolean).length > 1;
+  return text.trim().split(/\s+/).filter(Boolean).length > 2;
+}
+
+/**
+ * Split `/pay`'s arguments into the amount and an optional payee selector.
+ *
+ * ── WHY THE AMOUNT COMES FROM TOKEN ONE AND NOWHERE ELSE ─────────────────────
+ *
+ * A real user typed `/pay 0.2 0767221345` — "pay this much to this number", the
+ * obvious thing to type — and the first parser anchored to the END of the
+ * string, matched the PHONE NUMBER, and reported *"R7 672 213.45 is over the
+ * ceiling"*. The ceiling caught it, which was luck: `/pay 0.20 300` would have
+ * parsed as R3.00 and charged it.
+ *
+ * The fix then was to refuse any second token outright. Now that a second token
+ * is MEANINGFUL — it selects which configured phone to ask — that guarantee has
+ * to come from somewhere else, so it comes from here: the amount is taken from
+ * token one and nothing else is ever offered to `parsePayAmount`, which keeps
+ * its `^…$` anchors. A payee can never be read as money no matter what it looks
+ * like, because the money parser never sees it.
+ */
+export function splitPayArgs(text: string): { amount: string; selector: string } {
+  const tokens = text.trim().split(/\s+/).filter(Boolean);
+  return { amount: tokens[0] ?? '', selector: tokens[1] ?? '' };
 }
 
 /**
@@ -152,8 +195,22 @@ export async function requestDemoPayment(
   amountMinor: Minor,
   initiatedBy: string,
   env: Record<string, string | undefined> = process.env,
+  /**
+   * Which configured phone to ask. A `Payee`, NOT a string.
+   *
+   * The type is branded (`lib/momo/payees.ts`), and only `parsePayees` and
+   * `resolvePayee` can mint one — both of which read the environment. So
+   * `requestDemoPayment(amount, channel, env, whateverTheUserTyped)` does not
+   * compile, and "the payee came from configuration" is enforced by the type
+   * checker rather than promised in a comment.
+   *
+   * This replaced a hard structural guarantee (there was no parameter at all)
+   * and the swap was made deliberately, with the trade written down: a user may
+   * now SELECT from the operator's list, and still cannot SUPPLY a number.
+   */
+  payee?: Payee,
 ): Promise<DemoPayResult> {
-  const msisdn = env.MOMO_DEMO_MSISDN?.trim();
+  const msisdn = (payee?.msisdn ?? env.MOMO_DEMO_MSISDN)?.trim();
   if (!msisdn) {
     return { ok: false, reason: 'No payer number is configured, so there is nobody to ask.' };
   }
@@ -245,6 +302,9 @@ export async function requestDemoPayment(
     status: started.status,
     amountMinor,
     masked: maskMsisdn(msisdn),
+    // Decided by the NUMBER, not by the environment name. A sandbox fixture
+    // settles itself; any other number means MTN pushes a prompt to a handset.
+    resolvesItself: isDeterministic(msisdn),
   };
 }
 

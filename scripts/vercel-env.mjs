@@ -55,7 +55,7 @@ import { loadEnv, redact, colour as c } from './_env.mjs';
 // The payer check is a pure function in its own module so it can be TESTED —
 // see tests/contract/live-msisdn.test.ts. Inline, it was only ever assertable
 // by running this script against a doctored .env.local.
-import { liveMsisdnProblem, SANDBOX_FIXTURE_MSISDN } from './_msisdn.mjs';
+import { liveMsisdnProblem, livePayeesProblem, SANDBOX_FIXTURE_MSISDN } from './_msisdn.mjs';
 
 const API = 'https://api.vercel.com';
 
@@ -242,7 +242,14 @@ async function main() {
     [
       'MOMO_DEMO_MSISDN',
       env.MOMO_DEMO_MSISDN || SANDBOX_FIXTURE_MSISDN,
-      'the only payer /pay can ever charge',
+      'the default payer, used when /pay names nobody',
+    ],
+    // The phones /pay may ask, and the ONLY ones it may ask. Empty falls back
+    // to MOMO_DEMO_MSISDN alone, which is the behaviour before payees existed.
+    [
+      'MOMO_PAY_PAYEES',
+      env.MOMO_PAY_PAYEES || '',
+      'every phone /pay may ask (empty = just the default)',
     ],
     // M5d. Empty is not a default here — it is a denial. An unset value means
     // NOBODY can run /pay, which is why the live check below refuses rather
@@ -311,6 +318,11 @@ async function main() {
   if (targetEnvironment !== 'sandbox') {
     const problem = liveMsisdnProblem(env.MOMO_DEMO_MSISDN);
     if (problem) problems.push(problem);
+
+    // `/pay` can ask anyone on this list, so a fixture hiding in it is the same
+    // trap — it just fails on the second /pay of the demo instead of the first.
+    const payeesProblem = livePayeesProblem(env.MOMO_PAY_PAYEES);
+    if (payeesProblem) problems.push(payeesProblem);
   }
 
   if (momoMode === 'emulator') {

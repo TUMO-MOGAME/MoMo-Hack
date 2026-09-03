@@ -17,7 +17,7 @@ Every PR must update it. If you are a fresh session, read this before touching a
   `mo-mo-hack.vercel.app` alias still serves the same deployment. Production deploys on every
   merge, previews on every PR.
 - **Database:** live. 3 migrations applied to Supabase `edtduvwbejdfahkmfort` (`eu-west-2`).
-- **Tree state:** 757 green + 3 skipped over 39 files, 0 vulnerabilities, CI enforcing all of it.
+- **Tree state:** 776 green + 3 skipped over 40 files, 0 vulnerabilities, CI enforcing all of it.
   Both skips are opt-in and announce themselves: the walking skeleton (`MOMO_SKELETON=1`) and the
   write-skew case (`allowWrites`). Both commit permanent rows, so neither runs by accident.
 - **Blocked on:** nothing external. **F9 is done** and **the walking skeleton is closed** — a real
@@ -381,6 +381,65 @@ while testing.
 **It matters more now than it did yesterday**, because the roster puts Sipho, Gogo and Baba on the
 opening screen and invites precisely these sentences. Flagged for a decision rather than fixed at
 04:00 on the morning of a demo.
+
+### 💬 `/pay` can be told WHO to ask — by selecting, never by supplying
+
+**Two things were wrong in dev and Tumo found both.**
+
+**1. The reply promised a prompt that could never arrive.** `/pay 0.01` answered
+*"Request sent for R0.01 to •••• 3454. Check your phone — MTN will ask you to approve it with your
+MoMo PIN."* On sandbox the payer is `46733123454`, one of MTN's fixtures: it settles itself in
+about 25 seconds, **no prompt is pushed and no phone rings.** So the instruction could not be
+followed, beside a masked number Tumo did not recognise.
+
+Fixed by carrying `resolvesItself` on the payment result — `isDeterministic(msisdn)`, decided by
+the NUMBER rather than by the environment name — and branching the sentence. A fixture now says so
+plainly. **Same family as every other expired claim this session**, and derived from the
+transaction so it cannot drift again.
+
+**2. One payee, and no way to say who.** *"I'm only forced to send to one person."*
+
+#### The trade, because this one was not mine to make
+
+`requestDemoPayment` had **no payee parameter at all**, and
+`tests/unit/agent/pay-command.test.ts` said why: *"This asserts the shape of the API, which is the
+actual control: there is no argument through which a typed number could arrive."* Free-text payees
+turn a public bot into a way to make MTN ring any South African with a payment request.
+
+Put to Tumo as an explicit choice; **allowlist + typed name** chosen. So:
+
+| | |
+|---|---|
+| `MOMO_PAY_PAYEES` | `27767223145:me,27788033288:gogo` — the phones `/pay` may ask, and the only ones |
+| `/pay 0.01` | asks the first |
+| `/pay 0.01 gogo` · `/pay 0.01 3288` | by label, full number, or the last four the bot itself shows |
+| `/pay 0.01 0721234567` | **refused** — *"I don't know 0721234567. I can ask: me (•••• 3145), gogo (•••• 3288)."* |
+
+**A user may SELECT. A user may never SUPPLY.** That is the whole design, and it is enforced by the
+type checker rather than by a comment: `Payee` is **branded**, only `parsePayees`/`resolvePayee`
+can mint one, and both read the environment. `requestDemoPayment(amount, channel, env, '0761234567')`
+**does not compile.**
+
+**`hasExtraArguments` moved from >1 token to >2**, so the old guarantee needed a new home. It has
+one: the amount is parsed from **token one and nothing else** (`splitPayArgs`), so a payee can never
+be read as money no matter what it looks like. The R7-million bug — `/pay 0.2 0767221345` parsed as
+an amount — stays impossible, and is still pinned by test.
+
+#### A test that passed while its own comment went false
+
+The old guarantee was `expect(requestDemoPayment.length).toBeLessThanOrEqual(3)`. **A payee argument
+was added and it still passed** — `Function.length` counts parameters before the first default, and
+`env` has one, so the count never moved off 2.
+
+**A test that passes while its comment has become false is worse than one that fails**, because it
+certifies the thing it stopped checking. Rewritten to assert what is now true, with the structural
+half explicitly delegated to `npm run typecheck`.
+
+**19 new tests, proved to fire**: letting an unconfigured number resolve fails *"AN UNCONFIGURED
+NUMBER RESOLVES TO NULL"*; making an unset variable mean everybody fails *"UNSET IS NOT EVERYBODY"*.
+An ambiguous last-four resolves to **nobody** rather than a coin toss, because a coin toss must not
+choose whose phone rings. `scripts/vercel-env.mjs` refuses a live push with a sandbox fixture or a
+malformed number anywhere in the payee list, not just in `MOMO_DEMO_MSISDN`.
 
 ### ☎️ There is ONE number on MoMo — `27767223145` — and the number in M13 was a typo
 

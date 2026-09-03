@@ -65,3 +65,36 @@ export function liveMsisdnProblem(msisdn) {
 
   return null;
 }
+
+/**
+ * The same rules, applied to every entry in `MOMO_PAY_PAYEES`.
+ *
+ * `/pay` can now ask any phone on that list, so a sandbox fixture or a
+ * malformed number hiding in it is the same trap as one in `MOMO_DEMO_MSISDN` —
+ * it just fails on the second `/pay` of the demo instead of the first.
+ *
+ * Entries are `msisdn` or `msisdn:label`.
+ */
+export function livePayeesProblem(raw) {
+  const entries = (raw ?? '')
+    .split(/[,\s]+/)
+    .map((e) => e.trim())
+    .filter(Boolean);
+
+  if (entries.length === 0) return null; // unset falls back to MOMO_DEMO_MSISDN
+
+  const bad = [];
+  for (const entry of entries) {
+    const msisdn = (entry.split(':')[0] ?? '').trim();
+    const problem = liveMsisdnProblem(msisdn);
+    if (problem) bad.push(msisdn || '(empty)');
+  }
+
+  if (bad.length === 0) return null;
+
+  return (
+    `MOMO_PAY_PAYEES contains ${bad.length} entry/entries /pay could never charge: ${bad.join(', ')}.\n` +
+    '      Each must be international with no + and must not be the sandbox fixture\n' +
+    `      ${SANDBOX_FIXTURE_MSISDN}, e.g. 27767223145:me,27788033288:gogo.`
+  );
+}
