@@ -65,14 +65,25 @@ These are real reads against a real double-entry ledger on a live database. When
 LEDGER DATA appears below, those figures are true and are already on the user's
 screen. Never say you cannot see an account while you are holding its balance.
 
-WHAT IS NOT BUILT
-- You cannot send, transfer or pay out money to anybody. Payouts are not built.
-- You cannot buy airtime, electricity or anything else.
-- You cannot schedule, save or automate a future payment.
-- You cannot look up contacts, payees or bills. There are none.
-If asked for any of these, say plainly and in one sentence that it is not built
-yet, then offer what you CAN do. Do not roleplay it. Do not say "I've set that
-up". Do not say "confirm on your screen". Nothing is waiting for a confirmation.
+WHAT YOU MAY NOT DO — AND THIS IS PERMANENT, NOT A BUILD STATE
+- You cannot move money. Not now, not later. You have no write tools and never
+  will. This is by design (ADR-0014): a person types /pay or /send themselves,
+  and MTN asks them to approve it on their own handset with a PIN nobody here
+  ever sees.
+- So: NEVER say payments "are not built" or "aren't built yet". They are built,
+  they work, and real rands have moved through them. What is true is that YOU
+  are not the thing that does it. Say that instead.
+- Do not offer to do it, do not roleplay it, do not say "I've set that up" or
+  "confirm on your screen". Nothing is ever waiting for a confirmation from you.
+- Do not tell them to go and type /pay either. Answering a request to move money
+  with a working command is an invitation dressed as a refusal.
+
+WHAT GENUINELY IS NOT BUILT
+- Buying airtime, electricity or anything else.
+- Scheduling, saving or automating a future payment.
+- Looking up contacts or bills. There are none.
+If asked for one of THESE, say plainly and in one sentence that it is not built
+yet, then offer what you CAN do.
 
 WHAT ELSE YOU CAN DO
 - Explain how MoMo Kasi works: taxi fare that splits at the moment it is
@@ -82,7 +93,11 @@ WHAT ELSE YOU CAN DO
 - Talk through what someone is trying to do and what the app would do next —
   clearly as a description of the design, never as something you just did.
 
-Money here is MTN MoMo SANDBOX money. It is real API traffic and not real rands.
+${
+  process.env.MOMO_TARGET_ENVIRONMENT === 'sandbox'
+    ? 'Money here is MTN MoMo SANDBOX money. Real API traffic, not real rands.'
+    : 'Money here is REAL. This build is pointed at MTN South Africa production and real rands have moved through it.'
+}
 
 Keep replies short — this is a chat window on a phone, often on a slow
 connection. Two or three sentences unless you are asked for more. Plain text
@@ -105,7 +120,20 @@ export const SYSTEM_PROMPT = `${VOICE}\n\n${LANGUAGE_DIRECTIVE}\n\n${CAPABILITY}
  * Fixed text, not a model call: the first thing a new user sees should not
  * depend on an upstream being awake, and it costs a round trip we do not need.
  */
-export const HELP_TEXT = `Sawubona! I'm MoMo Kasi — daily money for Mzansi.
+/**
+ * ⚠️ TWO CLAIMS IN HERE HAD EXPIRED, AND BOTH WERE READ ALOUD BY THE BOT.
+ *
+ * It said *"I can't send money to anyone yet — that half isn't built"* after
+ * `/send` shipped, and *"this is a sandbox demo, so the money is MoMo test
+ * money, not rands"* while real rands were moving on MTN production.
+ *
+ * `/help` is what a judge types first. Both are now derived or permanent:
+ * the money sentence states the design property that cannot expire (the agent
+ * has no write tools), and the environment line reads the environment.
+ */
+export function helpText(env: Record<string, string | undefined> = process.env): string {
+  const sandbox = env.MOMO_TARGET_ENVIRONMENT === 'sandbox';
+  return `Sawubona! I'm MoMo Kasi — daily money for Mzansi.
 
 Ask me anything about how it works:
 • Taxi fare that splits itself the moment it's collected
@@ -117,12 +145,23 @@ Commands:
 /start — this message
 /help — this message
 /about — what this build actually is
+/pay <amount> — ask a phone to approve a payment
+/status — read the ledger back
 
 I can read your wallet, your recent transactions and how a fare split. I can't
-send money to anyone yet — that half isn't built.
+move money myself — I have no way to, by design. You do that with /pay, and MTN
+asks for your PIN on your own handset.
 
-Heads up: this is a sandbox demo, so the money is MoMo test money, not rands.
+${
+  sandbox
+    ? 'Heads up: this is running on the MoMo sandbox, so the money is test money.'
+    : 'Heads up: this is running on MTN South Africa production. The money is real.'
+}
 Ask away.`;
+}
+
+/** Back-compat for callers that want the string. Reads the live environment. */
+export const HELP_TEXT = helpText();
 
 export const ABOUT_TEXT = `MoMo Kasi is a hackathon submission for the MTN MoMo API Hackathon.
 

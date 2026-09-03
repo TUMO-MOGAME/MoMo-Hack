@@ -56,10 +56,24 @@ export async function payReply(text: string, channel: string): Promise<string> {
 
   const amount = parsePayAmount(amountToken);
   if (amount === null) {
+    // ⚠️ SHOW THE WHOLE COMMAND, NOT A MENU.
+    //
+    // This used to end "You can add who: me (•••• 3145), gogo (•••• 3288)." and
+    // Tumo replied `me` — which is exactly what that sentence invites. There is
+    // no pending-payment state, so `me` fell through to the agent and got a
+    // refusal about a payment nobody had asked for.
+    //
+    // The reply now shows the command as it must actually be typed. A prompt
+    // that reads like a question must be answerable as one; if it is not, it
+    // has to look like a command instead.
     return [
       'Tell me how much — like /pay 0.20 — and I will ask a phone to approve it.',
       '',
-      payees.length > 1 ? `You can add who: ${describePayees(payees)}.` : '',
+      payees.length > 1
+        ? `To choose who, put it on the same line: ${payees
+            .map((p) => `/pay 0.20 ${p.label || p.msisdn.slice(-4)}`)
+            .join('  ·  ')}`
+        : '',
     ]
       .filter(Boolean)
       .join('\n');
