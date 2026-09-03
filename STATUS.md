@@ -17,7 +17,7 @@ Every PR must update it. If you are a fresh session, read this before touching a
   `mo-mo-hack.vercel.app` alias still serves the same deployment. Production deploys on every
   merge, previews on every PR.
 - **Database:** live. 3 migrations applied to Supabase `edtduvwbejdfahkmfort` (`eu-west-2`).
-- **Tree state:** 646 green + 3 skipped over 35 files, 0 vulnerabilities, CI enforcing all of it.
+- **Tree state:** 750 green + 3 skipped over 38 files, 0 vulnerabilities, CI enforcing all of it.
   Both skips are opt-in and announce themselves: the walking skeleton (`MOMO_SKELETON=1`) and the
   write-skew case (`allowWrites`). Both commit permanent rows, so neither runs by accident.
 - **Blocked on:** nothing external. **F9 is done** and **the walking skeleton is closed** — a real
@@ -112,7 +112,7 @@ The word lists in `respond.ts` are **derived, not validated** — they came from
 already in this product plus the obvious money verbs, not from a native speaker. That is stated in
 the file. The eval is where they get checked.
 
-**Tree state on this branch:** 560 green + 3 skipped over 32 files. Typecheck, lint, format and
+**Tree state when this branch was written:** 560 green + 3 skipped over 32 files. It is merged now; the board total above is current. Typecheck, lint, format and
 build all clean. One manual step after merge: `npm run hooks:install` (it sets `core.hooksPath`,
 which is shared by every worktree of this repo, so it is deliberately **not** a `prepare` script).
 
@@ -284,6 +284,53 @@ receipt number is the strongest possible evidence for it. Three payments already
 **Sandbox remains wired and one flag away** (`npm run demo -- --emulator`, or
 `MOMO_TARGET_ENVIRONMENT=sandbox`) as the fallback if MTN or the venue wifi misbehaves at 09:30.
 That is what a fallback is for; it is not the plan.
+
+### 🗣️ `feat/language-mirroring` is merged — and the merge itself found two things
+
+**The last branch with unmerged work.** Everything else outstanding was dead wood from PRs already
+merged; this one carried the language directive as a real module, an eleven-language intent router,
+a graded eval, and `docs/12` §2a's honest split between the four languages we have evidence for and
+the seven we merely declare.
+
+**It was TEN commits behind.** Its tip predates the UI redesign, the theme, the greeting, the roster
+and disbursements — so a `git merge` of the branch would have reverted all of them. The *commit*,
+though, is 1,804 insertions against 16 deletions. So it was **cherry-picked onto current `main`**
+and the four conflicts resolved by hand rather than taken from either side wholesale.
+
+| Conflict | Resolution |
+|---|---|
+| `package.json` | Both sides' scripts kept |
+| `MISTAKES.md` | Both entries kept. Their M14 renumbered **M16** — `main` already has M14 (read-only checks) and M15 (`rm -rf`) |
+| `chat/page.tsx` | **Ours.** Their only change was a comment on the microphone button, and the redesign removed that button |
+| `respond.ts` | **Their condition, our sentence** — see below |
+
+**The `respond.ts` resolution is the one that mattered.** Their version of the refusal reinstated
+*"Money can come into this ledger, but nothing can go out of it yet"* — the exact sentence #45
+removed once disbursements landed (M3a). Their branch simply predates it. Taking the merge whole
+would have **expired the refusal for the fourth time this session's table records.** The multilingual
+condition was kept; the sentence was not.
+
+**The comment that lost its home was kept anyway.** Their microphone-button comment carried a real
+warning — when voice input lands, the transcriber must transcribe **verbatim** and never
+auto-translate on ingest, because the assistant mirrors what it *receives*. A transcriber that
+renders isiZulu speech as English text turns every spoken turn into an English turn **while the
+language directive downstream is working perfectly**, so nothing looks wrong from the reply. It is
+now `docs/12` §2c.
+
+#### And a bug I introduced while resolving it
+
+The scripted edit that resolved `respond.ts` wrote **13 literal backspace bytes (0x08)** where
+`\b` word boundaries belonged. **Nothing threw.** The regex simply stopped matching, so
+*"ngifuna ukukhokha my electricity"* fell past the electricity branch to the generic payout refusal.
+That is `MISTAKES.md` M12's shape — a pattern that reads correctly and matches nothing — arriving
+by way of M6, a scripted edit mangling its own file.
+
+**Caught by their test**, *"the code-switched sentence docs/12 uses as its own example is refused"* —
+precisely the test that should have caught it, in a file that arrived in the same commit.
+
+Worth recording how it hid: **`JSON.stringify` renders 0x08 as `\b`**, so printing the line to
+check it displayed the corruption formatted as the correct thing. Two verification passes agreed the
+file was fine while it was not. A byte-level histogram was the only honest check.
 
 ### 🧠 The bot's memory works — and had NO tests at all until now
 
