@@ -37,7 +37,7 @@ import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { respond } from '@/server/agent/respond';
-import { ABOUT_TEXT, SYSTEM_PROMPT } from '@/lib/agent/persona';
+import { ABOUT_TEXT, helpText, SYSTEM_PROMPT } from '@/lib/agent/persona';
 
 /**
  * Real phrasings, including the verbatim one from the transcript.
@@ -193,9 +193,53 @@ describe('the system prompt describes the build that exists', () => {
     expect(SYSTEM_PROMPT).not.toMatch(/You have NO balances/i);
   });
 
-  test('it states both halves: reads work, payouts do not', () => {
+  test('it states both halves: reads work, and the AGENT may not move money', () => {
+    // ⚠️ THIS TEST USED TO ENCODE THE EXPIRED CLAIM ITSELF.
+    //
+    // It was named "reads work, payouts do not" and asserted
+    // /cannot send, transfer or pay out/ — pinning the prompt to a sentence
+    // that stopped being true when M3a landed. So the guard against expired
+    // claims was holding one in place, and the bot went on telling users
+    // "payments are not built yet" with a green suite behind it.
+    //
+    // The distinction the prompt must now carry is permanent rather than
+    // temporal: the agent has no write tools BY DESIGN (ADR-0014), while the
+    // payment paths themselves are built and have moved real rands.
     expect(SYSTEM_PROMPT).toMatch(/read the wallet/i);
-    expect(SYSTEM_PROMPT).toMatch(/cannot send, transfer or pay out/i);
+    expect(SYSTEM_PROMPT).toMatch(/you cannot move money/i);
+    expect(SYSTEM_PROMPT).toMatch(/no write tools/i);
+  });
+
+  test('it does not tell the model that payments are unbuilt', () => {
+    // The exact phrasings a user was actually shown. The bot answered "me"
+    // with "Sending money or making payments is not built yet" while a real
+    // R0.20 was settling through the very path it was denying.
+    expect(SYSTEM_PROMPT).not.toMatch(/payouts are not built/i);
+    expect(SYSTEM_PROMPT).not.toMatch(/payments? (are|is) not built/i);
+    expect(SYSTEM_PROMPT).not.toMatch(/cannot send, transfer or pay out/i);
+  });
+
+  test('help text claims neither an unbuilt payout nor fake money', () => {
+    // `/help` is the first thing a judge types. It said "I can't send money to
+    // anyone yet — that half isn't built" after /send shipped, and "the money
+    // is MoMo test money, not rands" while real rands were moving.
+    const sandbox = helpText({ MOMO_TARGET_ENVIRONMENT: 'sandbox' });
+    const live = helpText({ MOMO_TARGET_ENVIRONMENT: 'mtnsouthafrica' });
+
+    for (const text of [sandbox, live]) {
+      expect(text).not.toMatch(/isn't built|is not built|aren't built/i);
+      // Whitespace-tolerant, not a literal space. The help text is a wrapped
+      // template literal, so this phrase spans a line break — asserting on a
+      // single space fails on formatting rather than on meaning.
+      expect(text).toMatch(/can'?t\s+move money myself/i);
+    }
+
+    // And the environment line is DERIVED, so it cannot outlive a deploy.
+    expect(sandbox).toMatch(/sandbox/i);
+    expect(sandbox).not.toMatch(/money is real/i);
+    expect(live).toMatch(/production/i);
+    expect(live).toMatch(/money is real/i);
+    expect(live).not.toMatch(/test money/i);
   });
 
   test('it forbids claiming a payment was prepared', () => {
