@@ -22,6 +22,11 @@ next-env.d.ts
 # env — NEVER commit these. The repo is public.
 .env
 .env*.local
+# ...and anything DERIVED from it. `.env*.local` matches `.env.local` but NOT
+# `.env.local.sandbox-backup`, because the pattern requires the name to END in
+# `.local`. A credentials backup made while switching environments slipped
+# through that hole and was staged for a commit to a PUBLIC repo.
+.env.local*
 .env.production
 !.env.example
 

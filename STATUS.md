@@ -219,6 +219,71 @@ browser that retracts its toolbar those differ, and the difference is exactly th
 the message log's own `scrollTop` is set — which cannot touch an ancestor — and the shell carries
 `overflow-hidden`.
 
+### 🟢 THE TELEGRAM MONEY PATH IS PROVEN ON PRODUCTION — end to end, on a real handset
+
+**2026-09-03, 04:27–04:45. The one thing that had never been exercised on the real bot.**
+
+```
+/pay 0.20  (Telegram, chat 6975972975)
+  -> MTN South Africa production
+  -> a real prompt on a real handset
+  -> a PIN we never see
+  -> SUCCESSFUL, MTN financialTransactionId 7452357139
+  -> reconciler resolved it
+  -> journal 63373960
+
+  MOMO_SETTLEMENT   +20
+  SUSPENSE          -20
+  SUM                 0    BALANCED
+
+  GLOBAL: 36 postings, sum 0
+```
+
+**The gate was verified first, and separately.** Three commands from a chat NOT on
+`TELEGRAM_PAY_CHAT_IDS` — `/pay`, `/status`, `/send` — all refused, with
+`momo_transaction`, `journal` and `ledger_entry` **unchanged at 18/22/34 before and after**. The row
+counts are the finding; this route returns 200 for nearly every outcome by design, so its status code
+says nothing (`MISTAKES.md` M8).
+
+#### Two hours were lost to a callback host, and the lesson is not the one it looked like
+
+Switching the local app to production carried `MOMO_CALLBACK_HOST=momo.tumoolo.tech` across from the
+sandbox config. A hand-made probe with that header returned
+**`500 INVALID_CALLBACK_URL_HOST`** — `momoAPIs.md` §4.1's documented failure, where MTN rejects the
+request and **creates no payment**. The callback host is bound to an API user at provisioning time;
+ours was re-provisioned against that domain on **sandbox**, and the production user is MTN's, not
+ours to re-provision.
+
+**And then the app's own request, with the same header, was accepted.** `32838d0d` exists at MTN and
+went SUCCESSFUL. Two calls, identical callback URL, opposite outcomes — **unexplained**, and recorded
+as unexplained rather than given a tidy story. MTN's gateway was also returning transient 500s on
+sandbox balance reads the same morning.
+
+**Resolved by taking the option that cannot fail rather than the one that should work.** §4.1
+measured that sending **no** callback URL is `202` either way, and `docs/03` §3 makes the reconciler
+authoritative — the callback is a latency optimisation, nothing more. `MOMO_CALLBACK_HOST` is now
+empty in both `.env.local` and on Vercel.
+
+**A second bug fell out of the same episode**, and it is the one that cost the time:
+`GET requesttopay/{ref}` returned **404 for four minutes** after MTN had accepted the payment. Acting
+on that 404, this session told Tumo *"MTN never created it"* — **which was wrong**. MTN is eventually
+consistent on that read. A 404 from a status endpoint is not proof of absence, only of "not yet".
+
+#### An accounting gap this session created, stated plainly
+
+The probe that proved the request path (`cd34ed65`, MTN receipt `7452345199`, R0.20) was approved on
+the handset. It was made **outside the app**, so the money moved at MTN and **the ledger has no
+record of it** — the books are R0.20 behind reality. Trivial in amount and it is test money, but it
+is exactly the silent drift the double-entry ledger exists to prevent, so it is written down rather
+than left to be discovered.
+
+#### Deployed
+
+`vercel-env.mjs` pushed 19/19 variables: production credentials, `mtnsouthafrica`, the two real
+payees, the chat allowlist, and an empty callback host. The script now reads `MOMO_CALLBACK_HOST`
+from `.env.local` instead of a hardcoded literal — clearing it locally had no effect on what was
+pushed, which is the wrong direction for a value whose mismatch is a 500 on every payment.
+
 ### 🟢 REAL MONEY HAS MOVED ON MTN SOUTH AFRICA PRODUCTION — three times, both channels
 
 **2026-09-02, ~22:00 UTC. Real rands, a real handset, a real PIN, and MTN's own receipt numbers.**
