@@ -466,6 +466,50 @@ where the wrong conclusion was published.
 
 ---
 
+## M15 · `rm -rf` on a directory `mkdir -p` had not created
+
+**What happened.** To prove a self-arming test guard, I needed
+`src/lib/agent/language.ts` — a file that lives on another agent's unmerged branch — present on
+disk for one test run. I ran `mkdir -p src/lib/agent`, wrote the borrowed file there, ran the test
+three ways, and cleaned up with `rm -rf src/lib/agent`.
+
+That directory already existed. It held `gemini.ts`, `mock.ts`, `persona.ts` and `wire.ts` — the
+agent persona, the wire codec and the Gemini client. **I deleted all four**, and the next
+`typecheck` came back with twenty errors across nine files. They were committed, so
+`git checkout -- src/lib/agent` restored them exactly and the cost was one minute.
+
+**Why.** `mkdir -p` **succeeds identically whether or not the directory already existed.** That is
+the entire point of `-p`, and it means the command returns *no information* about what it did. I
+then treated it as though it had told me something — as though "I made this directory" were an
+established fact — and paired it with the recursive delete that would only be safe if that fact
+were true.
+
+The general shape is the one M13 and M14 are also instances of: **a command that cannot fail is a
+command that cannot tell you anything.** `mkdir -p` not erroring is exactly as much evidence as a
+route returning an unconditional 200 (M8), or a `GET` succeeding where a `POST` is what you need
+(M14). In each case I read the absence of a complaint as a positive finding.
+
+It is worth naming what made this survivable and what would not have. The four files were
+**tracked and committed**, so git had them. Had that directory held an untracked scratch file — or
+had another agent been working in this tree with uncommitted changes, which `git worktree list`
+shows is a live possibility on this project (M4) — nothing would have brought them back.
+
+**The rule.** **Delete by the name of the thing you created, never by the directory you put it in.**
+A temporary file gets removed with `rm <the exact path>`; if a directory truly must go, prove you
+made it first (`test -d` *before* the `mkdir`, and branch on that), because `mkdir -p` will not
+tell you. And **run `git status --short` immediately after any experiment that writes into the
+source tree**, before running anything else — that is the command that caught this one, and it
+caught it only because it happened to be in the next step.
+
+**The guard.** `CLAUDE.md` §"Constraints that will bite" now carries the two-line form of this:
+`mkdir -p` is not evidence the directory is yours, and experiments that write into `src/` are
+cleaned up by filename with a `git status --short` after. The stronger structural guard is the one
+already in this file: **anything an experiment needs on disk goes in the scratchpad**, and the only
+reason this one could not was that the test had to find the file at its real import path — which
+is a narrow, recognisable exception, not a habit.
+
+---
+
 ## What has gone right, and why
 
 Worth recording, because these are the patterns to keep:

@@ -41,6 +41,7 @@ import { ChipSkeleton } from '@/components/artifacts/skeleton';
 import type { ArtifactStatus } from '@/components/artifacts/registry';
 import { ArtifactChip } from '@/components/chips/artifact-chip';
 import { SendIcon } from '@/components/icons';
+import { GreetingCycle } from '@/components/greeting-cycle';
 import { ThemeToggle } from '@/components/theme-toggle';
 import type { Artifact } from '@/lib/artifacts/types';
 import type { KasiContext } from '@/lib/agent/mock';
@@ -77,32 +78,6 @@ const OPENING_CHIPS: readonly string[] = [
   'Where did my taxi fare go?',
   'How am I doing this month?',
   'Ngifuna ukubona my balance',
-];
-
-/**
- * What this build can and cannot do, on the opening screen.
- *
- * The last row is the important one and it is styled as a refusal on purpose.
- * Saying what the product will NOT do, before anyone asks, is the same move the
- * agent's `unbuilt` route makes — and it is why the M10 transcript cannot
- * happen twice.
- */
-const CAPABILITIES: readonly {
-  readonly title: string;
-  readonly body: string;
-  readonly no?: true;
-}[] = [
-  {
-    title: 'Your balance',
-    body: 'and the difference between what you have and what you can spend.',
-  },
-  { title: 'Where a taxi fare went', body: 'a R12.50 fare split four ways, to the cent.' },
-  { title: 'Your transactions', body: 'read from the ledger, every one with its journal id.' },
-  {
-    title: 'Not from me: sending or paying',
-    body: 'a person types the command, and MTN asks them on their own phone.',
-    no: true,
-  },
 ];
 
 function Icon({ d, size = 20 }: { d: string; size?: number }) {
@@ -380,7 +355,7 @@ export default function ChatPage() {
           {isOpening ? (
             <section className="mx-auto flex max-w-[640px] flex-col items-center gap-3 px-2 text-center">
               <h2 className="text-[32px] font-medium leading-[1.2] tracking-[-0.01em]">
-                <em className="font-display not-italic text-brand-text">Sawubona.</em>
+                <GreetingCycle />
                 <br />
                 What do you want to know about your money?
               </h2>
@@ -507,25 +482,6 @@ export default function ChatPage() {
                 >
                   {c}
                 </button>
-              ))}
-            </div>
-            <div className="grid w-full gap-2.5 sm:grid-cols-2">
-              {CAPABILITIES.map((c) => (
-                <div
-                  key={c.title}
-                  className={`flex items-start gap-3 rounded-xl border p-3 text-sm ${
-                    c.no
-                      ? 'border-dashed border-input text-muted-foreground'
-                      : 'border-divider bg-card'
-                  }`}
-                >
-                  <span className={c.no ? 'text-muted-foreground' : 'text-brand-text'}>
-                    <Icon d={c.no ? 'M5.6 5.6l12.8 12.8' : 'M4 12h16'} size={18} />
-                  </span>
-                  <span>
-                    <b className="font-semibold">{c.title}</b> — {c.body}
-                  </span>
-                </div>
               ))}
             </div>
           </div>

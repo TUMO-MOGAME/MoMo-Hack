@@ -17,7 +17,7 @@ Every PR must update it. If you are a fresh session, read this before touching a
   `mo-mo-hack.vercel.app` alias still serves the same deployment. Production deploys on every
   merge, previews on every PR.
 - **Database:** live. 3 migrations applied to Supabase `edtduvwbejdfahkmfort` (`eu-west-2`).
-- **Tree state:** 610 green + 3 skipped over 32 files, 0 vulnerabilities, CI enforcing all of it.
+- **Tree state:** 623 green + 3 skipped over 33 files, 0 vulnerabilities, CI enforcing all of it.
   Both skips are opt-in and announce themselves: the walking skeleton (`MOMO_SKELETON=1`) and the
   write-skew case (`allowWrites`). Both commit permanent rows, so neither runs by accident.
 - **Blocked on:** nothing external. **F9 is done** and **the walking skeleton is closed** — a real
@@ -201,6 +201,44 @@ receipt number is the strongest possible evidence for it. Three payments already
 **Sandbox remains wired and one flag away** (`npm run demo -- --emulator`, or
 `MOMO_TARGET_ENVIRONMENT=sandbox`) as the fallback if MTN or the venue wifi misbehaves at 09:30.
 That is what a fallback is for; it is not the plan.
+
+### 👋 The opening word now rotates through all eleven languages
+
+**Tumo's change, and it is a bigger one than it looks.** The opening screen greeted everyone with
+*"Sawubona."* and nothing else, which quietly makes an eleven-language product isiZulu-shaped.
+`docs/12` §2 claims MoMo Kasi meets people in every South African language; the first word on the
+first screen is the cheapest place to actually show that, and the only one a judge sees before they
+read anything. It now cycles every 2.6s — Sawubona, Molo, Hallo, Thobela, Avuxeni, Dumela, Ndaa,
+Lotjhani, Lumela, Sanibonani, Howzit.
+
+**The four capability cards under the composer are gone**, also at Tumo's request. They are asserted
+gone in `tests/unit/design/greeting.test.ts`, so a revert or a stray merge cannot bring them back
+quietly.
+
+Three decisions worth the paragraph, because each is a way this could have shipped broken:
+
+| | |
+|---|---|
+| **It is silent to a screen reader** | The word sits inside the page's `<h2>`. A heading whose text changes every 2.6 seconds is a heading a screen reader re-announces every 2.6 seconds, over whatever the person was reading. The rotating word is `aria-hidden`; one stable *"Sawubona."* is exposed instead |
+| **It does not rotate under `prefers-reduced-motion`** | WCAG 2.2.2 covers information that auto-updates, not only things that slide about. The `setInterval` is never started — CSS alone would remove the fade and go on swapping the word, which is the part that actually hurts. `shouldRotate()` is a pure function in `src/lib/greetings.ts` precisely so this is unit-tested in both directions rather than grepped for (`MISTAKES.md` M12) |
+| **All eleven words are distinct** | isiZulu and siSwati genuinely share *Sawubona*; Sesotho and Setswana share *Dumela*. No language label is shown, so a repeat reads as the animation stuttering. siSwati takes *Sanibonani* (the plural greeting) and Sesotho takes *Lumela*; both are ordinary in those languages, and `src/lib/greetings.ts` says so where the next reader will look |
+
+**The language NAMES are not ours to invent, and that is guarded rather than commented.**
+`src/lib/agent/language.ts` owns the canonical eleven — and it is still in flight on
+`feat/language-mirroring`, so `greetings.ts` cannot import it today without depending on unmerged
+work. Leaving a *"keep these in step"* comment is precisely `MISTAKES.md` M11 failing within the
+hour, so instead the test reads that file if it exists: inert while it is absent, and the moment it
+lands it compares the two lists and fails on any name not in both. **The guard arms itself.**
+
+**Proved to fire, five ways** — a duplicate word, an inverted reduced-motion check, the capability
+lines restored, a misspelled language name, and a parser that finds nothing. The cross-module check
+was also proved *positively*, by copying the real `language.ts` in from the other branch for one
+run: the eleven names agree exactly.
+
+*(Cleaning that borrowed file up cost an incident — `rm -rf src/lib/agent` on a directory that
+already held four tracked files. Restored from git in a minute because they were committed.
+`MISTAKES.md` **M15**: `mkdir -p` succeeds whether or not the directory existed, so it is never
+evidence the directory is yours.)*
 
 ### 🎨 Both themes ship, dark is the default — and a money guard caught the way it was built
 
