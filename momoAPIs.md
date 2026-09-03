@@ -442,6 +442,19 @@ GET /collection/v1_0/accountholder/msisdn/{n}/active     ← can MTN SEE that wa
 
 Measured against `https://proxy.momoapi.mtn.com`, `X-Target-Environment: mtnsouthafrica`:
 
+> ⚠️ **Every MSISDN in the table below is `27767221345`, which is a TYPO.** The operator's real
+> number is **`27767223145`** — `31` and `13` transposed. Re-measured read-only on 2026-09-03:
+>
+> | Call | Result |
+> |---|---|
+> | `accountholder/msisdn/27767223145/active` | **`200 {"result":true}`** — the real number |
+> | `accountholder/msisdn/0767223145/active` | `200 {"result":false}` — local format |
+> | `accountholder/msisdn/+27767223145/active` | **`400`** — the `+` is rejected before lookup |
+> | `accountholder/msisdn/27767221345/active` | `200 {"result":false}` — the typo |
+>
+> The rows beneath are kept because the *method* is still the point, but none of them describes a
+> real wallet. **Use `27767223145`.**
+
 | Call | Result |
 |---|---|
 | our collection account balance | **`200 {"availableBalance":"32.39","currency":"ZAR"}`** |

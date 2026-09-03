@@ -52,6 +52,10 @@
  */
 
 import { loadEnv, redact, colour as c } from './_env.mjs';
+// The payer check is a pure function in its own module so it can be TESTED —
+// see tests/contract/live-msisdn.test.ts. Inline, it was only ever assertable
+// by running this script against a doctored .env.local.
+import { liveMsisdnProblem, SANDBOX_FIXTURE_MSISDN } from './_msisdn.mjs';
 
 const API = 'https://api.vercel.com';
 
@@ -231,9 +235,13 @@ async function main() {
     // The ONE number `/pay` may request money from. Falls back to the sandbox
     // fixture rather than to nothing: an unset value makes `/pay` refuse
     // outright, which is safe but looks broken in a demo.
+    //
+    // That fallback is correct on sandbox and a TRAP on production, where
+    // `46733123454` is not a registered wallet — see the refusal below, which
+    // stops the live push before this line can ship it.
     [
       'MOMO_DEMO_MSISDN',
-      env.MOMO_DEMO_MSISDN || '46733123454',
+      env.MOMO_DEMO_MSISDN || SANDBOX_FIXTURE_MSISDN,
       'the only payer /pay can ever charge',
     ],
     // M5d. Empty is not a default here — it is a denial. An unset value means
@@ -287,6 +295,22 @@ async function main() {
         '      Set TELEGRAM_PAY_CHAT_IDS in .env.local. Send /pay to the bot and read the\n' +
         '      chat id back out of its refusal, or use @userinfobot.',
     );
+  }
+
+  // ── the sandbox fixture is not a wallet on production ─────────────────────
+  //
+  // `46733123454` is MTN's sandbox test number. It auto-resolves in ~25s there
+  // and is INACTIVE on production, so a live deploy carrying it gives every
+  // `/pay` a `FAILED · PAYER_NOT_FOUND` — the failure that cost a whole session
+  // once already (MISTAKES.md M13).
+  //
+  // Refused here rather than left to fail at MTN, because the symptom arrives
+  // on stage, names nothing, and looks like a broken product rather than a
+  // wrong variable. The rules, and the measured responses behind each, are in
+  // `_msisdn.mjs`.
+  if (targetEnvironment !== 'sandbox') {
+    const problem = liveMsisdnProblem(env.MOMO_DEMO_MSISDN);
+    if (problem) problems.push(problem);
   }
 
   if (momoMode === 'emulator') {
