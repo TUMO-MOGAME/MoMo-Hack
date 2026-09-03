@@ -72,7 +72,23 @@ const apply = flag('yes');
 const allowLive = flag('allow-live');
 const withTelegram = flag('with-telegram');
 const wantProject = value('project', null);
-const host = value('host', 'momo.tumoolo.tech');
+/**
+ * The callback host, and `.env.local` is now AUTHORITATIVE for it.
+ *
+ * This used to be `value('host', 'momo.tumoolo.tech')` — a literal that ignored
+ * `.env.local` entirely, so clearing the variable locally had no effect on what
+ * got pushed. That is the wrong direction for a value whose mismatch is a
+ * **500 on every payment** (`momoAPIs.md` §4.1): the file you edit must be the
+ * file that wins.
+ *
+ * EMPTY IS A REAL CHOICE, not a missing value. The callback host is bound to an
+ * API user at provisioning time, and the production user is not ours to
+ * re-provision. §4.1 measured that sending NO callback URL is `202` either way,
+ * and `docs/03` §3 makes the reconciler the authoritative path — the callback is
+ * only a latency optimisation. So an empty host is the configuration that
+ * cannot fail, and it is deliberately preserved rather than defaulted away.
+ */
+const host = value('host', loadEnv().env.MOMO_CALLBACK_HOST ?? 'momo.tumoolo.tech');
 const momoMode = value('mode', 'sandbox');
 const targets = value('targets', 'production,preview')
   .split(',')
