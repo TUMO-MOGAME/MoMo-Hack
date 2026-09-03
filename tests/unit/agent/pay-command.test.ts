@@ -16,7 +16,7 @@
  *      payment, and the payer can still decline.
  */
 
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
   DEMO_MAX_MINOR,
   hasExtraArguments,
@@ -77,6 +77,19 @@ describe('parsing the amount', () => {
       expect(hasExtraArguments(' 0.20 to 0761234567')).toBe(true);
     });
 
+    // THE ENVIRONMENT IS PINNED, because these assertions read it.
+    //
+    // Without this the test passed on a laptop with MOMO_PAY_PAYEES in
+    // `.env.local` and FAILED in CI, where nothing is configured and the reply
+    // is "Nobody is set up for this demo yet" instead of the list. A test whose
+    // result depends on whose machine it runs on is not a test.
+    beforeEach(() => {
+      vi.stubEnv('MOMO_PAY_PAYEES', '27767223145:me,27788033288:gogo');
+    });
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
     test('a typed number that is not configured never becomes the payee', async () => {
       // THE assertion of this whole file. `0767221345` is not in
       // MOMO_PAY_PAYEES, so it is refused — and the refusal must not read as
@@ -130,7 +143,9 @@ describe('the payee can never come from user input', () => {
   test('an unresolvable selector is refused before MTN is reached', async () => {
     // The end-to-end version of the same claim, through the real reply path.
     // `9999999999` is well-formed and is not configured, so it must die here.
+    vi.stubEnv('MOMO_PAY_PAYEES', '27767223145:me');
     const reply = await payReply('/pay 0.20 9999999999', 'test');
+    vi.unstubAllEnvs();
     expect(reply).toMatch(/don't know|do not know/i);
     expect(reply).not.toMatch(/request sent/i);
   });
