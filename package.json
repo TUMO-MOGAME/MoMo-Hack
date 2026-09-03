@@ -33,7 +33,8 @@
     "demo": "node scripts/demo.mjs",
     "telegram:setup": "node scripts/telegram-setup.mjs",
     "dev:telegram": "node scripts/telegram-dev-bridge.mjs",
-    "contrast": "node scripts/contrast.mjs"
+    "contrast": "node scripts/contrast.mjs",
+    "seed:roster": "node scripts/seed-roster.mjs"
   },
   "dependencies": {
     "next": "^15.5.25",

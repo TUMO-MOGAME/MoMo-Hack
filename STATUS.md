@@ -17,7 +17,7 @@ Every PR must update it. If you are a fresh session, read this before touching a
   `mo-mo-hack.vercel.app` alias still serves the same deployment. Production deploys on every
   merge, previews on every PR.
 - **Database:** live. 3 migrations applied to Supabase `edtduvwbejdfahkmfort` (`eu-west-2`).
-- **Tree state:** 624 green + 3 skipped over 33 files, 0 vulnerabilities, CI enforcing all of it.
+- **Tree state:** 634 green + 3 skipped over 34 files, 0 vulnerabilities, CI enforcing all of it.
   Both skips are opt-in and announce themselves: the walking skeleton (`MOMO_SKELETON=1`) and the
   write-skew case (`allowWrites`). Both commit permanent rows, so neither runs by accident.
 - **Blocked on:** nothing external. **F9 is done** and **the walking skeleton is closed** — a real
@@ -201,6 +201,67 @@ receipt number is the strongest possible evidence for it. Three payments already
 **Sandbox remains wired and one flag away** (`npm run demo -- --emulator`, or
 `MOMO_TARGET_ENVIRONMENT=sandbox`) as the fallback if MTN or the venue wifi misbehaves at 09:30.
 That is what a fallback is for; it is not the plan.
+
+### 👨‍👩‍👧 The demo has PEOPLE in it now — `demo_persona`, six rows, read from the database
+
+**Tumo's change.** The product's story is *"I pay Sipho for the garden, I send Gogo electricity and
+Baba airtime"* — and until now the screen showed one anonymous wallet. The opening screen now shows
+the roster, fed by `GET /api/people` from a real table.
+
+| | |
+|---|---|
+| `0003_demo_roster.sql` | New table `demo_persona`, `kin_relation` + `support_kind` enums. **Purely additive** — nothing existing altered, so it cannot break a working path on a demo morning |
+| `npm run seed:roster` | Six people. **Idempotent by `relation`** — running it twice leaves six rows, not twelve, which matters because re-running the seed is the obvious way to fix a roster at 09:25 (`MISTAKES.md` M9) |
+| `GET /api/people` | Real rows. Empty on failure, never a 500 — the opening screen draws without a family rather than inventing one |
+| `PeopleStrip` | Mama, Baba, Gogo, Mkhulu, Sisi, Sipho — with what each is supported for |
+
+**Why not `profile`.** Two hard constraints, not preferences. `profile.id` is
+`references auth.users(id)`, so a row cannot exist without a Supabase Auth user — seeding six family
+members would have dragged in the entire authentication workstream that was deliberately deferred.
+And `profile.msisdn` is `unique`, so six people cannot share the one MTN number this demo has. The
+roster is its own table and says so in its name.
+
+**THE HONESTY PROBLEM, AND HOW IT IS HELD.** There is one MTN account. Six names on a screen imply
+six wallets, and a screen implying a movement that did not happen is `MISTAKES.md` M10 exactly. So:
+
+- `settles_to_operator_wallet` is `not null default true` — **every row asserts, in the data**, that
+  its money lands in the operator's own wallet. The strip reads that column and says so on screen,
+  rather than a hardcoded sentence that would outlive the fact. Remove the flag from one row and the
+  line disappears on its own; that is a test.
+- **There is no per-person MSISDN column.** Six numbers money never reaches is a fabrication with a
+  schema around it. When real payees exist, add a nullable column and flip the flag per row.
+- The only number on the strip is `usualMinor`, labelled **"usually"** in the markup — what you
+  typically send, never a total, never a balance, because the roster is linked to no ledger row.
+  A test fails on the words *sent*, *owed*, *paid*, *balance* and *total*.
+- **Nothing is clickable.** Every other affordance on that screen sends a real question, and there
+  is no true question to ask about a person the ledger has never heard of.
+
+**A real architectural guard caught this on the way in.** Both client components carried
+`import type { Person } from '@/server/agent/roster'`, and that module opens the service-role
+Postgres connection. `single-writer.test.ts` failed by name: *"no client component can reach the
+service-role client (ADR-0010)"*. The import was `import type` and is erased at build, so nothing
+could ever have leaked — **and the guard is right anyway**: `import type` is one keyword from
+`import`, deleting it is invisible in review, and in a public repo the service-role key is the worst
+thing that could go. Fixed by moving the types to `@/lib/roster` (the split
+`@/lib/artifacts/types` already has against `@/server/agent/tools`), **not** by relaxing the guard.
+
+**10 tests, proved to fire:** relabelling "usually" as "sent" fails; hardcoding the one-wallet line
+instead of deriving it fails.
+
+### ⏸️ A5-04 / A1-01 — authentication, DEFERRED for the presentation, on the record
+
+Tumo asked for login and signup this session. **Deferred, deliberately, with ~7 hours to the
+presentation**, and written here rather than left as a conversation.
+
+Auth is not a screen. It is a session on every API route, `owner_id` backfilled on
+`ledger_account`, and the RLS policies on **8 tables** going from designed to load-bearing. The
+failure mode is not "auth is missing" — it is `/pay`, `/send`, `/ledger` and the agent all breaking
+together, hours before they are needed, with no time to back the change out. The audits themselves
+cut this on Day 1 for exactly this reason.
+
+`audit:gate` stays shut on these two. That is the correct state: **the gate is reporting a real
+absence, not a bookkeeping error**, and closing it by pretending otherwise would be the one thing
+worse than shipping without auth.
 
 ### 👋 The opening word now rotates through all eleven languages
 
