@@ -16,12 +16,13 @@
  *      payment, and the payer can still decline.
  */
 
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 import {
   DEMO_MAX_MINOR,
   hasExtraArguments,
   parsePayAmount,
   requestDemoPayment,
+  splitPayArgs,
 } from '@/server/momo/demo-collect';
 import { payReply } from '@/server/momo/pay-replies';
 import { handleUpdate, parseCommand } from '@/server/telegram/handle';
@@ -52,24 +53,56 @@ describe('parsing the amount', () => {
     // The ceiling caught it. That was LUCK. `/pay 0.20 300` would have parsed as
     // R3.00 and charged it — someone who typed an amount and a reference would
     // be billed the reference.
-    test.each(['/pay 0.2 0767221345', '/pay 0.20 300', '/pay 0.20 to 0761234567', '/pay 5 5'])(
-      '%j is refused outright, not resolved to one of its numbers',
-      (text) => {
-        const args = text.replace(/^\/pay/i, '');
-        expect(hasExtraArguments(args)).toBe(true);
-        expect(parsePayAmount(args)).toBeNull();
-      },
-    );
+    // A SECOND TOKEN IS NOW MEANINGFUL — it selects which CONFIGURED phone to
+    // ask — so the guarantee moved rather than went away. It used to be "refuse
+    // any second token"; it is now "the amount comes from token ONE and the
+    // money parser never sees token two".
+    test.each([
+      ['/pay 0.2 0767221345', 20n],
+      ['/pay 0.20 300', 20n],
+      ['/pay 5 5', 500n],
+    ])('%j reads its amount from the FIRST token only', (text, expected) => {
+      const args = text.replace(/^\/pay/i, '');
+      const { amount, selector } = splitPayArgs(args);
 
-    test('the refusal explains that the payee is configuration', async () => {
+      expect(parsePayAmount(amount)).toBe(expected);
+      // The phone number is never offered to the money parser at all.
+      expect(selector).not.toBe('');
+      expect(parsePayAmount(`${amount} ${selector}`)).toBeNull();
+    });
+
+    test('three tokens are still refused outright', () => {
+      // "/pay 0.20 to 0761234567" — no shape here understands three, and
+      // guessing which one is the amount is how this went wrong the first time.
+      expect(hasExtraArguments(' 0.20 to 0761234567')).toBe(true);
+    });
+
+    // THE ENVIRONMENT IS PINNED, because these assertions read it.
+    //
+    // Without this the test passed on a laptop with MOMO_PAY_PAYEES in
+    // `.env.local` and FAILED in CI, where nothing is configured and the reply
+    // is "Nobody is set up for this demo yet" instead of the list. A test whose
+    // result depends on whose machine it runs on is not a test.
+    beforeEach(() => {
+      vi.stubEnv('MOMO_PAY_PAYEES', '27767223145:me,27788033288:gogo');
+    });
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    test('a typed number that is not configured never becomes the payee', async () => {
+      // THE assertion of this whole file. `0767221345` is not in
+      // MOMO_PAY_PAYEES, so it is refused — and the refusal must not read as
+      // though a payment were attempted.
       const reply = await payReply('/pay 0.20 0767221345', 'test');
-      expect(reply).toMatch(/just the amount/i);
-      expect(reply).toMatch(/server config|number you type/i);
-      // And it must not read as though a payment were attempted. "approve"
-      // appears legitimately in the explanation of what /pay does, so the
-      // assertion is on the claims that would mislead — a request having been
-      // sent, or a ceiling having been hit by a number that was never an amount.
+
+      expect(reply).toMatch(/don't know|do not know/i);
       expect(reply).not.toMatch(/request sent|ceiling|check your phone/i);
+    });
+
+    test('the refusal says who CAN be asked, so it is not a dead end', async () => {
+      const reply = await payReply('/pay 0.20 0767221345', 'test');
+      expect(reply).toMatch(/I can ask/i);
     });
   });
 });
@@ -82,13 +115,39 @@ describe('the payee can never come from user input', () => {
   });
 
   test('a number in the message does not become the payee', async () => {
-    // The whole message is discarded before this point — `requestDemoPayment`
-    // takes an AMOUNT and a channel, and has no parameter for a destination.
-    // This asserts the shape of the API, which is the actual control: there is
-    // no argument through which a typed number could arrive.
-    expect(requestDemoPayment.length).toBeLessThanOrEqual(3);
+    // ⚠️ THIS TEST'S GUARANTEE CHANGED, AND THE OLD ASSERTION WENT ON PASSING.
+    //
+    // It used to read `expect(requestDemoPayment.length).toBeLessThanOrEqual(3)`
+    // with a comment saying "there is no argument through which a typed number
+    // could arrive". A payee argument was then added — and the assertion still
+    // passed, because `Function.length` counts parameters BEFORE the first
+    // default and `env` has one, so the count never moved off 2.
+    //
+    // A test that passes while its own comment has become false is worse than a
+    // failing one: it certifies the thing it stopped checking. So the guarantee
+    // is restated as what is actually true now.
+    //
+    // The payee parameter takes a BRANDED `Payee` (`lib/momo/payees.ts`) that
+    // only `parsePayees`/`resolvePayee` can mint, both of which read the
+    // environment. `requestDemoPayment(amount, channel, env, '0767221345')` does
+    // not compile — that is the structural half, enforced by `npm run typecheck`
+    // rather than by this file.
+    //
+    // The runtime half is below: with no payee resolved and no configured
+    // number, it refuses rather than guessing.
     const result = await requestDemoPayment(minor(20n), 'test', {});
     expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.reason).toMatch(/no payer number/i);
+  });
+
+  test('an unresolvable selector is refused before MTN is reached', async () => {
+    // The end-to-end version of the same claim, through the real reply path.
+    // `9999999999` is well-formed and is not configured, so it must die here.
+    vi.stubEnv('MOMO_PAY_PAYEES', '27767223145:me');
+    const reply = await payReply('/pay 0.20 9999999999', 'test');
+    vi.unstubAllEnvs();
+    expect(reply).toMatch(/don't know|do not know/i);
+    expect(reply).not.toMatch(/request sent/i);
   });
 });
 

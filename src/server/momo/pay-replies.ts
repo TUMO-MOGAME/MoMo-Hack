@@ -28,34 +28,96 @@ import {
   hasExtraArguments,
   parsePayAmount,
   requestDemoPayment,
+  splitPayArgs,
 } from './demo-collect';
+import { describePayees, parsePayees, resolvePayee } from '@/lib/momo/payees';
 import { hasExtraSendArguments, parseSendAmount, sendDemoPayout } from './demo-payout';
 
 /** `/pay 0.20` → the sentence to send back. Never throws; a chat must answer. */
 export async function payReply(text: string, channel: string): Promise<string> {
   const args = text.replace(/^\/pay(?:@\S+)?/i, '');
 
-  // A second argument is almost always a payee, and answering it at all would
-  // be misleading — this build cannot pay an arbitrary number, by design.
-  // Saying so plainly beats parsing one of the two numbers and hoping.
+  const payees = parsePayees(process.env.MOMO_PAY_PAYEES, process.env.MOMO_DEMO_MSISDN);
+
+  // THREE tokens is still a refusal. Two is an amount and a payee; anything
+  // more is not a shape this understands, and guessing which token is which is
+  // how "/pay 0.20 300" once charged R3.00.
   if (hasExtraArguments(args)) {
     return [
-      'Just the amount, please — like /pay 0.20.',
+      'One amount and, if you like, who to ask — like /pay 0.20 or /pay 0.20 gogo.',
       '',
-      "I can't send money to a number you type. This asks the one phone that's",
-      'set up for this demo to approve a payment, and that number lives in the',
-      'server config, not in the message.',
+      payees.length > 0
+        ? `Right now I can ask: ${describePayees(payees)}.`
+        : 'No payer is configured right now, so there is nobody to ask.',
     ].join('\n');
   }
 
-  const amount = parsePayAmount(args);
+  const { amount: amountToken, selector } = splitPayArgs(args);
+
+  const amount = parsePayAmount(amountToken);
   if (amount === null) {
-    return 'Tell me how much — like /pay 0.20 — and I will ask your phone to approve it.';
+    return [
+      'Tell me how much — like /pay 0.20 — and I will ask a phone to approve it.',
+      '',
+      payees.length > 1 ? `You can add who: ${describePayees(payees)}.` : '',
+    ]
+      .filter(Boolean)
+      .join('\n');
+  }
+
+  // ── SELECT, NEVER SUPPLY ───────────────────────────────────────────────────
+  //
+  // A person may now choose WHICH configured phone to ask, by label, full
+  // number, or the last four digits the bot itself shows them. What they still
+  // cannot do is invent one: `resolvePayee` returns null for anything not in
+  // the environment, and that is refused here rather than passed to MTN.
+  //
+  // The distinction is the whole safety story. Free-text numbers would turn a
+  // public bot into a way to make MTN ring any South African with a payment
+  // request; selecting from a list the operator wrote can only ever ring a
+  // phone the operator already chose.
+  const payee = selector === '' ? (payees[0] ?? null) : resolvePayee(payees, selector);
+
+  if (!payee) {
+    return [
+      selector === ''
+        ? 'No payer is configured right now, so there is nobody to ask.'
+        : `I don't know "${selector}".`,
+      '',
+      payees.length > 0
+        ? `I can ask: ${describePayees(payees)}. Say the name, or just /pay ${amountToken} for the first one.`
+        : 'Nobody is set up for this demo yet.',
+    ].join('\n');
   }
 
   try {
-    const result = await requestDemoPayment(amount, channel);
+    // `process.env` explicitly, because the payee is the FOURTH argument — the
+    // third is the env override the tests inject.
+    const result = await requestDemoPayment(amount, channel, process.env, payee);
     if (!result.ok) return result.reason;
+
+    // ── THE PROMPT ONLY ARRIVES IF THERE IS A HANDSET ────────────────────
+    //
+    // This used to say "Check your phone" unconditionally. On sandbox the payer
+    // is `46733123454`, one of MTN's fixtures, which resolves itself in ~25
+    // seconds: no prompt is pushed, no PIN is asked for, and no phone rings.
+    // Tumo hit exactly this in dev — a masked number they did not recognise,
+    // beside an instruction that could never be followed.
+    //
+    // Same family as every other expired sentence this session: prose that
+    // described one configuration and shipped in another. Derived from the
+    // transaction now, so it cannot drift from what actually happened.
+    if (result.resolvesItself) {
+      return [
+        `Request sent for ${formatZAR(result.amountMinor)} to ${result.masked}.`,
+        '',
+        "That is MTN's sandbox test number, not a real handset — no phone will",
+        'ring and nobody is asked for a PIN. It settles on its own in about 25',
+        'seconds.',
+        '',
+        'Send /status then and I will read the ledger.',
+      ].join('\n');
+    }
 
     return [
       `Request sent for ${formatZAR(result.amountMinor)} to ${result.masked}.`,
