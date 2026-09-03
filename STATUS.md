@@ -17,7 +17,7 @@ Every PR must update it. If you are a fresh session, read this before touching a
   `mo-mo-hack.vercel.app` alias still serves the same deployment. Production deploys on every
   merge, previews on every PR.
 - **Database:** live. 3 migrations applied to Supabase `edtduvwbejdfahkmfort` (`eu-west-2`).
-- **Tree state:** 623 green + 3 skipped over 33 files, 0 vulnerabilities, CI enforcing all of it.
+- **Tree state:** 624 green + 3 skipped over 33 files, 0 vulnerabilities, CI enforcing all of it.
   Both skips are opt-in and announce themselves: the walking skeleton (`MOMO_SKELETON=1`) and the
   write-skew case (`allowWrites`). Both commit permanent rows, so neither runs by accident.
 - **Blocked on:** nothing external. **F9 is done** and **the walking skeleton is closed** — a real
@@ -381,6 +381,42 @@ the PAYOUT cap, not merely the live one"*.
 path is built, contract-verified and ledger-correct, and MTN's gate is the only thing between it and
 real rands — shown live in one command rather than described. That is a stronger story than a
 half-built payout, and it is true.
+
+### 🧪 The M5d gate was exercised against a running server, and the fix path it documented was false
+
+**The gate holds.** Three commands from a chat that is not on `TELEGRAM_PAY_CHAT_IDS`, driven
+through the real route with the real secret against `next dev`:
+
+| | |
+|---|---|
+| `/pay 0.20`, `/status`, `/send 0.10` | all `HTTP 200`, all `source: 'denied'` |
+| `momo_transaction` / `journal` / `ledger_entry` | **18 / 22 / 34 before, 18 / 22 / 34 after** |
+| MoMo or ledger activity in the log | **none** |
+| `telegram.pay.denied` | exactly three lines — `pay`, `status`, `send` |
+
+The row counts are the finding, not the 200. This route returns 200 for nearly every outcome by
+design, so its response says nothing about whether the money path ran — `MISTAKES.md` M8, applied
+rather than quoted.
+
+**And it turned up a false comment on the M5d fix path itself.** `handle.ts` said, at the denial:
+
+> *"The chat id is the ONLY thing that gets logged, and it is the only thing worth logging: it is
+> what an operator pastes into `TELEGRAM_PAY_CHAT_IDS` to fix a legitimate denial."*
+
+The log line actually reads `chat_id: "•••• 0111"`. `server/log.ts` masks any bare **9-15 digit
+run**, and a Telegram chat id is exactly that shape — so the logger eats it. **An operator cannot
+paste `•••• 0111`.** The masking is right and stays: these logs go to a public repo's deployment.
+What was wrong was the sentence claiming the log was the fix path.
+
+**The path that does work is the denial reply**, which is not logged and therefore not masked, and
+which puts the full id on the screen of the person who needs to hand it over. That was pinned by a
+test asserting the reply contains `999` — three digits, which proves less than it looks, because
+the failure mode is a **9-15 digit** id meeting the masker. Now pinned with a real-shaped id
+(`6083941772`) and an assertion that no `••••` reaches the reply. **Proved to fire** by masking the
+reply: fails *"a REAL-SHAPED chat id survives whole into the reply"*.
+
+That is the expiry-dated-comment pattern for the **fourth** time this session's table records — and
+the first one caught by running the thing rather than by reading it.
 
 ### 🔒 M5d — the Telegram allowlist. The blocking item for a production deploy is closed
 

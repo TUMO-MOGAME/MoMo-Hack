@@ -335,6 +335,26 @@ describe('the pay allowlist (M5d)', () => {
       expect(reply).toContain('999');
     });
 
+    test('a REAL-SHAPED chat id survives whole into the reply', async () => {
+      // The case above uses `999`, which is three digits and therefore proves
+      // less than it looks. A real Telegram chat id is 9-10 digits — which is
+      // exactly the shape `maskMsisdn` in `server/log.ts` redacts, and it DOES
+      // redact it: the denial log line reads `chat_id: "•••• 0111"`, measured
+      // against a running server.
+      //
+      // So the reply is the only place the operator can read the id, and this
+      // pins that it arrives unmasked and unsplit. If someone ever routes this
+      // text through the logger for consistency, the M5d fix path silently
+      // becomes four dots and a demo stalls with no way to unblock it.
+      const w = wire(new Set([42]));
+
+      await handleUpdate(w.deps as any, update('/pay 1.00', 6083941772) as any);
+
+      const reply = w.sent.join('\n');
+      expect(reply).toContain('6083941772');
+      expect(reply).not.toContain('••••');
+    });
+
     test('the @botname suffix does not slip past the gate', async () => {
       // `/pay@momokasi_demo_bot` is what Telegram delivers in a GROUP — the
       // exact place an outsider is most likely to find the bot.
