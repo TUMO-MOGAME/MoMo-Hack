@@ -448,6 +448,8 @@ Measured against `https://proxy.momoapi.mtn.com`, `X-Target-Environment: mtnsout
 > | Call | Result |
 > |---|---|
 > | `accountholder/msisdn/27767223145/active` | **`200 {"result":true}`** — the real number |
+> | `accountholder/msisdn/27788033288/active` | **`200 {"result":true}`** — a second live wallet |
+> | `accountholder/msisdn/0788033288/active` | `200 {"result":false}` — local format, same rule |
 > | `accountholder/msisdn/0767223145/active` | `200 {"result":false}` — local format |
 > | `accountholder/msisdn/+27767223145/active` | **`400`** — the `+` is rejected before lookup |
 > | `accountholder/msisdn/27767221345/active` | `200 {"result":false}` — the typo |

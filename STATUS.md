@@ -384,13 +384,14 @@ opening screen and invites precisely these sentences. Flagged for a decision rat
 
 ### ☎️ There is ONE number on MoMo — `27767223145` — and the number in M13 was a typo
 
-Tumo confirmed the only handset connected to MoMo is **0767223145**, which MoMo requires as
+Tumo confirmed the handsets connected to MoMo. **0767223145** first, then **0788033288** — two live wallets, which MoMo requires as
 **`27767223145`**: international, country code, no `+`. Re-measured read-only against MTN South
 Africa production on 2026-09-03, no payment requested and nothing spent:
 
 | Call | Result |
 |---|---|
 | `accountholder/msisdn/27767223145/active` | **`200 {"result":true}`** — the real number |
+| `accountholder/msisdn/27788033288/active` | **`200 {"result":true}`** — a second live wallet |
 | `accountholder/msisdn/0767223145/active` | `200 {"result":false}` — local format |
 | `accountholder/msisdn/+27767223145/active` | **`400`** — the `+` is rejected before lookup |
 | `accountholder/msisdn/27767221345/active` | `200 {"result":false}` |

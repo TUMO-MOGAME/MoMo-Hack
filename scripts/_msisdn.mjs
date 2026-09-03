@@ -7,9 +7,16 @@
  * `GET /collection/v1_0/accountholder/msisdn/{n}/active` on 2026-09-03:
  *
  *     27767223145   -> 200 {"result":true}     international, no +
+ *     27788033288   -> 200 {"result":true}     a second live wallet
  *     0767223145    -> 200 {"result":false}    local format
  *     +27767223145  -> 400                     the + is rejected before lookup
  *     46733123454   -> the SANDBOX fixture, not a wallet on production
+ *
+ * TWO numbers are live, and MOMO_DEMO_MSISDN still holds exactly ONE. That is
+ * deliberate: the payee being configuration and never input is what separates
+ * this from a machine for sending payment requests to strangers over MTN's
+ * network (tests/unit/agent/pay-command.test.ts). The second number is a
+ * demo-day FALLBACK — swap the variable and redeploy — not a runtime choice.
  *
  * The class this catches is malformed numbers. It cannot catch a well-formed
  * WRONG number, and nothing can — `MISTAKES.md` M13 was five failed payments
