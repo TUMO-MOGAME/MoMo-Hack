@@ -183,3 +183,35 @@ move money myself — a person types the command, and MTN asks them on their own
 handset. That one isn't a limitation to be fixed; it's the design.
 
 I'm answering through Gemini. Ask me how any of it works.`;
+
+/**
+ * The canned commands, shared by BOTH channels.
+ *
+ * `docs/13`'s stated property is that the web chat and Telegram say the SAME
+ * thing, and until now that was true of `/pay`, `/status` and `/send` — which
+ * share `pay-replies.ts` — but NOT of `/help`, `/about` and `/start`. Those
+ * lived in a private `CANNED` map inside the Telegram handler, so typing
+ * `/help` in the web chat sent it to the model as ordinary text and got
+ * whatever Gemini felt like saying.
+ *
+ * Two handlers each writing their own sentences is exactly how channel parity
+ * stops being a property of the code and becomes a thing someone remembers.
+ *
+ * `helpText()` is called per request rather than read from the `HELP_TEXT`
+ * const, so the environment line is current even on a long-lived server that
+ * was started before the environment changed.
+ */
+export function cannedReply(command: string): string | null {
+  switch (command.toLowerCase()) {
+    case 'start':
+    case 'help':
+      return helpText();
+    case 'about':
+      return ABOUT_TEXT;
+    default:
+      return null;
+  }
+}
+
+/** The commands both channels answer without calling the model. */
+export const CANNED_COMMANDS = ['start', 'help', 'about'] as const;
