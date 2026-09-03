@@ -118,14 +118,20 @@ Ask away.`;
 export const ABOUT_TEXT = `MoMo Kasi is a hackathon submission for the MTN MoMo API Hackathon.
 
 What's real: a double-entry ledger where every cent traces to a journal that
-sums to zero, integer money in cents (never floating point), and live MTN MoMo
-sandbox Collections — verified against the real sandbox.
+sums to zero, integer money in cents (never floating point), and MTN MoMo
+Collections — including real rands on MTN South Africa production, with MTN's
+own receipt numbers.
 
 Every amount I show you is read from that ledger by the server before I'm asked
 to say anything — I never calculate one. That's the point: I can't invent a
 balance, because I don't build the card it appears on.
 
-What isn't: no real money, no KYC, no licence, no taxi-association agreement,
-and no way to pay anybody out — money can come in and cannot yet leave.
+Paying out is built and works on the sandbox. On production MTN currently
+refuses disbursements for this account, so money can come in and cannot go out
+there — that's their authorisation gate, not a gap in the code.
+
+What isn't: no KYC, no licence, no taxi-association agreement. And I can never
+move money myself — a person types the command, and MTN asks them on their own
+handset. That one isn't a limitation to be fixed; it's the design.
 
 I'm answering through Gemini. Ask me how any of it works.`;

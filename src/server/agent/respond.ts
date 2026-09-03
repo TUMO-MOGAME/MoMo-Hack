@@ -148,9 +148,27 @@ function unbuiltProse(message: string): string {
     return "I can't set up anything that runs on its own yet — scheduled and recurring payments aren't built. What I can do right now is show you your balance, your recent transactions, or how a taxi fare splits.";
   }
   if (/\b(buy|purchase|top ?up|airtime|electricity|data)\b/i.test(message)) {
-    return "I can't buy airtime or electricity yet — that part isn't built. Money can come into this ledger, but nothing can go out of it yet. I can show you your balance, your recent transactions, or how a taxi fare splits.";
+    return "I can't buy airtime or electricity yet — that part isn't built. I can show you your balance, your recent transactions, or how a taxi fare splits.";
   }
-  return "I can't send money to anyone yet, so nothing has been set up and nothing is waiting for you to confirm. Payouts aren't built — money can come into this ledger and cannot yet leave it. What I can do is show you your balance, your recent transactions, or how a taxi fare splits.";
+  // ── THIS SENTENCE HAD EXPIRED, AND THAT IS M10's SECOND CAUSE AGAIN ────────
+  //
+  // It used to say *"Payouts aren't built — money can come into this ledger and
+  // cannot yet leave it."* True when written; false from M3a. `/send` exists,
+  // works, and posts a payout journal. A refusal that gives a reason which has
+  // stopped being true is still a false statement, and the next person reads it
+  // and stops checking.
+  //
+  // What has NOT changed, and never will, is the part that matters: **the agent
+  // cannot move money** (CLAUDE.md #11, ADR-0014). That is a permanent property
+  // of this build, not a build state — `respond()` has no write tools and does
+  // not import the payment module. So the refusal stands; only its reason is
+  // corrected, from "payouts don't exist" to "I am not the thing that does it".
+  //
+  // It deliberately does NOT tell the user to go and type `/send`. Answering a
+  // free-text payment request with a working command is an invitation dressed
+  // as a refusal, and this route exists precisely because that user was about
+  // to be told money was one tap away.
+  return "I can't send money — I have no way to move it, by design, so nothing has been set up and nothing is waiting for you to confirm. What I can do is show you your balance, your recent transactions, or how a taxi fare splits.";
 }
 
 /** Total of a wallet artifact's spendable rows. Bigint arithmetic, never float. */
