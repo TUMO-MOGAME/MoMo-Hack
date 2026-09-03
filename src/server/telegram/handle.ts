@@ -7,7 +7,7 @@
  */
 
 import type { AgentClient } from '@/lib/agent/gemini';
-import { ABOUT_TEXT, HELP_TEXT } from '@/lib/agent/persona';
+import { cannedReply } from '@/lib/agent/persona';
 import type { TelegramClient } from '@/lib/telegram/client';
 import type { TelegramUpdate } from '@/lib/telegram/types';
 import { log } from '@/server/log';
@@ -85,11 +85,14 @@ export function parseCommand(text: string): string | undefined {
  * `/start` is the first thing a new user ever sees, and it should not be able to
  * fail because an upstream is rate-limited.
  */
-const CANNED: Record<string, string> = {
-  start: HELP_TEXT,
-  help: HELP_TEXT,
-  about: ABOUT_TEXT,
-};
+// Moved to `persona.ts` so the WEB CHAT answers these identically. It used to
+// be a private map here, which meant `/help` in the browser went to the model
+// as ordinary text — channel parity holding for `/pay` and not for `/help`.
+//
+// Called per request rather than built into a module-level map, so the
+// environment line in `/help` is current even on a server that was started
+// before the environment changed. That is not hypothetical: this deployment
+// went from sandbox to production while running.
 
 /**
  * The reply when the model cannot answer.
@@ -155,7 +158,7 @@ export async function handleUpdate(
   const command = parseCommand(text);
 
   if (command) {
-    const canned = CANNED[command];
+    const canned = cannedReply(command);
     if (canned) {
       // `/start` is a fresh conversation. Without this, someone restarting the
       // bot to escape a confused thread carries the confusion with them.

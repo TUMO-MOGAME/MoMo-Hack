@@ -31,6 +31,7 @@
 import { createRateLimiter } from '@/server/momo/callback';
 import { log } from '@/server/log';
 import { payReply, sendReply, statusReply } from '@/server/momo/pay-replies';
+import { cannedReply } from '@/lib/agent/persona';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -106,6 +107,22 @@ export async function POST(request: Request): Promise<Response> {
     typeof (body as { message?: unknown }).message === 'string'
       ? (body as { message: string }).message.slice(0, 120).trim()
       : '';
+
+  // ── CHANNEL PARITY: /help, /about and /start answer here too ──────────────
+  //
+  // These are canned text with NO model call and NO money, and they are handled
+  // before the payment dispatch precisely because they touch neither. They used
+  // to live only in the Telegram handler, so typing `/help` in the web chat
+  // went to the model as ordinary text and got whatever Gemini improvised —
+  // parity holding for `/pay` and quietly not for `/help`.
+  //
+  // Answered ahead of the origin-sensitive money path on purpose: nothing here
+  // can spend anything, so it needs no more protection than the page itself.
+  const canned = /^\/([a-z]+)\b/i.exec(message);
+  const cannedText = canned?.[1] ? cannedReply(canned[1]) : null;
+  if (cannedText) {
+    return Response.json({ reply: cannedText }, { headers: { 'cache-control': 'no-store' } });
+  }
 
   if (!/^\/(pay|status|send)\b/i.test(message)) {
     return Response.json({ error: 'not a payment command' }, { status: 400 });

@@ -212,7 +212,11 @@ export default function ChatPage() {
       // a different endpoint because `/api/agent` is read-only and its docstring
       // promises so. Free text that merely sounds like a payment still goes to
       // the agent, which refuses it.
-      if (/^\/(pay|status|send)\b/i.test(text)) {
+      // `/help`, `/about` and `/start` are here too, so the web chat answers
+      // them exactly as Telegram does. They are canned text with no model call
+      // and no money; before this they fell through to `/api/agent` and got
+      // whatever Gemini improvised, which is the opposite of channel parity.
+      if (/^\/(pay|status|send|help|about|start)\b/i.test(text)) {
         const response = await fetch('/api/pay', {
           method: 'POST',
           // `x-momo-chat` marks this as our own page's request. A browser will
