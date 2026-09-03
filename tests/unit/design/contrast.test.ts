@@ -80,10 +80,10 @@ describe('the contrast script computes WCAG ratios correctly', () => {
     // no longer describes the same two colours in the other order, and the test
     // was comparing 13.00 against 12.36 and calling it symmetry.
     //
-    // Asserted directly instead: gold against the ground, both ways round.
-    // `brand` and `brand-accent` are the same value in the dark scale, so these
-    // two rows ARE the identical pair and must agree to the last digit.
-    expect(ratioFor(output, 'brand on background')).toBeCloseTo(
+    // Asserted through a pair that IS identical: in the dark scale
+    // `--brand-text` and `--brand-accent` are both #FFCB05, so these two rows
+    // describe the same two colours and must agree to the last digit.
+    expect(ratioFor(output, 'brand-text on background')).toBeCloseTo(
       ratioFor(output, 'brand-accent on background'),
       2,
     );
@@ -110,12 +110,14 @@ describe('the contrast script computes WCAG ratios correctly', () => {
     expect(onGround - onCard).toBeLessThan(1.5);
   });
 
-  test('every token that bounds a CONTROL meets SC 1.4.11', () => {
-    // A3-01, now fixed: --input 15% → 40%, --border 12% → 38%, --ring 35% → 45%.
-    // These are the values a user must perceive to operate the app, and the
-    // whole non-text section must be green.
-    const uiBlock = output.split('Non-text contrast')[1] ?? '';
-    expect(uiBlock).not.toMatch(/FAIL/);
+  test('every token that bounds a CONTROL meets SC 1.4.11, in BOTH themes', () => {
+    // A3-01, now closed. These are the values a user must perceive in order to
+    // operate the app, and EVERY non-text section must be green — there are two
+    // of them now, because both themes ship. A version of this test that read
+    // only the first section would have passed while the light theme failed.
+    const uiBlocks = output.split('Non-text contrast').slice(1);
+    expect(uiBlocks).toHaveLength(2);
+    for (const block of uiBlocks) expect(block).not.toMatch(/FAIL/);
     expect(ratioFor(output, 'input on background')).toBeGreaterThanOrEqual(3);
     expect(ratioFor(output, 'border on background')).toBeGreaterThanOrEqual(3);
     expect(ratioFor(output, 'ring on card')).toBeGreaterThanOrEqual(3);
@@ -129,8 +131,29 @@ describe('the contrast script computes WCAG ratios correctly', () => {
     expect(output).toMatch(/n\/a.*not graded.*divider/);
   });
 
-  test('every text pairing passes 4.5:1', () => {
-    const textBlock = output.split('Non-text contrast')[0] ?? '';
-    expect(textBlock).not.toMatch(/FAIL/);
+  test('every text pairing passes 4.5:1, in BOTH themes', () => {
+    // The whole report, both themes, both sections. Blunt on purpose: the
+    // moment a FAIL appears anywhere, this fails, and the row names itself.
+    //
+    // This caught a real one the first time the light theme was measured —
+    // `brand on background` at 1.38:1, gold text on an off-white page. The fix
+    // was not to lower the threshold but to measure what the UI actually
+    // renders, which is `--brand-text`.
+    expect(output).not.toMatch(/FAIL/);
+  });
+
+  test('both themes are measured, and dark is reported first', () => {
+    // If either header ever disappears, half the product silently stops being
+    // checked and every assertion above still passes.
+    expect(output).toMatch(/DARK THEME \(the default\)/);
+    expect(output).toMatch(/LIGHT THEME/);
+    expect(output.indexOf('DARK THEME')).toBeLessThan(output.indexOf('LIGHT THEME'));
+  });
+
+  test('the gold FILL is reported but not graded as text', () => {
+    // #FFCB05 on the light page is 1.38:1. It is not a text pairing — the
+    // wallet card puts `--brand-foreground` on it, which is graded at 12.36:1 —
+    // but the number stays on screen so nobody has to rediscover it.
+    expect(output).toMatch(/n\/a.*not graded.*brand fill on background/);
   });
 });

@@ -2,6 +2,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Geist, Geist_Mono, Playfair_Display } from 'next/font/google';
 import './globals.css';
+import { THEME_BOOTSTRAP } from '@/lib/theme';
 
 const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
@@ -49,14 +50,14 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   // The one literal colour in the codebase: <meta name="theme-color"> cannot
-  // take a CSS variable. Two entries, so the browser chrome follows whichever
-  // theme is actually showing rather than being pinned to the old dark-only
-  // build. These are `--background` from `src/design/tokens.ts` and must be
-  // kept in step with it by hand — nothing derives them.
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#F4F4F2' },
-    { media: '(prefers-color-scheme: dark)', color: '#0A0A0B' },
-  ],
+  // take a CSS variable. These are `--background` from `src/design/tokens.ts`
+  // and must be kept in step with it by hand — nothing derives them.
+  //
+  // Pinned to DARK rather than keyed to `prefers-color-scheme`, because our
+  // default is dark regardless of the OS setting. Keying it to the OS would put
+  // light browser chrome above a dark app for anyone whose laptop is in light
+  // mode — which is most projectors.
+  themeColor: '#0A0A0B',
   width: 'device-width',
   initialScale: 1,
   // Taxi ranks, gloves, cracked screens. Let people zoom.
@@ -65,14 +66,24 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    // LIGHT IS THE DEFAULT NOW. The app was `className="dark"` — dark-only,
-    // forced — and the redesign is drawn light-first. `.dark` is still defined
-    // and still measured by `npm run contrast`, so switching back is one class.
+    // ── BOTH THEMES SHIP. DARK IS THE DEFAULT. ────────────────────────────
     //
-    // Light is also the safer choice for the thing this build exists to do:
-    // a dark screen on a projector in a lit room washes out, and A3 measured
-    // our dark palette as the one that had the contrast problems.
-    <html lang="en-ZA">
+    // No `className="dark"` here any more, and no `className` at all: the class
+    // is stamped by `THEME_BOOTSTRAP` below, synchronously, before first paint,
+    // from the reader's own stored choice. Hard-coding it here would override
+    // that choice on every navigation.
+    //
+    // `suppressHydrationWarning` is required and is not a shrug. The bootstrap
+    // deliberately mutates <html> before React hydrates — that is the entire
+    // point of running before paint — so the server's markup and the browser's
+    // DOM differ on this one element by design. Scoped to <html>; every other
+    // element still gets a real mismatch warning.
+    <html lang="en-ZA" suppressHydrationWarning>
+      <head>
+        {/* Before first paint. See src/lib/theme.ts for why this is a script
+            and not an effect, and why it is not a CLAUDE.md #12 violation. */}
+        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable}`}>
         {children}
       </body>
