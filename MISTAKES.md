@@ -405,12 +405,35 @@ call that asks it directly — most payment APIs have one for exactly this (`acc
 "are we live", `accountholder/.../active` for "can you see them"). **A diagnosis that costs
 nothing to verify must be verified, not reasoned about.**
 
+> **A LATER CORRECTION, AND IT SHARPENS THE ENTRY RATHER THAN SOFTENING IT.**
+>
+> Every number investigated above was `27767221345`. The operator's real MoMo number is
+> **`27767223145`** — the same digits with `31` and `13` **transposed**. Measured read-only
+> against production on 2026-09-03: `27767223145` → `{"result":true}`, `27767221345` →
+> `{"result":false}`.
+>
+> So the wallet in the failure table was never anybody's wallet. The five `PAYER_NOT_FOUND`
+> responses were literally correct about a number that does not exist, and the remedy was not
+> "register for MoMo" — it was "check the digits".
+>
+> The rule below is unchanged and now has a second edge: **when an API names what it could not
+> find, read back the thing you actually sent it.** A transposition survives every amount of
+> re-reading, because the eye that typed it is the eye checking it, and it survived four MSISDN
+> formats here precisely because all four were formats of the *wrong number*. Varying the format
+> of an input is not the same as verifying the input.
+
 **The guard.** `momoAPIs.md` §9a now opens with the diagnostic ORDER, not the conclusion:
 `account/balance` first, then `accountholder/{n}/active`, and only then a `requesttopay` — with a
 note that a `false` from the second means a payment attempt can only ever return
 `PAYER_NOT_FOUND`. The failure table is kept beneath it, labelled as the superseded reading, so the
 next person meets the cheap check before they meet the expensive story. `STATUS.md` carries the
 same correction where the wrong conclusion was published.
+
+For the transposition, the guard is code rather than prose: `scripts/vercel-env.mjs` refuses a live
+push whose `MOMO_DEMO_MSISDN` is the sandbox fixture, carries a `+`, or is in local `0…` format —
+each rejection quoting the measured production response for that shape. It cannot catch a
+well-formed wrong number, and nothing can; it does catch every malformed one, which is the class
+that produced this.
 
 ---
 

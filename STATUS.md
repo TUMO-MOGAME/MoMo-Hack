@@ -17,7 +17,7 @@ Every PR must update it. If you are a fresh session, read this before touching a
   `mo-mo-hack.vercel.app` alias still serves the same deployment. Production deploys on every
   merge, previews on every PR.
 - **Database:** live. 3 migrations applied to Supabase `edtduvwbejdfahkmfort` (`eu-west-2`).
-- **Tree state:** 750 green + 3 skipped over 38 files, 0 vulnerabilities, CI enforcing all of it.
+- **Tree state:** 757 green + 3 skipped over 39 files, 0 vulnerabilities, CI enforcing all of it.
   Both skips are opt-in and announce themselves: the walking skeleton (`MOMO_SKELETON=1`) and the
   write-skew case (`allowWrites`). Both commit permanent rows, so neither runs by accident.
 - **Blocked on:** nothing external. **F9 is done** and **the walking skeleton is closed** — a real
@@ -381,6 +381,52 @@ while testing.
 **It matters more now than it did yesterday**, because the roster puts Sipho, Gogo and Baba on the
 opening screen and invites precisely these sentences. Flagged for a decision rather than fixed at
 04:00 on the morning of a demo.
+
+### ☎️ There is ONE number on MoMo — `27767223145` — and the number in M13 was a typo
+
+Tumo confirmed the only handset connected to MoMo is **0767223145**, which MoMo requires as
+**`27767223145`**: international, country code, no `+`. Re-measured read-only against MTN South
+Africa production on 2026-09-03, no payment requested and nothing spent:
+
+| Call | Result |
+|---|---|
+| `accountholder/msisdn/27767223145/active` | **`200 {"result":true}`** — the real number |
+| `accountholder/msisdn/0767223145/active` | `200 {"result":false}` — local format |
+| `accountholder/msisdn/+27767223145/active` | **`400`** — the `+` is rejected before lookup |
+| `accountholder/msisdn/27767221345/active` | `200 {"result":false}` |
+
+**That last row rewrites M13.** Every number in that investigation was `27767221345` — the real
+number with **`31` and `13` transposed**. So the wallet in the failure table was never anybody's
+wallet: five `PAYER_NOT_FOUND` responses were literally correct about a number that does not exist,
+and the remedy was never *"register for MoMo"*, it was *"check the digits"*.
+
+M13's rule survives intact and gains an edge: **when an API names what it could not find, read back
+the thing you actually sent it.** A transposition survives any amount of re-reading, because the eye
+that typed it is the eye checking it — and it survived four MSISDN *formats* there precisely because
+all four were formats of the wrong number. **Varying the format of an input is not verifying the
+input.** `MISTAKES.md` M13 and `momoAPIs.md` §9a now carry the correction where the wrong number
+is quoted.
+
+#### The trap this exposed, and the guard on it
+
+`scripts/vercel-env.mjs` fell back to **`46733123454`** for `MOMO_DEMO_MSISDN` — MTN's **sandbox
+fixture**, which is not a registered wallet on production. `.env.local` holds that same value today.
+A live deploy would have pinned it, and **every `/pay` on stage would have returned
+`PAYER_NOT_FOUND`** — the M13 failure again, at 09:30, in front of judges, naming nothing.
+
+The script now **refuses a live push** whose payer is the sandbox fixture, unset, `+`-prefixed, or
+in local `0…` format, each rejection quoting the measured production response for that shape. It
+sits beside the M5d allowlist refusal, and for the same reason: the deploy would have "succeeded"
+and then not worked.
+
+**The check is a pure function in `scripts/_msisdn.mjs`, not an inline branch.** Inline, the only
+way to exercise it was to doctor a real `.env.local` and run a deploy script — which is how a guard
+ends up never exercised at all. **7 tests, proved to fire**: removing the local-format branch fails
+by name, and allowing the fixture fails by name.
+
+**It cannot catch a well-formed wrong number, and that is asserted too** — `27767221345` passes this
+guard, because nothing at this layer could tell it from a real number. A silent pass here means
+"not obviously broken", never "verified".
 
 ### ✂️ The pitch page lost two sections — and three claims that had expired with them
 
