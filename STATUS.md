@@ -17,7 +17,7 @@ Every PR must update it. If you are a fresh session, read this before touching a
   `mo-mo-hack.vercel.app` alias still serves the same deployment. Production deploys on every
   merge, previews on every PR.
 - **Database:** live. 3 migrations applied to Supabase `edtduvwbejdfahkmfort` (`eu-west-2`).
-- **Tree state:** 600 green + 3 skipped over 31 files, 0 vulnerabilities, CI enforcing all of it.
+- **Tree state:** 610 green + 3 skipped over 32 files, 0 vulnerabilities, CI enforcing all of it.
   Both skips are opt-in and announce themselves: the walking skeleton (`MOMO_SKELETON=1`) and the
   write-skew case (`allowWrites`). Both commit permanent rows, so neither runs by accident.
 - **Blocked on:** nothing external. **F9 is done** and **the walking skeleton is closed** — a real
@@ -201,6 +201,41 @@ receipt number is the strongest possible evidence for it. Three payments already
 **Sandbox remains wired and one flag away** (`npm run demo -- --emulator`, or
 `MOMO_TARGET_ENVIRONMENT=sandbox`) as the fallback if MTN or the venue wifi misbehaves at 09:30.
 That is what a fallback is for; it is not the plan.
+
+### 🎨 Both themes ship, dark is the default — and a money guard caught the way it was built
+
+The chat is Tumo's mockup, dark by default, with a working toggle. Both themes measure green on
+`npm run contrast`.
+
+**The part worth recording is how it nearly merged.** The no-flash bootstrap has to run
+synchronously in `<head>` — a theme read in a `useEffect` is a theme applied after first paint,
+which on the way into a dark app is a full-brightness white flash on a phone. That was written as
+`<script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />`, with a docstring in
+`src/lib/theme.ts` arguing at length that it was **not** a CLAUDE.md #12 violation — #12 names the
+*artifact path*, and this is a frozen constant that never sees model input.
+
+**The argument was right and the code was still wrong.** CI's money guard greps
+`dangerouslySetInnerHTML` across **all** of `src`, not merely the artifact path, so `Money guards`
+went red and PR #47 sat `BLOCKED`. Two ways out, and the choice matters more than the fix:
+
+| | |
+|---|---|
+| Narrow the guard to the artifact path | Correct by the letter of #12 — and an exception carved into a money guard to fix a *theme flash* is an exception the next person widens. A broad guard's value is that it needs no judgement call |
+| Remove the prop | React 19 renders a single string child on `<script>` verbatim, so the prop bought nothing. `<script>{THEME_BOOTSTRAP}</script>` |
+
+**Removed the prop.** The docstring's claim that *"there is no other way to run code before first
+paint in the App Router"* was simply false, and it had been written confidently enough to justify
+the thing it was defending. Verified by reading the built output, not by reasoning:
+`.next/server/app/chat.html` carries the bootstrap body verbatim inside `<head>`.
+
+**The failure this could have had is silent**, which is why it got a test rather than a note. If
+React ever stops rendering a text child on `<script>`, the element still renders, the build still
+passes, and the only symptom is the white flash the whole mechanism exists to prevent — nothing
+throws. `MISTAKES.md` M8's shape exactly. `tests/unit/design/theme-bootstrap.test.ts` asserts the
+rendered element is not empty, that the constant contains nothing that could close it early (React
+must not escape a script child, so the constant *is* the safety boundary), and that the layout still
+uses it. **Proved to fire:** reintroducing the prop fails *"is what the root layout actually puts in
+`<head>`"* by name.
 
 ### 🔁 The expiry bug has now happened three times, and it finally has a guard
 

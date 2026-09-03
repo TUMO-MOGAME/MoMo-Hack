@@ -13,12 +13,21 @@
  * So `THEME_BOOTSTRAP` runs synchronously in `<head>`, before anything renders,
  * and stamps the class on `<html>` itself.
  *
- * ── WHY THIS IS NOT A CLAUDE.md #12 VIOLATION ────────────────────────────────
+ * ── AND WHY IT IS A TEXT CHILD, NOT `dangerouslySetInnerHTML` ────────────────
  *
- * #12 forbids `dangerouslySetInnerHTML` **in the artifact path** — the place
- * where model-derived data becomes markup. This is a frozen string constant in
- * this file, contains no interpolation, and never sees user or model input.
- * There is no other way to run code before first paint in the App Router.
+ * React 19 renders a single string child on `<script>` verbatim, so the prop
+ * buys nothing here. It was used first, and CI rejected it: the money guard
+ * bans `dangerouslySetInnerHTML` across ALL of `src`, while CLAUDE.md #12 only
+ * names the artifact path. The guard is deliberately broader than the rule,
+ * and that is worth keeping — an exception carved into a money guard to fix a
+ * theme flash is an exception the next person widens. The prop was removed
+ * rather than the guard narrowed.
+ *
+ * Because React does not escape a `<script>` text child — it must not, or the
+ * code would break — this constant is itself the safety boundary. It is a
+ * frozen literal with no interpolation and never sees user or model input.
+ * `tests/unit/design/theme-bootstrap.test.ts` asserts both halves: that the
+ * rendered element is not empty, and that nothing in here could close it early.
  *
  * ── THE DEFAULT IS DARK, AND FAILURE FALLS TO DARK ───────────────────────────
  *

@@ -81,8 +81,17 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en-ZA" suppressHydrationWarning>
       <head>
         {/* Before first paint. See src/lib/theme.ts for why this is a script
-            and not an effect, and why it is not a CLAUDE.md #12 violation. */}
-        <script dangerouslySetInnerHTML={{ __html: THEME_BOOTSTRAP }} />
+            and not an effect.
+
+            A text CHILD, not `dangerouslySetInnerHTML`. React 19 renders a
+            single string child on <script> verbatim, so the prop buys nothing
+            here — and the CI money guard bans the prop across all of `src`,
+            not merely the artifact path. A broad guard is worth more than the
+            one-line convenience of the prop, and an exception carved into a
+            money guard for a theme flash is an exception the next person
+            widens. Proved by `tests/unit/design/theme-bootstrap.test.ts`,
+            which fails if React ever renders this element empty. */}
+        <script>{THEME_BOOTSTRAP}</script>
       </head>
       <body className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable}`}>
         {children}
