@@ -6,27 +6,45 @@
  *
  * The chat holds a compact, clickable CHIP; the full artifact lives beside it
  * (desktop) or in a modal bottom sheet (phone) and can be reopened from history
- * without re-prompting. Pattern taken from the Social-Assembly reference.
+ * without re-prompting.
  *
  * It talks to `POST /api/agent`, which reads the live ledger and assembles the
- * artifact server-side (S7a). The only thing left of `mockAgent` here is
- * `SUGGESTIONS` — the starter chips — and the `KasiContext` type.
+ * artifact server-side (S7a), and to `POST /api/pay` for the slash commands.
+ *
+ * ── THE REDESIGN, AND THE THREE THINGS IT DOES NOT COPY ─────────────────────
+ *
+ * The layout follows the supplied UI: a 264px rail, a centred thread with an
+ * opening state, a rounded composer, and the artifact as a right-hand panel on
+ * desktop / a bottom sheet on phone.
+ *
+ * Three pieces of the mockup are deliberately NOT built, because building them
+ * would mean putting things on screen that are not true:
+ *
+ *  1. **The signed-in account** (*"Thabo · •••• 4821 · Katlehong"*). There is no
+ *     authentication yet — A5-04 and A1-01 are open on exactly that. A rail
+ *     confidently naming a user we cannot identify is a lie with a face on it.
+ *  2. **"Continue with Telegram"**. A button that cannot sign anyone in is an
+ *     invented action, which is `MISTAKES.md` M10 with a cursor on it.
+ *  3. **Recent conversations**. We store none. Four plausible titles would be
+ *     four fabrications sitting under a real balance.
+ *
+ * What replaces them is real: the position block is fed from `/api/context`
+ * (the ledger), and the trust line is a promise the architecture actually keeps
+ * — we never see a MoMo PIN, because MTN asks for it on the payer's own handset.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { ArtifactPanel, ArtifactSheet, EmptyPanel } from '@/components/artifact-panel';
+import { ArtifactPanel, ArtifactSheet } from '@/components/artifact-panel';
 import { ContextDrawer } from '@/components/context/context-drawer';
-import { ContextPanel } from '@/components/context/context-panel';
-import { ContextStrip } from '@/components/context/context-strip';
 import { ChipSkeleton } from '@/components/artifacts/skeleton';
 import type { ArtifactStatus } from '@/components/artifacts/registry';
 import { ArtifactChip } from '@/components/chips/artifact-chip';
-import { MicIcon, SendIcon } from '@/components/icons';
+import { SendIcon } from '@/components/icons';
 import type { Artifact } from '@/lib/artifacts/types';
 import type { KasiContext } from '@/lib/agent/mock';
-import { SUGGESTIONS } from '@/lib/agent/mock';
 import { reviveContext, reviveTurn, type WireTurn } from '@/lib/agent/wire';
+import { formatZAR, posting } from '@/domain/money';
 
 interface Message {
   readonly id: string;
@@ -35,20 +53,78 @@ interface Message {
   readonly artifact?: Artifact;
 }
 
-const GREETING: Message = {
-  id: 'm0',
-  role: 'agent',
-  text: "Sawubona. I'm MoMo Kasi. Ask me about your money, find work near you, or check the stokvel.",
-};
-
 /** Honour the OS setting for the auto-scroll too, not only for CSS animation. */
 function scrollBehaviour(): ScrollBehavior {
   if (typeof window === 'undefined' || !window.matchMedia) return 'auto';
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth';
 }
 
+/** The rail's shortcuts. Each one SENDS A REAL QUESTION — none of them navigate. */
+const SHORTCUTS: readonly { readonly label: string; readonly ask: string; readonly d: string }[] = [
+  { label: 'Wallet', ask: 'How much do I have?', d: 'M3 6h18v13H3zM3 10h18' },
+  { label: 'Taxi fares', ask: 'Where did my taxi fare go?', d: 'M4 12h16M12 4v16' },
+  {
+    label: 'Your month',
+    ask: 'How am I doing this month?',
+    d: 'M4 19h16M6 15v-4M12 15V7M18 15v-7',
+  },
+  { label: 'Transactions', ask: 'Show me my transactions', d: 'M4 7h16M4 12h16M4 17h10' },
+];
+
+const OPENING_CHIPS: readonly string[] = [
+  'How much do I have?',
+  'Where did my taxi fare go?',
+  'How am I doing this month?',
+  'Ngifuna ukubona my balance',
+];
+
+/**
+ * What this build can and cannot do, on the opening screen.
+ *
+ * The last row is the important one and it is styled as a refusal on purpose.
+ * Saying what the product will NOT do, before anyone asks, is the same move the
+ * agent's `unbuilt` route makes — and it is why the M10 transcript cannot
+ * happen twice.
+ */
+const CAPABILITIES: readonly {
+  readonly title: string;
+  readonly body: string;
+  readonly no?: true;
+}[] = [
+  {
+    title: 'Your balance',
+    body: 'and the difference between what you have and what you can spend.',
+  },
+  { title: 'Where a taxi fare went', body: 'a R12.50 fare split four ways, to the cent.' },
+  { title: 'Your transactions', body: 'read from the ledger, every one with its journal id.' },
+  {
+    title: 'Not from me: sending or paying',
+    body: 'a person types the command, and MTN asks them on their own phone.',
+    no: true,
+  },
+];
+
+function Icon({ d, size = 20 }: { d: string; size?: number }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.8}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className="shrink-0"
+    >
+      <path d={d} />
+    </svg>
+  );
+}
+
 export default function ChatPage() {
-  const [messages, setMessages] = useState<Message[]>([GREETING]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
   const [open, setOpen] = useState<Artifact | null>(null);
@@ -57,10 +133,12 @@ export default function ChatPage() {
   // Fetched once, from the ledger. It used to be `contextSnapshot()` — a mock —
   // and a rail confidently showing R2,300 while the chat answers R12.50 from the
   // same database is the contradiction a judge notices first. Null until it
-  // arrives; the rail renders its own empty state rather than inventing one.
+  // arrives; the rail renders nothing rather than inventing a number.
   const [context, setContext] = useState<KasiContext | null>(null);
-  const logRef = useRef<HTMLElement>(null);
-  const composerRef = useRef<HTMLInputElement>(null);
+  const logRef = useRef<HTMLDivElement>(null);
+  const composerRef = useRef<HTMLTextAreaElement>(null);
+
+  const isOpening = messages.length === 0 && !thinking;
 
   // ── Keep the conversation pinned WITHOUT moving the page ────────────────────
   //
@@ -69,17 +147,9 @@ export default function ChatPage() {
   // the top of the window and a band of blank page appeared under the composer.
   //
   // `scrollIntoView` is not a request to scroll one box. It scrolls EVERY
-  // scrollable ancestor until the element is in view — the message log first,
-  // and then the document. And the document here is scrollable by a small
-  // amount almost everywhere: `globals.css` sets `html, body { height: 100% }`
-  // (the *small* viewport, which excludes retractable browser chrome) while this
-  // shell is `h-dvh` (the *dynamic* viewport, which includes it). On any browser
-  // that hides its toolbar on scroll those two differ, and the difference is
-  // exactly the height of the blank band.
-  //
-  // So: scroll the log element itself and nothing else. `scrollTop` cannot touch
-  // an ancestor, which makes the leak structurally impossible rather than merely
-  // absent. The shell also gets `overflow-hidden` for the same reason.
+  // scrollable ancestor until the element is in view. So: scroll the log element
+  // itself and nothing else. `scrollTop` cannot touch an ancestor, which makes
+  // the leak structurally impossible rather than merely absent.
   useEffect(() => {
     const log = logRef.current;
     if (!log) return;
@@ -127,16 +197,12 @@ export default function ChatPage() {
     // The real turn. `/api/agent` reads the ledger, builds the artifact
     // server-side, and asks the model only for the prose — so no amount on
     // this screen was generated by a model (CLAUDE.md #14).
-    //
-    // Money crosses as decimal strings because `JSON.stringify` throws on a
-    // bigint, and `Number()` would lose precision above 2^53. `reviveTurn`
-    // turns it back into money before anything renders.
     let turn: { reply: string; artifact?: Artifact };
     try {
-      // `/pay` and `/status` are COMMANDS, not conversation. They go to a
-      // different endpoint because `/api/agent` is read-only and its docstring
-      // promises so — see the note at the top of `/api/pay`. Free text that
-      // merely sounds like a payment still goes to the agent, which refuses it.
+      // `/pay`, `/status` and `/send` are COMMANDS, not conversation. They go to
+      // a different endpoint because `/api/agent` is read-only and its docstring
+      // promises so. Free text that merely sounds like a payment still goes to
+      // the agent, which refuses it.
       if (/^\/(pay|status|send)\b/i.test(text)) {
         const response = await fetch('/api/pay', {
           method: 'POST',
@@ -149,9 +215,7 @@ export default function ChatPage() {
           body: JSON.stringify({ message: text }),
         });
         const data = (await response.json()) as { reply?: string; error?: string };
-        turn = {
-          reply: data.reply ?? 'That command is not available right now.',
-        };
+        turn = { reply: data.reply ?? 'That command is not available right now.' };
         setMessages((m) => [...m, { id: `a${Date.now()}`, role: 'agent', text: turn.reply }]);
         setThinking(false);
         return;
@@ -187,84 +251,173 @@ export default function ChatPage() {
     window.setTimeout(() => setPanelStatus('complete'), 350);
   }, []);
 
+  const spendable = context?.balances.find((b) => b.kind === 'WALLET');
+  // `posting`, not `minor`: a sum across accounts can legitimately be negative
+  // (a credit-normal account carries a negative balance), and `minor()` throws
+  // on negatives. Branding it wrong here would turn a correct total into a
+  // crash on the one screen that must never look broken.
+  const heldTotal = context
+    ? posting(context.balances.reduce((sum, b) => sum + b.money.amount, 0n))
+    : undefined;
+
   return (
-    <div className="flex h-dvh flex-col overflow-hidden lg:flex-row">
+    <div
+      // THE THIRD COLUMN HAS TO BE DECLARED, not just rendered. The grid was
+      // `lg:grid-cols-[264px_minmax(0,1fr)]` with the artifact panel rendered
+      // as a third child — which does not sit beside the chat, it wraps onto a
+      // new implicit ROW and pushes the whole conversation off screen. Caught by
+      // reading the markup rather than by a test, because nothing here has a
+      // browser to fail in.
+      className={`grid h-dvh grid-cols-1 overflow-hidden bg-background text-foreground ${
+        open ? 'lg:grid-cols-[264px_minmax(0,1fr)_448px]' : 'lg:grid-cols-[264px_minmax(0,1fr)]'
+      }`}
+    >
       <a href="#composer" className="skip-link">
         Skip to the message box
       </a>
 
-      {/* context rail: a third column only where there is genuinely room for
-          one. Below xl it becomes the strip above the composer and the drawer
-          behind it — never a cramped column stealing width from the chat. */}
+      {/* ── the rail ──────────────────────────────────────────────────────── */}
       <aside
-        aria-label="Your position"
-        className="hidden w-72 shrink-0 border-r border-divider xl:block"
+        aria-label="Shortcuts and your position"
+        className="hidden min-h-0 flex-col gap-0.5 overflow-y-auto px-3 pb-4 pt-3.5 lg:flex"
       >
-        {context ? <ContextPanel context={context} onOpen={openArtifact} /> : null}
+        <h1 className="px-2.5 pb-4 pt-1.5">
+          <Link href="/" className="rounded-md font-display text-2xl leading-none text-foreground">
+            MoMo <em className="italic text-brand-text">Kasi</em>
+          </Link>
+        </h1>
+
+        <button
+          type="button"
+          onClick={() => {
+            setMessages([]);
+            setOpen(null);
+            composerRef.current?.focus();
+          }}
+          aria-current={isOpening}
+          className="flex min-h-11 w-full items-center gap-2.5 rounded-[10px] px-2.5 text-left text-[15px] transition-colors hover:bg-secondary aria-[current=true]:bg-secondary"
+        >
+          <Icon d="M4 20l4-1 10-10-3-3L5 16z" />
+          New chat
+        </button>
+
+        {SHORTCUTS.map((s) => (
+          <button
+            key={s.label}
+            type="button"
+            onClick={() => void send(s.ask)}
+            className="flex min-h-11 w-full items-center gap-2.5 rounded-[10px] px-2.5 text-left text-[15px] transition-colors hover:bg-secondary"
+          >
+            <Icon d={s.d} />
+            {s.label}
+          </button>
+        ))}
+
+        <div className="mt-auto flex flex-col gap-2.5 pt-4">
+          {/* THE POSITION BLOCK — real, or absent. Never a placeholder number. */}
+          {spendable && heldTotal !== undefined ? (
+            <button
+              type="button"
+              onClick={() => context && openArtifact(context.wallet)}
+              className="flex flex-col gap-1.5 rounded-[14px] bg-brand p-3.5 text-left text-brand-foreground transition-[filter] hover:brightness-[1.06]"
+            >
+              <span className="text-xs font-medium uppercase tracking-[0.06em] opacity-80">
+                Spendable now
+              </span>
+              <span className="font-mono text-[26px] font-medium leading-[1.05] tracking-[-0.02em] tabular-nums">
+                {formatZAR(spendable.money.amount)}
+              </span>
+              <span className="text-[13px] opacity-85">
+                of <span className="font-mono tabular-nums">{formatZAR(heldTotal)}</span> held at
+                MTN
+              </span>
+            </button>
+          ) : null}
+
+          {/* True of the architecture, not a marketing line: the PIN is typed
+              into MTN's own app on the payer's handset and never reaches us. */}
+          <div className="flex items-start gap-2.5 p-1 text-[13px] leading-[1.35] text-muted-foreground">
+            <span className="text-brand-text">
+              <Icon d="M8 11V7a4 4 0 0 1 8 0v4" />
+            </span>
+            <span>
+              We never ask for your <b className="font-semibold">MoMo PIN</b>.
+            </span>
+          </div>
+        </div>
       </aside>
 
-      {/* conversation */}
-      <section
+      {/* ── the conversation ──────────────────────────────────────────────── */}
+      <main
         aria-label="Conversation"
-        className="flex min-h-0 flex-1 flex-col lg:max-w-[520px] lg:border-r lg:border-border"
+        className="relative flex min-h-0 min-w-0 flex-col bg-card lg:border-l lg:border-divider"
       >
-        {/* A3-02: this page rendered ZERO headings — no h1, nothing. Verified
-            against production HTML. Heading navigation is how a screen-reader
-            user orients on a page, and this is the product's main surface.
-
-            The wordmark becomes the h1 rather than adding a hidden one: it
-            already IS the page's title, it is already the first thing in the
-            document, and a visible heading that matches what a sighted user
-            reads is better than a duplicate nobody can see. The link stays
-            inside it, which is valid and keeps "go home" where the thumb
-            expects it. */}
-        <header className="flex items-center justify-between gap-3 border-b border-divider px-5 py-4">
-          <h1 className="min-w-0">
-            <Link href="/" className="flex min-h-11 min-w-0 items-baseline gap-2 rounded-md">
-              <span className="whitespace-nowrap font-display text-2xl text-brand">MoMo Kasi</span>
-              {/* At 320px the wordmark plus the sandbox badge is the whole
-                  width, and a broken wordmark looks like a bug. The tagline is
-                  the part that can go. */}
-              <span className="hidden truncate text-xs text-muted-foreground sm:inline">
-                daily money for Mzansi
-              </span>
-            </Link>
-          </h1>
-          <span className="shrink-0 rounded-full border border-border px-2 py-1 text-xs uppercase tracking-widest text-muted-foreground">
-            sandbox
+        <div className="absolute inset-x-0 top-0 z-[2] flex items-center justify-between gap-3 bg-gradient-to-b from-card from-70% to-transparent px-4 py-3 lg:px-6">
+          <span className="font-mono text-xs text-muted-foreground">
+            {context ? 'live ledger' : 'connecting…'}
           </span>
-        </header>
+          <Link
+            href="/ledger"
+            className="rounded-lg border border-input px-2.5 py-1 font-mono text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            ledger
+          </Link>
+        </div>
 
-        <main
+        <div
           ref={logRef}
-          className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-5 py-6"
           role="log"
           aria-live="polite"
           aria-label="Messages"
+          className={`flex min-h-0 flex-col gap-[22px] overflow-y-auto overscroll-contain px-5 pb-2 pt-16 lg:px-10 lg:pt-[72px] ${
+            isOpening ? 'flex-none justify-center overflow-visible pt-0' : 'flex-1'
+          }`}
         >
+          {isOpening ? (
+            <section className="mx-auto flex max-w-[640px] flex-col items-center gap-3 px-2 text-center">
+              <h2 className="text-[32px] font-medium leading-[1.2] tracking-[-0.01em]">
+                <em className="font-display not-italic text-brand-text">Sawubona.</em>
+                <br />
+                What do you want to know about your money?
+              </h2>
+              <p className="max-w-[520px] text-base leading-normal text-muted-foreground">
+                Ask in English, isiZulu, or both in one sentence. Every rand comes from a
+                transaction in the ledger, with its id on it — I don&apos;t guess, round up, or give
+                advice.
+              </p>
+            </section>
+          ) : null}
+
           {messages.map((m) =>
             m.role === 'user' ? (
-              <div key={m.id} className="flex justify-end">
-                <div className="max-w-[85%] rounded-lg rounded-br-sm bg-secondary px-4 py-2.5 text-base leading-relaxed text-secondary-foreground animate-rise">
+              <article key={m.id} className="mx-auto flex w-full max-w-[760px] flex-col items-end">
+                <div className="max-w-[85%] rounded-[22px] bg-secondary px-4 py-3 text-base leading-normal text-secondary-foreground animate-rise">
                   <span className="sr-only">You said: </span>
                   {m.text}
                 </div>
-              </div>
+              </article>
             ) : (
-              <div key={m.id} className="max-w-[92%] space-y-3 animate-rise">
-                <p className="text-base leading-relaxed text-foreground">
-                  <span className="sr-only">MoMo Kasi said: </span>
+              <article
+                key={m.id}
+                className="mx-auto flex w-full max-w-[760px] flex-col items-start gap-2 animate-rise"
+              >
+                <div className="font-mono text-xs text-muted-foreground">MoMo Kasi</div>
+                <div className="whitespace-pre-line border-l-[3px] border-brand py-1 pl-3.5 text-base leading-normal">
                   {m.text}
-                </p>
+                </div>
                 {m.artifact ? (
                   <ArtifactChip artifact={m.artifact} onOpen={() => openArtifact(m.artifact!)} />
                 ) : null}
-              </div>
+              </article>
             ),
           )}
 
           {thinking ? (
-            <div className="space-y-3" role="status" aria-live="polite">
+            <div
+              className="mx-auto flex w-full max-w-[760px] flex-col gap-3"
+              role="status"
+              aria-live="polite"
+            >
               <span className="sr-only">MoMo Kasi is thinking.</span>
               <div className="flex items-center gap-1.5" aria-hidden="true">
                 {[0, 1, 2].map((i) => (
@@ -275,90 +428,119 @@ export default function ChatPage() {
                   />
                 ))}
               </div>
-              <div className="max-w-[92%]">
-                <ChipSkeleton />
-              </div>
+              <ChipSkeleton />
             </div>
           ) : null}
-        </main>
+        </div>
 
-        <div className="space-y-3 border-t border-divider px-5 py-4">
-          {/* No rail until the ledger has answered. An empty gap for a moment
-              beats a confident number that is not true. */}
-          {context ? (
-            <div className="xl:hidden">
-              <ContextStrip context={context} onOpen={() => setDrawerOpen(true)} />
-            </div>
-          ) : null}
+        {/* Phone-only position strip. The rail is hidden below lg, and a
+            balance you cannot see is a balance you do not trust. */}
+        {spendable && heldTotal !== undefined ? (
+          <div className="flex gap-2 overflow-x-auto px-4 pt-2 lg:hidden [scrollbar-width:none]">
+            <span className="inline-flex min-h-9 flex-none items-center gap-2 rounded-full border border-brand bg-brand px-3 text-[13px] font-medium text-brand-foreground">
+              Spendable{' '}
+              <span className="font-mono tabular-nums">{formatZAR(spendable.money.amount)}</span>
+            </span>
+            <span className="inline-flex min-h-9 flex-none items-center gap-2 rounded-full border border-divider bg-card px-3 text-[13px]">
+              Held <span className="font-mono tabular-nums">{formatZAR(heldTotal)}</span>
+            </span>
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+              className="inline-flex min-h-9 flex-none items-center rounded-full border border-divider bg-card px-3 text-[13px]"
+            >
+              Details
+            </button>
+          </div>
+        ) : null}
 
-          {messages.length <= 1 ? (
-            <div className="flex flex-wrap gap-2">
-              {SUGGESTIONS.map((s) => (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void send(input);
+          }}
+          className="mx-auto flex w-full max-w-[792px] items-end gap-2.5 px-4 pb-4 pt-3 lg:pb-5"
+        >
+          <label className="flex min-h-14 flex-1 items-end gap-2 rounded-[28px] border border-input bg-card py-1.5 pl-2 pr-1.5 shadow-[0_6px_28px_rgba(0,0,0,0.08)] focus-within:border-brand-text focus-within:ring-2 focus-within:ring-brand-text">
+            <span className="sr-only">Message MoMo Kasi</span>
+            {/* 17px. Below 16px mobile Safari zooms on focus, and this is a
+                cracked screen in the sun. */}
+            <textarea
+              id="composer"
+              ref={composerRef}
+              rows={1}
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  void send(input);
+                }
+              }}
+              placeholder="Ask about your money…"
+              className="max-h-[140px] flex-1 resize-none border-0 bg-transparent px-2 py-2.5 text-[17px] leading-[1.4] outline-none placeholder:text-muted-foreground"
+            />
+          </label>
+          <button
+            type="submit"
+            disabled={!input.trim()}
+            aria-label="Send message"
+            className="grid size-11 shrink-0 place-items-center rounded-full bg-brand text-brand-foreground transition-[filter] hover:brightness-[1.06] disabled:bg-secondary disabled:text-muted-foreground"
+          >
+            <SendIcon size={20} />
+          </button>
+        </form>
+
+        {isOpening ? (
+          <div className="mx-auto flex w-full max-w-[760px] flex-col items-center gap-5 px-4 pb-6">
+            <div className="flex flex-wrap justify-center gap-2">
+              {OPENING_CHIPS.map((c) => (
                 <button
-                  key={s}
+                  key={c}
                   type="button"
-                  onClick={() => send(s)}
-                  className="min-h-11 rounded-full border border-border px-4 text-sm text-foreground transition-colors hover:border-brand hover:bg-secondary"
+                  onClick={() => void send(c)}
+                  className="inline-flex min-h-11 items-center rounded-full border border-input bg-card px-4 text-[15px] font-medium transition-colors hover:border-brand-text hover:bg-brand-soft"
                 >
-                  {s}
+                  {c}
                 </button>
               ))}
             </div>
-          ) : null}
+            <div className="grid w-full gap-2.5 sm:grid-cols-2">
+              {CAPABILITIES.map((c) => (
+                <div
+                  key={c.title}
+                  className={`flex items-start gap-3 rounded-xl border p-3 text-sm ${
+                    c.no
+                      ? 'border-dashed border-input text-muted-foreground'
+                      : 'border-divider bg-card'
+                  }`}
+                >
+                  <span className={c.no ? 'text-muted-foreground' : 'text-brand-text'}>
+                    <Icon d={c.no ? 'M5.6 5.6l12.8 12.8' : 'M4 12h16'} size={18} />
+                  </span>
+                  <span>
+                    <b className="font-semibold">{c.title}</b> — {c.body}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </main>
 
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              send(input);
-            }}
-            className="flex items-center gap-2"
-          >
-            {/* 16px minimum. Smaller text triggers zoom-on-focus on mobile
-                Safari and is unreadable on a cracked screen in the sun. */}
-            <input
-              id="composer"
-              ref={composerRef}
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Ask about your money…"
-              aria-label="Message MoMo Kasi"
-              className="min-h-11 min-w-0 flex-1 rounded-lg border border-input bg-card px-4 py-3 text-base text-foreground transition-colors placeholder:text-muted-foreground focus:border-brand"
-            />
-            {/* Voice is never the only route to anything (A3). Until S8c lands
-                this control hands the user straight back to the message box. */}
-            <button
-              type="button"
-              onClick={() => composerRef.current?.focus()}
-              aria-label="Voice input is not available yet — use the message box"
-              className="grid size-11 shrink-0 place-items-center rounded-lg border border-border text-muted-foreground transition-colors hover:border-brand hover:text-foreground"
-            >
-              <MicIcon size={18} />
-            </button>
-            <button
-              type="submit"
-              disabled={!input.trim()}
-              className="grid size-11 shrink-0 place-items-center rounded-lg bg-brand text-brand-foreground transition-opacity hover:opacity-90 disabled:opacity-40"
-              aria-label="Send message"
-            >
-              <SendIcon size={18} />
-            </button>
-          </form>
-        </div>
-      </section>
-
-      {/* artifact: right panel from 1024px up */}
-      <aside aria-label="Artifact" className="hidden min-h-0 flex-1 overflow-y-auto lg:block">
-        {open ? (
+      {/* artifact: right panel from lg up, as a third column */}
+      {open ? (
+        <aside
+          aria-label="Artifact"
+          className="hidden min-h-0 overflow-y-auto border-l border-divider bg-card lg:block"
+        >
           <ArtifactPanel artifact={open} status={panelStatus} onClose={close} />
-        ) : (
-          <EmptyPanel />
-        )}
-      </aside>
+        </aside>
+      ) : null}
 
-      {/* artifact: modal bottom sheet below 1024px — the real case */}
+      {/* artifact: modal bottom sheet below lg — the real case */}
       {open ? <ArtifactSheet artifact={open} status={panelStatus} onClose={close} /> : null}
 
-      {/* the rail, for everyone without a third column */}
       {drawerOpen && context ? (
         <ContextDrawer
           context={context}

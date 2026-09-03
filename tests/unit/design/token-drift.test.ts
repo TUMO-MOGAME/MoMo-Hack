@@ -61,9 +61,26 @@ function blockTokens(header: string): Record<string, string> {
 
   const out: Record<string, string> = {};
   for (const m of body.matchAll(/^\s*--([a-z0-9-]+):\s*([^;]+);/gim)) {
-    out[m[1] as string] = (m[2] as string).trim();
+    out[m[1] as string] = norm(m[2] as string);
   }
   return out;
+}
+
+/**
+ * Compare COLOURS, not the exact characters that spell them.
+ *
+ * Prettier normalises hex in CSS to lower case, so `#F4F4F2` in `tokens.ts`
+ * arrives here as `#f4f4f2` — the same colour, a failing string comparison, and
+ * a test that breaks every time anyone runs the formatter. A guard that fires
+ * on formatting is a guard people learn to ignore, which is worse than not
+ * having it.
+ *
+ * Case and surrounding whitespace only. Nothing here collapses `#fff` to
+ * `#ffffff` or reorders an `oklch()` — those are differences worth failing on,
+ * because they are differences someone typed on purpose.
+ */
+function norm(value: string): string {
+  return value.trim().toLowerCase();
 }
 
 const root = blockTokens(':root {');
@@ -105,7 +122,7 @@ describe('every role in tokens.ts matches the shipped CSS', () => {
       for (const [role, value] of Object.entries(colors[scale])) {
         test(`--${role}`, () => {
           expect(`--${role}: ${css[role] ?? '(missing from globals.css)'}`).toBe(
-            `--${role}: ${value}`,
+            `--${role}: ${norm(value)}`,
           );
         });
       }

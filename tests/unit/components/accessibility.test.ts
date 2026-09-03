@@ -152,8 +152,24 @@ describe('globals.css', () => {
   });
 
   test('the overlay colour exists in both themes', () => {
-    expect(css).toContain('--overlay: oklch(0 0 0 / 55%)');
-    expect(css).toContain('--overlay: oklch(0 0 0 / 72%)');
+    // ── PINNED TO THE ROLE, NOT TO THE VALUE ─────────────────────────────────
+    //
+    // This used to assert the literal `oklch(0 0 0 / 55%)` and `oklch(0 0 0 /
+    // 72%)`. Both were correct until the palette was redrawn, at which point
+    // the test failed for a reason that had nothing to do with what it is
+    // named after: the scrim still existed, in both themes, doing its job.
+    //
+    // A test that has to be edited every time a designer picks a different
+    // black is a test people edit without reading. What matters here is that
+    // BOTH themes define a scrim and that Tailwind can see it — the exact
+    // values are compared, in both directions, by
+    // `tests/unit/design/token-drift.test.ts`, which derives them instead of
+    // restating them (MISTAKES.md M11).
+    const root = css.split(':root {')[1]?.split('\n}')[0] ?? '';
+    const dark = css.split('.dark {')[1]?.split('\n}')[0] ?? '';
+
+    expect(root).toMatch(/^\s*--overlay:\s*\S+;/m);
+    expect(dark).toMatch(/^\s*--overlay:\s*\S+;/m);
     expect(css).toContain('--color-overlay: var(--overlay)');
   });
 });
@@ -166,8 +182,21 @@ describe('design tokens are the single source of truth (A2)', () => {
 
   test('every colour role in globals.css also exists in tokens.ts', () => {
     // A2: "A colour defined only in globals.css and not in tokens.ts is drift.
-    // So is the reverse." `overlay` is the role this workstream added.
-    expect(tokens).toContain("overlay: 'oklch(0 0 0 / 55%)'");
-    expect(tokens).toContain("overlay: 'oklch(0 0 0 / 72%)'");
+    // So is the reverse."
+    //
+    // This asserted two literal oklch strings, which is the weakest possible
+    // form of that claim: it proved one role, by value, until the palette
+    // changed. The claim is now enforced properly and generically — every role,
+    // both scales, both directions — by
+    // `tests/unit/design/token-drift.test.ts`, which caught real drift on its
+    // first run (three roles holding the values that FAILED A3-01).
+    //
+    // What stays here is the structural half: `overlay` is declared in both
+    // scales of the token file at all. A missing role is a different failure
+    // from a drifted one, and this file is where the A2 workstream looks.
+    const scales = tokens.split('dark: {');
+    expect(scales).toHaveLength(2);
+    expect(scales[0]).toMatch(/^\s*overlay: '/m);
+    expect(scales[1]).toMatch(/^\s*overlay: '/m);
   });
 });

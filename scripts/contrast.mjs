@@ -110,12 +110,38 @@ function parseOklch(value, name) {
   };
 }
 
+/**
+ * `#RRGGBB`, `#RGB`, `#RRGGBBAA` → the same shape as `parseOklch`.
+ *
+ * The design system moved to hex when the UI was redrawn, and converting those
+ * hexes to OKLCH to keep this parser happy would have shifted every colour by a
+ * rounding error — measuring a palette that is not quite the one that ships is
+ * the whole failure mode `MISTAKES.md` M11 is about. So the checker learns the
+ * notation instead of the palette bending to the checker.
+ */
+function parseHex(value, name) {
+  const m = /^#([0-9a-f]{3}|[0-9a-f]{6}|[0-9a-f]{8})$/i.exec(value.trim());
+  if (!m) throw new Error(`contrast: cannot parse --${name}: ${value}`);
+  let h = m[1];
+  if (h.length === 3) h = h.replace(/./g, (c) => c + c);
+  const n = (i) => parseInt(h.slice(i, i + 2), 16) / 255;
+  return {
+    rgb: [n(0), n(2), n(4)],
+    alpha: h.length === 8 ? n(6) : 1,
+  };
+}
+
+/** Whichever notation the stylesheet actually uses for this token. */
+function parseColour(value, name) {
+  return value.trim().startsWith('#') ? parseHex(value, name) : parseOklch(value, name);
+}
+
 const RAW = darkTokens();
 
 function token(name) {
   const value = RAW[name];
   if (!value) throw new Error(`contrast: --${name} is not defined in the .dark block`);
-  return parseOklch(value, name);
+  return parseColour(value, name);
 }
 
 /** Opaque roles, as sRGB triples. */
