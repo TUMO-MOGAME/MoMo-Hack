@@ -17,7 +17,7 @@ Every PR must update it. If you are a fresh session, read this before touching a
   `mo-mo-hack.vercel.app` alias still serves the same deployment. Production deploys on every
   merge, previews on every PR.
 - **Database:** live. 3 migrations applied to Supabase `edtduvwbejdfahkmfort` (`eu-west-2`).
-- **Tree state:** 634 green + 3 skipped over 34 files, 0 vulnerabilities, CI enforcing all of it.
+- **Tree state:** 646 green + 3 skipped over 35 files, 0 vulnerabilities, CI enforcing all of it.
   Both skips are opt-in and announce themselves: the walking skeleton (`MOMO_SKELETON=1`) and the
   write-skew case (`allowWrites`). Both commit permanent rows, so neither runs by accident.
 - **Blocked on:** nothing external. **F9 is done** and **the walking skeleton is closed** — a real
@@ -201,6 +201,56 @@ receipt number is the strongest possible evidence for it. Three payments already
 **Sandbox remains wired and one flag away** (`npm run demo -- --emulator`, or
 `MOMO_TARGET_ENVIRONMENT=sandbox`) as the fallback if MTN or the venue wifi misbehaves at 09:30.
 That is what a fallback is for; it is not the plan.
+
+### 🧠 The bot's memory works — and had NO tests at all until now
+
+**Tumo asked whether the agent remembers a conversation, on Telegram as well as the web.** It does.
+Measured, on both channels, rather than read off the code:
+
+| | |
+|---|---|
+| **Web** | Two live turns against `POST /api/agent`. *"my grandmother is called Gogo and she lives in Katlehong"* → then *"Where does my grandmother live?"* → **"Gogo lives in Katlehong."** |
+| **Telegram** | `readHistory(chatId)` is handed to the agent on every message. 8 turns, 30-minute TTL, per chat |
+
+**`src/server/telegram/memory.ts` had zero tests.** `grep` over `tests/` found nothing — the module
+that decides whether the product can hold a conversation was entirely uncovered, on the day it was
+asked about. **12 tests added**, split across two claims that are NOT the same thing:
+
+1. **The store behaves** — keeps turns in order, isolates one chat from another (the bot is public;
+   a shared history leaks a stranger's messages and the amounts in them), expires after 30 minutes,
+   caps at 8 turns dropping the *oldest*, and `/start` wipes the thread.
+2. **The wiring passes it** — `handleUpdate` actually hands the stored turns to the agent on the
+   next message.
+
+The second is the one that would have failed silently. **Delete `readHistory` from the call and the
+bot still answers every message perfectly well — as a stranger, every time.** No error, no crash,
+nothing red. **Proved to fire:** removing it fails *"the SECOND message carries the first exchange
+with it"* by name.
+
+**The honest limit, restated because it is a demo risk.** Telegram history is IN-MEMORY per Vercel
+instance. A cold start loses the thread. It is best-effort by design and nothing in the money path
+depends on it — but on stage, a long gap between messages can produce a bot that has forgotten the
+last thing it was told. The web chat does not have this problem: the browser holds the history and
+sends it with every message.
+
+### ⚠️ Found while testing: the refusal route swallows ordinary conversation
+
+*"My garden helper is called Sipho and I pay him on Fridays."* — a statement about someone's life,
+containing no request — is refused as a payment attempt:
+
+> *"I can't send money — I have no way to move it, by design, so nothing has been set up…"*
+
+`modelled: false`, `tool: 'none'`. The `unbuilt` route matched on **"pay him"**.
+
+**Not changed, deliberately.** That route is `MISTAKES.md` M10's guard, and the asymmetry is stark:
+a false refusal is safe and slightly rude, while a false acceptance is the transcript that told a
+user money was one tap from moving. Distinguishing *"send R50 to Sipho"* from *"I pay him on
+Fridays"* by regex is M12's trap exactly — the phrasings that break it are the ones nobody types
+while testing.
+
+**It matters more now than it did yesterday**, because the roster puts Sipho, Gogo and Baba on the
+opening screen and invites precisely these sentences. Flagged for a decision rather than fixed at
+04:00 on the morning of a demo.
 
 ### 👨‍👩‍👧 The demo has PEOPLE in it now — `demo_persona`, six rows, read from the database
 
