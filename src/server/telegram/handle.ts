@@ -113,10 +113,12 @@ export const FALLBACK_TEXT =
  *    A refusal is the easiest place in the product to be unambiguous, so it is.
  * 2. **Give the reason honestly** — the number this rings is a real person's
  *    phone, not a sandbox. "Not authorised" invites someone to keep trying.
- * 3. **Echo the chat id.** This is the operator's fix path: the id goes
- *    straight into `TELEGRAM_PAY_CHAT_IDS`. It gives an attacker nothing — it
- *    is their own id and the list lives on the server — and it turns a
- *    30-minute "why is the bot ignoring me" on stage into a paste.
+ * 3. **Echo the chat id.** This is the operator's ONLY fix path, and the
+ *    reason it has to be in the reply rather than the log is that the logger
+ *    masks any 9-15 digit run and a chat id is one (see the call site below).
+ *    It gives an attacker nothing — it is their own id and the list lives on
+ *    the server — and it turns a 30-minute "why is the bot ignoring me" on
+ *    stage into a paste.
  *
  * It does NOT offer to add them, or hint that asking would work. It ends.
  */
@@ -196,9 +198,17 @@ export async function handleUpdate(
       // drives the reconciler, and it reads out the amount and the split of a
       // payment made by somebody else. Neither belongs to a stranger.
       if (!money.allowlist.has(chatId)) {
-        // The chat id is the ONLY thing that gets logged, and it is the only
-        // thing worth logging: it is what an operator pastes into
-        // TELEGRAM_PAY_CHAT_IDS to fix a legitimate denial.
+        // The chat id is the ONLY thing logged, and it arrives MASKED — the
+        // logger redacts any bare 9-15 digit run (`maskMsisdn`, `server/log.ts`)
+        // and a Telegram chat id is exactly that shape, so this prints
+        // `•••• 0111`, not the id. Measured, not assumed.
+        //
+        // That is the right default and it stays: these logs go to a public
+        // repo's deployment. It does mean THE LOG IS NOT THE OPERATOR'S FIX
+        // PATH — `denialText` below is, because the reply is not logged and so
+        // is not masked, and it puts the full id on the screen of the very
+        // person who needs to hand it over. This comment said the opposite
+        // until it was checked against a real run.
         log('warn', 'telegram.pay.denied', {
           correlation_id: String(update.update_id),
           chat_id: String(chatId),
