@@ -6,6 +6,13 @@ build/
 coverage/
 node_modules/
 
+# Design references dropped in the repo root — self-extracting HTML bundles
+# exported from a design tool. Hundreds of KB of base64 on one line; prettier
+# reformats them into something the extractor can no longer unpack, and they are
+# read, never edited.
+*.dc.html
+MoMo Kasi*.html
+
 # Generated, and not ours to reformat.
 package-lock.json
 next-env.d.ts

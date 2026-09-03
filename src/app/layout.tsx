@@ -49,9 +49,14 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   // The one literal colour in the codebase: <meta name="theme-color"> cannot
-  // take a CSS variable. This is `--background` in the dark theme, and the app
-  // is dark-only today. Keep the two in step by hand.
-  themeColor: '#000000',
+  // take a CSS variable. Two entries, so the browser chrome follows whichever
+  // theme is actually showing rather than being pinned to the old dark-only
+  // build. These are `--background` from `src/design/tokens.ts` and must be
+  // kept in step with it by hand — nothing derives them.
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#F4F4F2' },
+    { media: '(prefers-color-scheme: dark)', color: '#0A0A0B' },
+  ],
   width: 'device-width',
   initialScale: 1,
   // Taxi ranks, gloves, cracked screens. Let people zoom.
@@ -60,7 +65,14 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en-ZA" className="dark">
+    // LIGHT IS THE DEFAULT NOW. The app was `className="dark"` — dark-only,
+    // forced — and the redesign is drawn light-first. `.dark` is still defined
+    // and still measured by `npm run contrast`, so switching back is one class.
+    //
+    // Light is also the safer choice for the thing this build exists to do:
+    // a dark screen on a projector in a lit room washes out, and A3 measured
+    // our dark palette as the one that had the contrast problems.
+    <html lang="en-ZA">
       <body className={`${geistSans.variable} ${geistMono.variable} ${playfair.variable}`}>
         {children}
       </body>

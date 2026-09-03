@@ -63,6 +63,19 @@ export interface ColorScale {
   /** The MoMo-adjacent brand gold. Used solid, as a gradient, and as soft tints. */
   brand: string;
   'brand-foreground': string;
+  /**
+   * Gold you WRITE WITH, as opposed to gold you fill with.
+   *
+   * `#FFCB05` on a white surface is about 1.5:1 — it fails SC 1.4.3 outright,
+   * and every design that puts brand-coloured text on white and hopes gets this
+   * wrong. Splitting the brand into a fill and a text tone is the fix, and it is
+   * the single most useful idea in the redesign.
+   *
+   * On dark ground the two converge: gold on near-black is already ~13:1.
+   */
+  'brand-text': string;
+  /** The tint behind a brand-coloured chip or highlight. Never a text colour. */
+  'brand-soft': string;
   'brand-accent': string;
   'brand-accent-foreground': string;
   border: string;
@@ -80,94 +93,116 @@ export interface ColorScale {
 
 export const colors: { light: ColorScale; dark: ColorScale } = {
   light: {
-    background: 'oklch(1 0 0)',
-    foreground: 'oklch(0.145 0 0)',
-    card: 'oklch(1 0 0)',
-    'card-foreground': 'oklch(0.145 0 0)',
-    popover: 'oklch(1 0 0)',
-    'popover-foreground': 'oklch(0.145 0 0)',
-    primary: 'oklch(0.205 0 0)',
-    'primary-foreground': 'oklch(0.985 0 0)',
-    secondary: 'oklch(0.97 0 0)',
-    'secondary-foreground': 'oklch(0.205 0 0)',
-    muted: 'oklch(0.97 0 0)',
-    'muted-foreground': 'oklch(0.556 0 0)',
-    accent: 'oklch(0.97 0 0)',
-    'accent-foreground': 'oklch(0.205 0 0)',
-    destructive: 'oklch(0.577 0.245 27.325)',
-    'destructive-foreground': 'oklch(0.985 0 0)',
-    success: 'oklch(0.596 0.145 163.225)',
-    'success-foreground': 'oklch(0.985 0 0)',
-    warning: 'oklch(0.554 0.135 66.442)',
-    'warning-foreground': 'oklch(0.985 0 0)',
-    info: 'oklch(0.546 0.215 262.881)',
-    'info-foreground': 'oklch(0.985 0 0)',
-    brand: 'oklch(0.842 0.166 89.5)',
-    'brand-foreground': 'oklch(0.145 0 0)',
-    'brand-accent': 'oklch(0.75 0.183 55.934)',
-    'brand-accent-foreground': 'oklch(0.145 0 0)',
-    border: 'oklch(0.922 0 0)',
-    input: 'oklch(0.922 0 0)',
-    ring: 'oklch(0.708 0 0)',
-    overlay: 'oklch(0 0 0 / 55%)',
-    'chart-1': 'oklch(0.842 0.166 89.5)',
-    'chart-2': 'oklch(0.696 0.17 162.48)',
-    'chart-3': 'oklch(0.707 0.165 254.624)',
-    'chart-4': 'oklch(0.667 0.229 322.15)',
-    'chart-5': 'oklch(0.705 0.213 47.604)',
+    background: '#F4F4F2',
+    foreground: '#121212',
+    card: '#FFFFFF',
+    'card-foreground': '#121212',
+    popover: '#FFFFFF',
+    'popover-foreground': '#121212',
+    // Kept NEUTRAL rather than gold. The mockup's `.primary` button is gold,
+    // but `--primary` is a shadcn role that existing components already use for
+    // "the ordinary solid button". Repointing it at the brand would turn every
+    // neutral control gold at once. Gold has its own role: `brand`.
+    primary: '#1B1B1A',
+    'primary-foreground': '#F4F4F2',
+    secondary: '#ECECE8',
+    'secondary-foreground': '#121212',
+    muted: '#ECECE8',
+    'muted-foreground': '#5C5C57',
+    accent: '#ECECE8',
+    'accent-foreground': '#121212',
+    destructive: '#B3261E',
+    'destructive-foreground': '#FFFFFF',
+    success: '#136F3F',
+    'success-foreground': '#FFFFFF',
+    warning: '#8A5A00',
+    'warning-foreground': '#FFFFFF',
+    info: '#1B4FD8',
+    'info-foreground': '#FFFFFF',
+    brand: '#FFCB05',
+    'brand-foreground': '#141200',
+    // ⚠️ GOLD TEXT IS NOT THE GOLD FILL, and this is the sharpest idea in the
+    // design. #FFCB05 on white is about 1.5:1 — unreadable, and it fails
+    // SC 1.4.3 by a mile. So the brand has TWO tokens: a fill you put dark text
+    // on, and a darkened gold you write WITH. In dark mode they converge,
+    // because gold on near-black is already readable.
+    'brand-text': '#6B5300',
+    'brand-soft': '#FFF3C2',
+    'brand-accent': '#6B5300',
+    'brand-accent-foreground': '#FFFFFF',
+    // ⚠️ MAPPED BY ROLE, NOT BY NAME, and the difference matters.
+    //
+    // The redesign calls its hairline `--border` (#D8D8D2) and its control edge
+    // `--control-border` (#77776F). Our system uses `--border` for the graded
+    // control boundary and `--divider` for the ungraded hairline. Copying the
+    // names across would have put a 1.26:1 edge on every control — which is
+    // A3-01 exactly, the finding this project raised these values to close.
+    //
+    // The mockup's own composer has that weakness: `.ta` draws its resting edge
+    // with the light `--border`. It looks elegant and it is not perceivable in
+    // Highveld sun. So the hairline tone goes to `--divider`, where it belongs
+    // and where it is honestly ungraded, and controls keep an edge you can see.
+    border: '#77776F',
+    input: '#77776F',
+    // The focus ring is `--brand-text`, NOT `--brand`. The mockup focuses with
+    // `outline: 3px solid var(--brand)`; on the white surfaces this design uses
+    // that is ~1.5:1 and would reintroduce the A3 finding we just closed.
+    // #6B5300 still reads unmistakably gold and clears 3:1 with room.
+    ring: '#6B5300',
+    overlay: '#00000073',
+    'chart-1': '#FFCB05',
+    'chart-2': '#0E9F6E',
+    'chart-3': '#2563EB',
+    'chart-4': '#B4468A',
+    'chart-5': '#D2691E',
   },
-  // "Super glowing black" — kept from the reference system. Pure black ground,
-  // near-black cards, white foreground, luminous edges.
+  // The dark scale from the same design: near-black ground, lifted surfaces,
+  // and the brand converging to a single gold because gold on near-black is
+  // already readable. No white-alpha borders here — the redesign uses solid
+  // greys, which is why the A3-01 alpha-compositing trap does not recur.
   dark: {
-    background: 'oklch(0 0 0)',
-    foreground: 'oklch(1 0 0)',
-    card: 'oklch(0.08 0 0)',
-    'card-foreground': 'oklch(1 0 0)',
-    popover: 'oklch(0.06 0 0)',
-    'popover-foreground': 'oklch(1 0 0)',
-    primary: 'oklch(1 0 0)',
-    'primary-foreground': 'oklch(0 0 0)',
-    secondary: 'oklch(0.14 0 0)',
-    'secondary-foreground': 'oklch(1 0 0)',
-    muted: 'oklch(0.12 0 0)',
-    'muted-foreground': 'oklch(0.72 0 0)',
-    accent: 'oklch(0.18 0 0)',
-    'accent-foreground': 'oklch(1 0 0)',
-    destructive: 'oklch(0.704 0.191 22.216)',
-    'destructive-foreground': 'oklch(0.145 0 0)',
-    success: 'oklch(0.765 0.177 163.223)',
-    'success-foreground': 'oklch(0.205 0 0)',
-    warning: 'oklch(0.828 0.189 84.429)',
-    'warning-foreground': 'oklch(0.205 0 0)',
-    info: 'oklch(0.707 0.165 254.624)',
-    'info-foreground': 'oklch(0.205 0 0)',
-    brand: 'oklch(0.862 0.176 90.5)',
-    'brand-foreground': 'oklch(0 0 0)',
-    'brand-accent': 'oklch(0.78 0.183 55.934)',
-    'brand-accent-foreground': 'oklch(0 0 0)',
-    // ⚠️ THESE THREE HAD ALREADY DRIFTED, and this file held the failing values.
-    //
-    // A3-01 measured `--border` at 1.27:1 and `--input` at 1.39:1 against a 3:1
-    // requirement — on a cracked screen in Highveld sun the composer had no
-    // visible edge. The fix raised them, and it was applied to `globals.css`
-    // only. So the file calling itself "THE single source of truth" kept the
-    // values that FAILED the audit, for as long as nothing compared the two.
-    //
-    // A2-01 predicted exactly this. `tests/unit/design/token-drift.test.ts`
-    // caught it on its first run, which is the argument for that test in one
-    // example. Interaction affordances are what a user must PERCEIVE to
-    // operate, not decoration.
-    border: 'oklch(1 0 0 / 38%)',
-    input: 'oklch(1 0 0 / 40%)',
-    // 35% passes at 3.01:1 with no headroom at all (A3-08). 45% gives ~4.4:1
-    // and costs nothing, because the ring is transient.
-    ring: 'oklch(1 0 0 / 45%)',
-    overlay: 'oklch(0 0 0 / 72%)',
-    'chart-1': 'oklch(0.862 0.176 90.5)',
-    'chart-2': 'oklch(0.765 0.177 163.223)',
-    'chart-3': 'oklch(0.707 0.165 254.624)',
-    'chart-4': 'oklch(0.667 0.295 322.15)',
-    'chart-5': 'oklch(0.705 0.213 47.604)',
+    background: '#0A0A0B',
+    foreground: '#F2F2EE',
+    card: '#141416',
+    'card-foreground': '#F2F2EE',
+    popover: '#141416',
+    'popover-foreground': '#F2F2EE',
+    primary: '#F2F2EE',
+    'primary-foreground': '#0A0A0B',
+    secondary: '#1E1E21',
+    'secondary-foreground': '#F2F2EE',
+    muted: '#1E1E21',
+    'muted-foreground': '#A3A39C',
+    accent: '#1E1E21',
+    'accent-foreground': '#F2F2EE',
+    destructive: '#FF6B5E',
+    'destructive-foreground': '#3A1410',
+    success: '#4ADE80',
+    'success-foreground': '#062B16',
+    warning: '#FBBF24',
+    'warning-foreground': '#2A1D00',
+    info: '#7DA6FF',
+    'info-foreground': '#0A1938',
+    brand: '#FFCB05',
+    'brand-foreground': '#141200',
+    // Converges with `brand` here: on #0A0A0B, #FFCB05 is about 13:1, so the
+    // darkened variant the light scale needs would only make text harder to
+    // read. Same role, different value — which is what a token is for.
+    'brand-text': '#FFCB05',
+    'brand-soft': '#2A2300',
+    'brand-accent': '#FFCB05',
+    'brand-accent-foreground': '#141200',
+    // Same role mapping as the light scale — see the note there. #2A2A2E is
+    // 1.38:1 on this ground and is the DIVIDER; #6F6F76 is the control edge.
+    border: '#6F6F76',
+    input: '#6F6F76',
+    ring: '#FFCB05',
+    overlay: '#000000B8',
+    'chart-1': '#FFCB05',
+    'chart-2': '#34D399',
+    'chart-3': '#7DA6FF',
+    'chart-4': '#E879C7',
+    'chart-5': '#FB923C',
   },
 };
 

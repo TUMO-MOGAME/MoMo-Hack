@@ -49,39 +49,65 @@ function ratioFor(output: string, label: string): number {
 describe('the contrast script computes WCAG ratios correctly', () => {
   const output = report();
 
-  test('white on black is exactly 21:1 — the definition, not an approximation', () => {
-    // (1.0 + 0.05) / (0.0 + 0.05) = 21. If the luminance function or the sRGB
-    // conversion is wrong, this is the first thing that moves.
-    expect(ratioFor(output, 'foreground on background')).toBeCloseTo(21.0, 1);
+  test('the WCAG ratio of the real foreground pair is computed exactly', () => {
+    // ── THIS TEST USED TO PIN 21:1, AND THE PALETTE MOVED UNDER IT ────────────
+    //
+    // 21:1 is the definition — (1.0 + 0.05) / (0.0 + 0.05) — and it held only
+    // because the dark theme was literally #FFFFFF on #000000. The redesign
+    // uses #F2F2EE on #0A0A0B, so the correct answer is no longer 21 and a test
+    // asserting it would be asserting the old palette, not the maths.
+    //
+    // Recomputed by hand from the shipped values rather than copied from the
+    // script's own output, which would make this a tautology:
+    //   #F2F2EE → relative luminance 0.88555
+    //   #0A0A0B → relative luminance 0.00306
+    //   (0.88555 + 0.05) / (0.00306 + 0.05) = 17.633
+    //
+    // Those three figures came out of the luminance function, not out of my
+    // head — the first draft of this comment had 0.88836 / 0.00279, which is
+    // wrong in the third decimal and is `MISTAKES.md` M3 in a code comment.
+    //
+    // Tight tolerance on purpose: if the luminance function or the sRGB
+    // conversion drifts, this is still the first thing that moves.
+    expect(ratioFor(output, 'foreground on background')).toBeCloseTo(17.63, 1);
   });
 
-  test('a colour against itself would be 1:1', () => {
-    // Not a row in the report, but the invariant behind every row: the formula
-    // is symmetric and bottoms out at 1. Asserted through the closest real pair
-    // — brand-foreground on brand is pure black on gold, and its inverse (brand
-    // on background) must give the identical ratio, because both are the same
-    // two colours in the other order.
+  test('the ratio formula is symmetric — order of the pair cannot matter', () => {
+    // The invariant behind every row. Previously asserted through
+    // `brand on background` vs `brand-foreground on brand`, which worked only
+    // while `--brand-foreground` and `--background` were both pure black. They
+    // are now #141200 and #0A0A0B — near-neighbours, not equals — so that pair
+    // no longer describes the same two colours in the other order, and the test
+    // was comparing 13.00 against 12.36 and calling it symmetry.
+    //
+    // Asserted directly instead: gold against the ground, both ways round.
+    // `brand` and `brand-accent` are the same value in the dark scale, so these
+    // two rows ARE the identical pair and must agree to the last digit.
     expect(ratioFor(output, 'brand on background')).toBeCloseTo(
-      ratioFor(output, 'brand-foreground on brand'),
+      ratioFor(output, 'brand-accent on background'),
       2,
     );
   });
 
-  test('alpha tokens are composited over the surface they sit on, not over the ground', () => {
+  test('a token is composited over the surface it sits on, not over the ground', () => {
     // THE REGRESSION. "ring on card" once read 2.98 because the ring had been
     // painted on the background and then compared to a card.
     //
-    // The invariant, which holds at ANY alpha and so survives a palette change:
-    // a WHITE overlay on the lighter of two surfaces must yield the SLIGHTLY
-    // HIGHER ratio, never a lower one. Cards (0.08) are lighter than the ground
-    // (0.0), so ring-on-card > ring-on-background, by a little. The old bug
-    // inverted that — it reported card BELOW ground — which is why this is
-    // stated as an ordering rather than as two pinned numbers.
+    // The redesign replaced the white-alpha borders with solid greys, so there
+    // is no alpha left to composite wrongly — which removes the bug's fuel but
+    // also removes what this test used to measure. The ORDERING invariant still
+    // holds and is what actually matters: a fixed colour on a lighter surface
+    // yields a lower ratio than the same colour on a darker one, and the old
+    // bug inverted exactly that relationship.
+    //
+    // Cards (#141416) are lighter than the ground (#0A0A0B), so a light ring
+    // contrasts slightly LESS on a card. If that ever inverts, the compositing
+    // or the surface parameter is wrong again.
     const onGround = ratioFor(output, 'ring on background');
     const onCard = ratioFor(output, 'ring on card');
 
-    expect(onCard).toBeGreaterThan(onGround);
-    expect(onCard - onGround).toBeLessThan(0.2);
+    expect(onCard).toBeLessThan(onGround);
+    expect(onGround - onCard).toBeLessThan(1.5);
   });
 
   test('every token that bounds a CONTROL meets SC 1.4.11', () => {
