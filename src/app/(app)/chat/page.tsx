@@ -41,6 +41,7 @@ import { ChipSkeleton } from '@/components/artifacts/skeleton';
 import type { ArtifactStatus } from '@/components/artifacts/registry';
 import { ArtifactChip } from '@/components/chips/artifact-chip';
 import { SendIcon } from '@/components/icons';
+import { ThemeToggle } from '@/components/theme-toggle';
 import type { Artifact } from '@/lib/artifacts/types';
 import type { KasiContext } from '@/lib/agent/mock';
 import { reviveContext, reviveTurn, type WireTurn } from '@/lib/agent/wire';
@@ -356,12 +357,15 @@ export default function ChatPage() {
           <span className="font-mono text-xs text-muted-foreground">
             {context ? 'live ledger' : 'connecting…'}
           </span>
-          <Link
-            href="/ledger"
-            className="rounded-lg border border-input px-2.5 py-1 font-mono text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-          >
-            ledger
-          </Link>
+          <div className="flex items-center gap-1">
+            <Link
+              href="/ledger"
+              className="rounded-lg border border-input px-2.5 py-1 font-mono text-xs text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+            >
+              ledger
+            </Link>
+            <ThemeToggle />
+          </div>
         </div>
 
         <div

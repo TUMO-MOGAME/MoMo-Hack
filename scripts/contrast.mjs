@@ -88,10 +88,10 @@ function ratio(a, b) {
  * tokens, because a parser that silently returns nothing is the failure mode
  * that matters.
  */
-function darkTokens() {
+function blockTokens(header) {
   const css = readFileSync(join(process.cwd(), 'src/app/globals.css'), 'utf8');
-  const block = css.split('.dark {')[1]?.split('\n}')[0];
-  if (!block) throw new Error('contrast: no `.dark {` block found in globals.css');
+  const block = css.split(header)[1]?.split('\n}')[0];
+  if (!block) throw new Error(`contrast: no \`${header}\` block found in globals.css`);
 
   const out = {};
   for (const m of block.matchAll(/^\s*--([a-z0-9-]+):\s*([^;]+);/gim)) {
@@ -136,32 +136,57 @@ function parseColour(value, name) {
   return value.trim().startsWith('#') ? parseHex(value, name) : parseOklch(value, name);
 }
 
-const RAW = darkTokens();
+/**
+ * Both themes ship now, so both are measured.
+ *
+ * This header used to read "DARK THEME (the only shipped theme)" and the whole
+ * script only ever read `.dark`. That was true for as long as the app was
+ * `className="dark"`, and false the moment light shipped — a measuring tool
+ * confidently reporting on half the product. Same expiry class as MISTAKES.md
+ * M10's second cause, which is why it is fixed here rather than noted.
+ *
+ * Dark is printed FIRST because dark is the default theme.
+ */
+function measure(header) {
+  const RAW = blockTokens(header);
 
-function token(name) {
-  const value = RAW[name];
-  if (!value) throw new Error(`contrast: --${name} is not defined in the .dark block`);
-  return parseColour(value, name);
+  function token(name) {
+    const value = RAW[name];
+    if (!value) throw new Error(`contrast: --${name} is not defined in the ${header} block`);
+    return parseColour(value, name);
+  }
+
+  /** Opaque roles, as sRGB triples. */
+  const T = Object.fromEntries(
+    [
+      ['background', 'background'],
+      ['foreground', 'foreground'],
+      ['card', 'card'],
+      ['secondary', 'secondary'],
+      ['secondaryFg', 'secondary-foreground'],
+      ['muted', 'muted'],
+      ['mutedFg', 'muted-foreground'],
+      ['brand', 'brand'],
+      ['brandFg', 'brand-foreground'],
+      ['brandText', 'brand-text'],
+      ['brandSoft', 'brand-soft'],
+      ['brandAccent', 'brand-accent'],
+      ['destructive', 'destructive'],
+      ['success', 'success'],
+      ['warning', 'warning'],
+    ].map(([key, cssName]) => [key, token(cssName).rgb]),
+  );
+
+  /** Alpha-capable roles, read from the stylesheet — never typed out here. */
+  const ALPHA = {
+    border: token('border'),
+    input: token('input'),
+    divider: token('divider'),
+    ring: token('ring'),
+  };
+
+  return { T, ALPHA };
 }
-
-/** Opaque roles, as sRGB triples. */
-const T = Object.fromEntries(
-  [
-    ['background', 'background'],
-    ['foreground', 'foreground'],
-    ['card', 'card'],
-    ['secondary', 'secondary'],
-    ['secondaryFg', 'secondary-foreground'],
-    ['muted', 'muted'],
-    ['mutedFg', 'muted-foreground'],
-    ['brand', 'brand'],
-    ['brandFg', 'brand-foreground'],
-    ['brandAccent', 'brand-accent'],
-    ['destructive', 'destructive'],
-    ['success', 'success'],
-    ['warning', 'warning'],
-  ].map(([key, cssName]) => [key, token(cssName).rgb]),
-);
 
 /**
  * `--border`, `--input` and `--ring` are white at low alpha, so they have no
@@ -187,14 +212,6 @@ const T = Object.fromEntries(
  */
 const alphaOn = (role, surface) => over(role.rgb, surface, role.alpha);
 
-/** Alpha roles, read from the stylesheet — never typed out here. */
-const ALPHA = {
-  border: token('border'),
-  input: token('input'),
-  divider: token('divider'),
-  ring: token('ring'),
-};
-
 const TEXT = [
   ['foreground on background', 'foreground', 'background', 4.5],
   ['foreground on card', 'foreground', 'card', 4.5],
@@ -203,8 +220,20 @@ const TEXT = [
   ['muted-foreground on muted', 'mutedFg', 'muted', 4.5],
   ['muted-foreground on secondary', 'mutedFg', 'secondary', 4.5],
   ['secondary-foreground on secondary', 'secondaryFg', 'secondary', 4.5],
-  ['brand on background (wordmark)', 'brand', 'background', 4.5],
-  ['brand-foreground on brand (button)', 'brandFg', 'brand', 4.5],
+  // ⚠️ `brand-text`, NOT `brand`. This row used to read `brand on background`
+  // and it FAILED at 1.38:1 the moment the light theme was measured — because
+  // #FFCB05 on #F4F4F2 is unreadable, which is exactly why the palette splits
+  // the brand into a fill and a text tone.
+  //
+  // But we never RENDER that pairing: the wordmark, links and gold labels all
+  // use `--brand-text`. Grading a combination the UI does not use is the same
+  // error as MISTAKES.md M11's "ring painted on the ground, compared to a card"
+  // — a real number answering a question nobody asked. The fill is still
+  // reported below, ungraded, so it cannot hide.
+  ['brand-text on background (wordmark, links)', 'brandText', 'background', 4.5],
+  ['brand-text on card', 'brandText', 'card', 4.5],
+  ['brand-text on brand-soft (chips)', 'brandText', 'brandSoft', 4.5],
+  ['brand-foreground on brand (button, wallet card)', 'brandFg', 'brand', 4.5],
   ['brand-accent on background', 'brandAccent', 'background', 4.5],
   ['destructive on background', 'destructive', 'background', 4.5],
   ['success on background', 'success', 'background', 4.5],
@@ -224,36 +253,65 @@ const UI = [
 const fmt = (n) => n.toFixed(2).padStart(6);
 const verdict = (r, need) => `${r >= need ? 'PASS' : 'FAIL'}  ${fmt(r)}:1  (needs ${need})`;
 
-console.log('--- WCAG 2.2 AA · normal text (>= 4.5:1) · DARK THEME (the only shipped theme) ---');
-for (const [label, fg, bg, need] of TEXT) {
-  console.log(`${verdict(ratio(T[fg], T[bg]), need)}  ${label}`);
+function printTheme(themeLabel, header) {
+  const { T, ALPHA } = measure(header);
+
+  console.log(`--- WCAG 2.2 AA · normal text (>= 4.5:1) · ${themeLabel} ---`);
+  for (const [label, fg, bg, need] of TEXT) {
+    console.log(`${verdict(ratio(T[fg], T[bg]), need)}  ${label}`);
+  }
+
+  console.log('\n--- Non-text contrast, SC 1.4.11 (>= 3:1) ---');
+  console.log('    a token is composited over the surface it is painted on');
+  /**
+   * `--divider` is reported but NOT graded, and the distinction is the whole point
+   * of splitting the role. SC 1.4.11 governs what you must perceive in order to
+   * *operate* something — a control's boundary, a state, a meaningful graphic. It
+   * does not govern decoration. A hairline between two sections carries no
+   * information a user needs, so holding it to 3:1 would be inventing a
+   * requirement, and the usual way that ends is someone quietly lowering the real
+   * thresholds to make the report green.
+   *
+   * Printing it as `n/a` rather than hiding it keeps the value visible, so that if
+   * a divider is ever pressed into service as a control boundary, the number is
+   * already on screen.
+   */
+  const DECORATIVE = ['divider on background (decorative)', 'divider', 'background'];
+
+  /**
+   * Reported, never graded: the gold FILL against the page.
+   *
+   * `--brand` is a background you put `--brand-foreground` on top of — the wallet
+   * card, the send button — and that pairing is graded above at 12.36:1. What is
+   * NOT a text pairing is the fill against the page behind it, which in the light
+   * theme is 1.38:1.
+   *
+   * It is printed because a number that disappears is a number nobody reconsiders.
+   * If a gold surface is ever given a border-less edge that a user must perceive
+   * to operate it, this row is already on screen saying it cannot be.
+   */
+  const FILL = ['brand fill on background (not a text pairing)', 'brand', 'background'];
+
+  for (const [label, role, surfaceName] of UI) {
+    const surface = T[surfaceName];
+    console.log(`${verdict(ratio(alphaOn(ALPHA[role], surface), surface), 3.0)}  ${label}`);
+  }
+
+  {
+    const [label, role, surfaceName] = DECORATIVE;
+    const surface = T[surfaceName];
+    const r = ratio(alphaOn(ALPHA[role], surface), surface);
+    console.log(`n/a  ${fmt(r)}:1  (not graded)  ${label}`);
+  }
+
+  {
+    const [label, role, surfaceName] = FILL;
+    console.log(`n/a  ${fmt(ratio(T[role], T[surfaceName]))}:1  (not graded)  ${label}`);
+  }
 }
 
-console.log('\n--- Non-text contrast, SC 1.4.11 (>= 3:1) ---');
-console.log('    alpha tokens are composited over the surface they are painted on');
-/**
- * `--divider` is reported but NOT graded, and the distinction is the whole point
- * of splitting the role. SC 1.4.11 governs what you must perceive in order to
- * *operate* something — a control's boundary, a state, a meaningful graphic. It
- * does not govern decoration. A hairline between two sections carries no
- * information a user needs, so holding it to 3:1 would be inventing a
- * requirement, and the usual way that ends is someone quietly lowering the real
- * thresholds to make the report green.
- *
- * Printing it as `n/a` rather than hiding it keeps the value visible, so that if
- * a divider is ever pressed into service as a control boundary, the number is
- * already on screen.
- */
-const DECORATIVE = ['divider on background (decorative)', 'divider', 'background'];
-
-for (const [label, role, surfaceName] of UI) {
-  const surface = T[surfaceName];
-  console.log(`${verdict(ratio(alphaOn(ALPHA[role], surface), surface), 3.0)}  ${label}`);
-}
-
-{
-  const [label, role, surfaceName] = DECORATIVE;
-  const surface = T[surfaceName];
-  const r = ratio(alphaOn(ALPHA[role], surface), surface);
-  console.log(`n/a  ${fmt(r)}:1  (not graded)  ${label}`);
-}
+// DARK FIRST — it is the default theme, and the existing assertions read the
+// first matching row.
+printTheme('DARK THEME (the default)', '.dark {');
+console.log();
+printTheme('LIGHT THEME', ':root {');
