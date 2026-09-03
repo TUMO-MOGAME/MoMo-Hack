@@ -34,7 +34,9 @@
     "telegram:setup": "node scripts/telegram-setup.mjs",
     "dev:telegram": "node scripts/telegram-dev-bridge.mjs",
     "contrast": "node scripts/contrast.mjs",
-    "seed:roster": "node scripts/seed-roster.mjs"
+    "seed:roster": "node scripts/seed-roster.mjs",
+    "eval:language": "node scripts/language-eval.mjs",
+    "hooks:install": "node scripts/install-hooks.mjs"
   },
   "dependencies": {
     "next": "^15.5.25",

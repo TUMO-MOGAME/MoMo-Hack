@@ -510,6 +510,71 @@ is a narrow, recognisable exception, not a habit.
 
 ---
 
+## M16 · Shipped a multilingual claim on top of an English-only safety layer
+
+**What happened.** `docs/12` §2 has claimed since the first week that MoMo Kasi *"understands and
+replies in every South African language today"*. The implementation of that claim was two lines
+inside the VOICE block of `persona.ts`. Everything the prompt sits on top of was keyed on English:
+the intent router, the sub-classifier that picks which refusal a person reads, and the `/pay`
+amount parser.
+
+The worst of those was `ROUTES.unbuilt` — the guard added in M10 that stops the agent claiming it
+sent money. It works by refusing with fixed text and **never calling the model**. It matched
+`send|transfer|pay|withdraw`, so:
+
+- *"Send R5 to my brother"* got the structural guarantee — fixed text, no model call.
+- *"Ngicela ukuthumela u-R5 kubhuti wami"* matched nothing, fell through to `none`, and reached the
+  model with no card and no fixed answer in front of it. **That is the exact configuration that
+  produced M10's lie.**
+
+Two safety levels for the same question, selected by which language the user happens to write in —
+inside the one feature whose entire promise is that the answer does not change with language.
+
+**Why.** Two causes, and the second is the general one.
+
+1. A prompt-layer change was treated as the whole feature. The model was told to mirror eleven
+   languages; the deterministic code around it was never audited for the same thing.
+2. **The gap concealed itself.** `agent.intent.unbuilt` fired on English traffic and reported a
+   clean 0% for everything else. A 0% fire rate reads as *"this does not happen"*. It actually
+   meant *"this is not measured"* — the layer was matching English patterns against non-English
+   text, so the instrument that would have shown the hole was the hole.
+
+**The rule.** When a prompt is made multilingual, **every deterministic text-matching layer under
+it is audited in the same change**, and the decision for each one is written down in a comment:
+extend the patterns, replace the check with a model-based one, or accept the gap and state its
+user-visible consequence. *Never leave it undecided.* A layer that is planned to graduate from
+"detect and log" to "block or regenerate" must have multilingual coverage **before** that ships —
+otherwise quality is being enforced for one language group and not the others.
+
+And: any telemetry that buckets by a matched phrase must record **which pattern family matched**,
+not just the outcome. Otherwise a coverage hole and a quiet week look identical.
+
+**The guard.** Four, because the failure is silent and one detector is not enough:
+
+- `tests/unit/agent/language.test.ts` asserts `SYSTEM_PROMPT` **contains** `LANGUAGE_DIRECTIVE` —
+  wiring, not existence. It also walks `src/` for every model call site and fails on a new one that
+  does not carry the prompt.
+- `tests/unit/agent/language-routing.test.ts` runs the eval fixtures through `respond()` offline
+  and asserts every language reaches the same tool, and that every refusal is unmodelled.
+- CI (`Money guards`) greps for the interpolation and for a second copy of the rule, in 5 seconds.
+- `.githooks/pre-push` runs the wiring test before anything leaves the machine
+  (`npm run hooks:install`).
+
+> **Why four guards for one rule.** Every other failure in this repository announces itself — a
+> throw, a red test, a 500. This one does not. If the interpolation is dropped, typecheck passes,
+> lint passes, the build passes, and every existing test passes, because they all assert on English
+> input and English output. The product simply starts answering every isiZulu, Setswana and
+> Afrikaans message in English, and **the users that lands on are the least likely of anyone to
+> report it.** They conclude the app is not for them and stop typing. There is no bug report
+> coming, so the guard has to be the whole detection system.
+
+**Related, found by the same audit.** `parsePayAmount` accepted only a dot as a decimal separator.
+South Africa writes it as a comma, and that is what an `af-ZA` or `zu-ZA` Android keypad offers, so
+`/pay 0,20` — a correctly written twenty cents — returned `null` and the user was told *"Tell me
+how much"*. It failed closed and politely, which is the combination nobody reports, because the
+user assumes they typed it wrong. Guarded by `tests/unit/agent/pay-amount-locale.test.ts`.
+
+---
 ## What has gone right, and why
 
 Worth recording, because these are the patterns to keep:

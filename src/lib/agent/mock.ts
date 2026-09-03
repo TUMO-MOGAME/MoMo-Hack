@@ -241,6 +241,27 @@ interface Rule {
   readonly turn: () => AgentTurn;
 }
 
+/**
+ * ── LANGUAGE AUDIT: ACCEPTED GAP, BECAUSE NOTHING READS THIS ────────────────
+ *
+ * These patterns are a deterministic text-matching layer keyed mostly on
+ * English, with four isiZulu words that arrived by instinct rather than by
+ * design ("ngingakanani", "umgalelo", "sebenza", "khokha"). Under the audit in
+ * `respond.ts` that would be a two-tier router and would be extended.
+ *
+ * IT IS NOT, BECAUSE `mockAgent` REACHES NO USER. The chat page imports
+ * `SUGGESTIONS` and the `KasiContext` type from this file and nothing else —
+ * every reply and every artifact has come from `respond.ts` against the real
+ * ledger since S7a. Extending word lists nobody executes is how a codebase
+ * gets a second, wrong answer to "which languages do we route".
+ *
+ * USER-VISIBLE CONSEQUENCE: none today.
+ *
+ * ⚠️ IF THIS IS EVER REVIVED — as a fixture source for UI tests, an offline
+ * demo mode, or anything a person sees — it inherits the audit. Route through
+ * `classify()` in `respond.ts` rather than growing a second word list here;
+ * one router that speaks eleven languages beats two that disagree.
+ */
 const RULES: readonly Rule[] = [
   {
     test: /\b(balance|money|wallet|how much do i have|ngingakanani)\b/i,
@@ -308,6 +329,18 @@ export function mockAgent(input: string): AgentTurn {
   return rule ? rule.turn() : FALLBACK;
 }
 
+/**
+ * The starter chips, and they are ENGLISH ON PURPOSE.
+ *
+ * This is the one place the mirroring rule genuinely does not apply, because
+ * there is nothing yet to mirror — a chip is shown before the user has written
+ * a word (docs/12 §2b). Guessing a language for a first-time visitor is the
+ * picker we deliberately do not have, wearing a different hat.
+ *
+ * And tapping one is not a bypass: the chip text becomes the user message, so
+ * an English tap is answered in English, which is correct mirroring rather than
+ * a fallback. Anyone who types instead is mirrored from their first word.
+ */
 export const SUGGESTIONS: readonly string[] = [
   'How much do I have?',
   'Find me work today',

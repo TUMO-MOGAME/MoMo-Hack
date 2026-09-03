@@ -198,6 +198,42 @@ jobs:
           fi
           echo "No dangerouslySetInnerHTML."
 
+      # ── THE ONE GUARD WHOSE ABSENCE IS COMPLETELY SILENT (docs/12 §2a) ─────
+      #
+      # Every other failure in this repository announces itself. If SYSTEM_PROMPT
+      # stops interpolating LANGUAGE_DIRECTIVE, nothing throws: typecheck passes,
+      # lint passes, the build passes, and every other test passes because they
+      # all assert on English input and English output. The product just starts
+      # answering every isiZulu, Setswana and Afrikaans message in English — and
+      # the users that lands on are the least likely of anyone to file a bug.
+      #
+      # `tests/unit/agent/language.test.ts` proves it properly and runs in the
+      # Tests job. This is the five-second version, so a diff that drops the
+      # interpolation is rejected with a sentence rather than a stack trace.
+      - name: The language directive is interpolated, not merely imported
+        run: |
+          if ! grep -qF '${LANGUAGE_DIRECTIVE}' src/lib/agent/persona.ts; then
+            echo "::error::SYSTEM_PROMPT no longer interpolates LANGUAGE_DIRECTIVE (docs/12 §2a). Non-English users would silently be answered in English."
+            exit 1
+          fi
+          # And there must be exactly one copy of the rule. Two always drift:
+          # one gets tuned, the other does not, and the user is mirrored in one
+          # place and answered in English in the other.
+          #
+          # COMMENT LINES ARE DROPPED FIRST. `language.ts` quotes the removed
+          # VOICE line verbatim to explain what moved and why, and a guard that
+          # fires on the docstring describing the rule is a guard that gets
+          # deleted rather than fixed — this repo has already had two do exactly
+          # that, which is why the dangerouslySetInnerHTML step above filters the
+          # same way.
+          hits=$(grep -rn "Match the user's language and register" src \
+                 | grep -vE ':[[:space:]]*(//|\*|/\*)' || true)
+          if [ -n "$hits" ]; then
+            echo "::error::A second copy of the language rule is back in src/. The directive lives in src/lib/agent/language.ts and nowhere else."
+            echo "$hits"
+            exit 1
+          fi
+          echo "Language directive is wired into SYSTEM_PROMPT, once."
       # A committed .env is the one mistake a public repo (ADR-0005) cannot take
       # back — it is scraped within minutes and stays in the history forever.
       - name: No committed secrets file

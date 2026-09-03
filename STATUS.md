@@ -17,7 +17,7 @@ Every PR must update it. If you are a fresh session, read this before touching a
   `mo-mo-hack.vercel.app` alias still serves the same deployment. Production deploys on every
   merge, previews on every PR.
 - **Database:** live. 3 migrations applied to Supabase `edtduvwbejdfahkmfort` (`eu-west-2`).
-- **Tree state:** 646 green + 3 skipped over 35 files, 0 vulnerabilities, CI enforcing all of it.
+- **Tree state:** 750 green + 3 skipped over 38 files, 0 vulnerabilities, CI enforcing all of it.
   Both skips are opt-in and announce themselves: the walking skeleton (`MOMO_SKELETON=1`) and the
   write-skew case (`allowWrites`). Both commit permanent rows, so neither runs by accident.
 - **Blocked on:** nothing external. **F9 is done** and **the walking skeleton is closed** — a real
@@ -38,6 +38,89 @@ Every PR must update it. If you are a fresh session, read this before touching a
 | **Days to code freeze** | 25 (27 Sep 2026) |
 | **Open PRs** | none. #10, #11, #13-#21, #23-#25, #35 merged. |
 
+### 🗣️ Eleven languages, and the machinery around them now speaks them too
+
+Branch `feat/language-mirroring`. `docs/12` §2 has claimed since day one that *"MoMo Kasi
+understands and replies in every South African language today"*. That claim was carried by **two
+lines inside the VOICE block** and by nothing else — no carve-outs, no test, and an English-only
+regex layer wrapped around it. Two lines of prompt is not a feature; it is a claim.
+
+**What shipped**
+
+| | |
+|---|---|
+| One directive module | `src/lib/agent/language.ts` — `LANGUAGE_DIRECTIVE`, interpolated into `SYSTEM_PROMPT` between VOICE and CAPABILITY. Both channels reach it: web through `respond.ts`, Telegram through `gemini.ts`'s `system_instruction`. |
+| Zero duplicated copies | The old two-liner is **deleted** from VOICE and from `docs/12` §4.2 in the same change, so `refusal.test.ts`'s doc-vs-code pin still holds. CI greps for a second copy. |
+| Three carve-outs | Domain vocabulary stays English (`R12.50`, MoMo PIN, stokvel, kombi, gogo); machine-read literals never translate (`/pay`, `/status`, `SUCCESSFUL`, `PAYER_NOT_FOUND`); verbatim content is never translated. All three asserted. |
+| The router speaks eleven | `ROUTES` in `respond.ts` gained an `also` pattern per intent, built on stems rather than `\b`-anchored words because Nguni and Sotho-Tswana agglutinate. |
+| Wiring test + CI + pre-push | `tests/unit/agent/language.test.ts` (28 assertions), a 5-second CI grep, and `.githooks/pre-push`. |
+| Eval harness | `npm run eval:language` — 6 questions × 4 languages through the real `/api/agent`, written out as a grading sheet with the columns empty. |
+
+**🔴 The finding that mattered — a two-tier refusal, and it concealed itself**
+
+The `unbuilt` route is not a routing nicety. It is the guard added in #35 after the agent told a
+user *"I've prepared a transfer of R0.01… confirm the payment on your phone"* when nothing had been
+prepared (`MISTAKES.md` M10). It works by never calling the model at all.
+
+It was keyed on `send|transfer|pay|withdraw`. So:
+
+- *"Send R5 to my brother"* → fixed refusal, no model call. **Structural guarantee.**
+- *"Ngicela ukuthumela u-R5 kubhuti wami"* → matched nothing, fell through to `none`, reached the
+  model with no card and no fixed answer in front of it. **The exact configuration that produced
+  the original lie.**
+
+Same product, same question, two different safety levels, chosen by which language you write in.
+And `agent.intent.unbuilt` would have reported a clean **0% fire rate** for non-English traffic —
+which reads as "no payment requests" and actually means "not measured". `classify()` now returns
+which pattern family matched and `respond()` logs it, so the gap is visible instead of inferred.
+
+**🟡 A second one, in the money path**
+
+`parsePayAmount` accepted only a dot. South Africa writes the decimal separator as a **comma**, and
+that is what an `af-ZA` or `zu-ZA` Android keypad puts under the thumb — so `/pay 0,20`, a
+correctly written twenty cents, returned `null` and was answered with *"Tell me how much — like
+/pay 0.20"*. It failed closed and politely, which is the failure mode nobody reports. Now accepts
+`[.,]`; `1,250` still refuses, because a thousands group always has three digits and this allows
+two, so the ambiguity is closed by construction rather than by a rule someone has to remember.
+
+**Accepted gaps, stated rather than discovered**
+
+- **The refusal sentences are English in every language.** The only translator available is the
+  model, and `unbuiltProse` exists precisely because the model may not write that sentence — a
+  refusal it can reword is a refusal it can be talked out of. Fixed English that is correct beats
+  fluent isiZulu that might not be. Same for `HELP_TEXT`, `ABOUT_TEXT`, `denialText` and
+  `pay-replies.ts`. Fix path: verified translations from a native speaker, gated on `EVAL_VERIFIED`.
+- **`mockAgent`'s router was not extended** — it reaches no user (only `SUGGESTIONS` and the
+  `KasiContext` type are imported). Comment says so, and says it inherits the audit if revived.
+- **No-text turns fall back to English.** Today it costs nothing: `handleUpdate` returns
+  `ignored / no_text` for photos and voice notes. When **M5c** lands, mirror the last text turn in
+  `readHistory(chatId)`. Decided, not discovered — `docs/12` §2b.
+- **Tshivenda's send verb is deliberately absent.** "rumela" is also a Sotho greeting, and
+  answering *"Rumela!"* with "I can't send money" is worse than not matching. Asserted in a test
+  so nobody helpfully adds it back.
+
+**⚠️ Verified vs declared — read this before saying "eleven languages" out loud**
+
+Eleven languages named in a prompt is eleven languages *attempted*. `EVAL_VERIFIED` splits them:
+
+| | Languages | Status |
+|---|---|---|
+| **Verified** | English, isiZulu, Afrikaans, Setswana | Fixtures exist and the router is asserted against them. **The prose eval has NOT been graded yet** — `npm run eval:language` needs a running app and a first-language speaker. |
+| **Declared, unverified** | isiXhosa, Sepedi, Sesotho, Xitsonga, siSwati, Tshivenda, isiNdebele | Named in the directive, attempted by the model, not graded. Do not claim as working. |
+
+The word lists in `respond.ts` are **derived, not validated** — they came from the vocabulary
+already in this product plus the obvious money verbs, not from a native speaker. That is stated in
+the file. The eval is where they get checked.
+
+**Tree state when this branch was written:** 560 green + 3 skipped over 32 files. It is merged now; the board total above is current. Typecheck, lint, format and
+build all clean. One manual step after merge: `npm run hooks:install` (it sets `core.hooksPath`,
+which is shared by every worktree of this repo, so it is deliberately **not** a `prepare` script).
+
+**Next, in order:** run `npm run eval:language` against a running app and have a first-language
+speaker grade isiZulu, Afrikaans and Setswana → move anything that fails out of `EVAL_VERIFIED` →
+only then say the number out loud in the pitch.
+
+---
 ### The CI finding, kept because it changes how every merge before it was judged
 
 `STATUS.md` said #10 and #11 were both "green". **Neither was, and CI could not have told us
@@ -201,6 +284,53 @@ receipt number is the strongest possible evidence for it. Three payments already
 **Sandbox remains wired and one flag away** (`npm run demo -- --emulator`, or
 `MOMO_TARGET_ENVIRONMENT=sandbox`) as the fallback if MTN or the venue wifi misbehaves at 09:30.
 That is what a fallback is for; it is not the plan.
+
+### 🗣️ `feat/language-mirroring` is merged — and the merge itself found two things
+
+**The last branch with unmerged work.** Everything else outstanding was dead wood from PRs already
+merged; this one carried the language directive as a real module, an eleven-language intent router,
+a graded eval, and `docs/12` §2a's honest split between the four languages we have evidence for and
+the seven we merely declare.
+
+**It was TEN commits behind.** Its tip predates the UI redesign, the theme, the greeting, the roster
+and disbursements — so a `git merge` of the branch would have reverted all of them. The *commit*,
+though, is 1,804 insertions against 16 deletions. So it was **cherry-picked onto current `main`**
+and the four conflicts resolved by hand rather than taken from either side wholesale.
+
+| Conflict | Resolution |
+|---|---|
+| `package.json` | Both sides' scripts kept |
+| `MISTAKES.md` | Both entries kept. Their M14 renumbered **M16** — `main` already has M14 (read-only checks) and M15 (`rm -rf`) |
+| `chat/page.tsx` | **Ours.** Their only change was a comment on the microphone button, and the redesign removed that button |
+| `respond.ts` | **Their condition, our sentence** — see below |
+
+**The `respond.ts` resolution is the one that mattered.** Their version of the refusal reinstated
+*"Money can come into this ledger, but nothing can go out of it yet"* — the exact sentence #45
+removed once disbursements landed (M3a). Their branch simply predates it. Taking the merge whole
+would have **expired the refusal for the fourth time this session's table records.** The multilingual
+condition was kept; the sentence was not.
+
+**The comment that lost its home was kept anyway.** Their microphone-button comment carried a real
+warning — when voice input lands, the transcriber must transcribe **verbatim** and never
+auto-translate on ingest, because the assistant mirrors what it *receives*. A transcriber that
+renders isiZulu speech as English text turns every spoken turn into an English turn **while the
+language directive downstream is working perfectly**, so nothing looks wrong from the reply. It is
+now `docs/12` §2c.
+
+#### And a bug I introduced while resolving it
+
+The scripted edit that resolved `respond.ts` wrote **13 literal backspace bytes (0x08)** where
+`\b` word boundaries belonged. **Nothing threw.** The regex simply stopped matching, so
+*"ngifuna ukukhokha my electricity"* fell past the electricity branch to the generic payout refusal.
+That is `MISTAKES.md` M12's shape — a pattern that reads correctly and matches nothing — arriving
+by way of M6, a scripted edit mangling its own file.
+
+**Caught by their test**, *"the code-switched sentence docs/12 uses as its own example is refused"* —
+precisely the test that should have caught it, in a file that arrived in the same commit.
+
+Worth recording how it hid: **`JSON.stringify` renders 0x08 as `\b`**, so printing the line to
+check it displayed the corruption formatted as the correct thing. Two verification passes agreed the
+file was fine while it was not. A byte-level histogram was the only honest check.
 
 ### 🧠 The bot's memory works — and had NO tests at all until now
 

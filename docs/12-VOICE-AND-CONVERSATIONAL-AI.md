@@ -114,6 +114,55 @@ market, found a real gap, and engineered for it.
 
 ---
 
+### 2a. Verified, and declared-but-unverified
+
+The claim in §2 is that the LLM handles every South African language at zero marginal cost. That is
+true of the *instruction*, and instruction-following is not fluency. Model quality falls off sharply
+from high-resource to low-resource languages, and eleven languages named in a prompt is eleven
+languages *attempted*, not eleven languages *working*.
+
+So the roster is split, and the split is code — `EVAL_VERIFIED` in `src/lib/agent/language.ts`:
+
+| | Languages | What we may say |
+|---|---|---|
+| **Verified** | English, isiZulu, Afrikaans, Setswana | Graded by a fluent speaker on `npm run eval:language`. Claim these. |
+| **Declared, unverified** | isiXhosa, Sepedi, Sesotho, Xitsonga, siSwati, Tshivenda, isiNdebele | Named in the directive, attempted by the model, **not graded**. Do not claim these as working. |
+
+isiZulu is first because `docs/12` already calls it the demo language. Afrikaans is second because it
+has by some distance the best model fluency of the SA languages — the cheapest quality win available.
+Setswana is third as the Sotho-Tswana representative, the group most heavily code-switched in the
+Gauteng urban mix and therefore the case mirroring handles and a picker never would.
+
+This is the same posture §2 already takes on spoken isiZulu: name the gap, do not paper over it.
+
+### 2b. When there is nothing to mirror
+
+A bare photo, a voice note, or a tapped button carries no text to match, so the fallback is English.
+**Decided, not discovered.** There is no `user_preferences.preferred_language` and there will not be
+one until there is a user to hang it on — there is no auth in this product yet (M9a), so a stored
+preference would be keyed on a Telegram chat id and nothing else.
+
+Today this costs nothing, because a no-text update never reaches the model at all: `handleUpdate`
+returns `ignored / no_text` for photos, stickers and voice notes, and the web composer cannot submit
+an empty message. It starts costing something the day **M5c** (gig proof photos) lands. The answer
+then is the thread we already keep: `readHistory(chatId)` holds the last eight turns, and the last
+thing the user actually wrote is the right thing to mirror. English only when the thread is empty too.
+
+### 2c. The transcriber mirrors too — a warning with no home in the code yet
+
+**When S8c (voice input) lands, speech-to-text must be instructed to transcribe VERBATIM, in the
+language spoken, and must never auto-translate on ingest.**
+
+This warning used to live as a comment beside the microphone button on the chat page. The UI
+redesign removed that button, so the comment came out with it — and the guidance is worth more than
+its old location, which is why it is here instead of gone.
+
+The assistant mirrors what it *receives*. A transcriber that quietly renders isiZulu speech as
+English text turns every spoken turn into an English turn, and **the language directive downstream
+is working perfectly while it happens**. That is what would make the bug so hard to see: the reply
+is in the right language for the text that arrived. Nothing looks wrong from the reply alone, and
+the only symptom is that spoken isiZulu somehow never gets an isiZulu answer.
+
 ## 3. Making ElevenLabs free: the phrase bank
 
 ElevenLabs Free gives **10,000 credits/month ≈ 20,000 characters ≈ ~15 minutes of conversational
@@ -208,8 +257,6 @@ You are MoMo Kasi — a warm, brief, practical money assistant for South African
 
 VOICE
 - Speak like a friend, not a bank. Short sentences. No corporate hedging.
-- Match the user's language and register, including code-switching. If they mix
-  isiZulu and English, you mix isiZulu and English.
 - Use the greeting that fits: "Sawubona", "Molo", "Dumela", "Howzit".
 - Never say "I am an AI language model". You are MoMo Kasi.
 - Celebrate small wins. Getting paid R60 matters.
@@ -228,6 +275,33 @@ MONEY — NON-NEGOTIABLE
 WHEN YOU ARE UNSURE
 Say you are unsure and offer the nearest thing you can do.
 ```
+
+### 4.2a The language directive — one module, not a paragraph here
+
+The persona above says nothing about language any more. It used to carry two lines —
+*"Match the user's language and register, including code-switching…"* — and those two lines were the
+entire implementation of this document’s §2 claim.
+
+The directive now lives in **`src/lib/agent/language.ts`** as `LANGUAGE_DIRECTIVE`, and
+`SYSTEM_PROMPT` interpolates it between VOICE and CAPABILITY. **Its text is deliberately not
+reproduced here.** §4.2 is pinned to the code by a test because it was written in this doc first and
+copied into the code; the directive was written in code and has no second copy to drift from.
+
+What it guarantees, beyond "match the language":
+
+| Rule | Why it is in the prompt |
+|---|---|
+| Mirror the user, code-switching included | A picker forces "pure" output in one direction; users read that as being corrected, and correction reads as judgement |
+| Domain vocabulary stays in English | A translated "MoMo PIN" or "stokvel" cannot be matched to the thing on the handset |
+| Machine-read literals never translate | `/pay`, `/status`, `SUCCESSFUL`, `PAYER_NOT_FOUND`. Silent when it breaks — the parser stops matching and the user still sees a good answer |
+| Verbatim content is never translated | Quotes, names and LEDGER DATA lines keep their own language |
+| Substance never changes with language | The failure the whole feature exists to prevent |
+| English when there is nothing to mirror | §2b |
+
+`tests/unit/agent/language.test.ts` asserts the constant is both **imported and interpolated**, not
+merely that it exists. That is the failure mode that does not throw: an edit drops the interpolation,
+nothing fails, and the product answers every non-English message in English — and the users it fails
+are the least likely to file a bug about it.
 
 ### 4.3 Tools the agent can call
 
