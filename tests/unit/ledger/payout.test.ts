@@ -31,6 +31,7 @@ import {
   sendDemoPayout,
 } from '@/server/momo/demo-payout';
 import { initiatePayout } from '@/server/momo/payout';
+import { statusText } from '@/server/momo/pay-replies';
 import { MomoRequestError, upstream } from '@/lib/momo/errors';
 import { TEST_MSISDN } from '@/lib/momo/test-msisdns';
 import type { CollectionsApi, DisbursementsApi, MomoClient } from '@/lib/momo/types';
@@ -341,6 +342,98 @@ describe('initiatePayout — one id, minted once, persisted first', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * ⚠️ FOUND BY RUNNING THE PRODUCT, NOT BY A TEST.
+ *
+ * `/send 0.10` worked, and then `/status` said:
+ *
+ *   > *"That R0.10 is still pending. **If your phone has not asked you yet,
+ *   > give it a moment.** If you have already approved it, send /status again."*
+ *
+ * Nothing was ever going to ask that phone. A transfer has no prompt and no
+ * PIN. The sentence was correct for the shape it was written against and false
+ * about the thing in front of it — `MISTAKES.md` M10 in miniature: prose that
+ * fits the template instead of the truth.
+ *
+ * Every existing guard held. The amount was real, the status was real, the
+ * ledger was right. **Nothing watches the verbs**, which is exactly what M10
+ * says about invented actions, and this is the read-only cousin of it: a real
+ * state, described as something it is not.
+ */
+describe('/status describes a payout as a payout', () => {
+  const base = {
+    amountMinor: minor(10n),
+    settled: false,
+    terminal: false,
+    reason: null,
+    journalId: null,
+    parts: [],
+  };
+
+  test('a pending payout is never told to check a phone', () => {
+    const text = statusText({ ...base, product: 'DISBURSEMENT', status: 'PENDING' });
+
+    // The exact false promises from the transcript: a phone that will be asked,
+    // and an approval that will be given. Note the assertion is NOT `/approve/`
+    // — "Nothing to approve" is the correct sentence and contains the word. It
+    // is the PROMISE that must be absent, not the vocabulary.
+    expect(text).not.toMatch(/your phone/i);
+    expect(text).not.toMatch(/already approved/i);
+    expect(text).toMatch(/nothing to approve/i);
+    expect(text).toMatch(/no PIN prompt/i);
+  });
+
+  test('a pending COLLECTION still is — the fix must not flatten both', () => {
+    const text = statusText({ ...base, product: 'COLLECTION', status: 'PENDING' });
+
+    expect(text).toMatch(/phone/i);
+    expect(text).toMatch(/approved/i);
+  });
+
+  test('a settled payout says money LEFT, and never "received"', () => {
+    const text = statusText({
+      ...base,
+      product: 'DISBURSEMENT',
+      status: 'SUCCESSFUL',
+      settled: true,
+      terminal: true,
+    });
+
+    expect(text).toMatch(/paid out/i);
+    expect(text).not.toMatch(/received/i);
+    // And it names the direction the postings actually took, which is the
+    // claim a judge can check against the ledger on screen.
+    expect(text).toMatch(/SUSPENSE debited/);
+    expect(text).toMatch(/MOMO_SETTLEMENT/);
+  });
+
+  test('a settled collection still says received', () => {
+    const text = statusText({
+      ...base,
+      product: 'COLLECTION',
+      status: 'SUCCESSFUL',
+      settled: true,
+      terminal: true,
+    });
+
+    expect(text).toMatch(/received/i);
+    expect(text).not.toMatch(/paid out/i);
+  });
+
+  test('a failed payout says no money LEFT THE WALLET, not "nothing is waiting on your phone"', () => {
+    const text = statusText({
+      ...base,
+      product: 'DISBURSEMENT',
+      status: 'FAILED',
+      terminal: true,
+      reason: 'NOT_ENOUGH_FUNDS',
+    });
+
+    expect(text).toMatch(/no money left the wallet/i);
+    expect(text).not.toMatch(/waiting on your phone/i);
+  });
+});
 
 describe('nothing a user types can become an amount or a payee', () => {
   test.each([

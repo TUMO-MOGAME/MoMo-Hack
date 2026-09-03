@@ -226,6 +226,8 @@ export async function requestDemoPayment(
 }
 
 export interface DemoStatus {
+  /** 'COLLECTION' or 'DISBURSEMENT' — which way the money went. */
+  readonly product: string;
   readonly status: string;
   readonly amountMinor: Minor;
   readonly settled: boolean;
@@ -269,8 +271,8 @@ export async function demoStatus(transactionId?: string): Promise<DemoStatus | n
   // `MoneyDb` exposes only `transaction()` — every read lives on `MoneyTx`,
   // inside a write transaction. Opening one to answer "what happened?" would
   // take row locks for a status message. This is a read, so it reads.
-  const COLUMNS = `id, status::text as status, amount_minor::text as amount_minor,
-                   journal_id, last_response`;
+  const COLUMNS = `id, product::text as product, status::text as status,
+                   amount_minor::text as amount_minor, journal_id, last_response`;
   const { rows } = await getPool().query(
     transactionId
       ? `select ${COLUMNS} from momo_transaction where id = $1::uuid`
@@ -283,6 +285,12 @@ export async function demoStatus(transactionId?: string): Promise<DemoStatus | n
 
   const amountMinor = BigInt(String(r.amount_minor)) as Minor;
   const row = {
+    // Which WAY the money went. `/status` says very different things about a
+    // collection and a payout, and without this it told a payout to "check
+    // your phone" — a prompt that is never coming, because a transfer has no
+    // PIN step. Describing something that will never happen is MISTAKES.md
+    // M10's failure in miniature.
+    product: String(r.product),
     status: String(r.status),
     journalId: r.journal_id ? String(r.journal_id) : null,
   };
@@ -298,6 +306,7 @@ export async function demoStatus(transactionId?: string): Promise<DemoStatus | n
   }));
 
   return {
+    product: row.product,
     status: row.status,
     amountMinor,
     settled: row.status === 'SUCCESSFUL',
